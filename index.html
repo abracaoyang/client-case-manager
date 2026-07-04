@@ -1540,7 +1540,10 @@
         <button class="btn" id="btn-font-inc" style="padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border: none; background: transparent; min-width: 28px; height: 28px;">A+</button>
       </div>
       <button class="btn" id="btn-show-archived" onclick="toggleArchivedView()" style="opacity: 0.65;">📦 已封存</button>
-      <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px;">⚙️</button>
+      <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
+        ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
+      </button>
+      <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
       <button class="btn btn-primary" id="btn-add-case">＋ 新增議題案件</button>
     </div>
   </header>
@@ -1553,20 +1556,53 @@
   </div>
 
   <!-- 送件提醒對話框 -->
-  <div class="modal-overlay" id="reminder-modal" style="z-index: 3000;">
-    <div class="modal-box" style="width: 480px; border-color: var(--color-c); box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);">
-      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; color: var(--color-c); font-size: 1.1rem; display: flex; align-items: center; gap: 6px; font-weight: 700;">
-          🔔 今日送件提醒
-        </h3>
-        <span style="cursor:pointer;" onclick="toggleReminderModal(false)">✕</span>
+<!-- 待辦送件時程提醒對話框 -->
+  <div class="modal-overlay" id="reminder-modal">
+    <div class="modal-box" style="width: 820px; max-width: 95vw; max-height: 85vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+      
+      <!-- 頂部 Header -->
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-shrink: 0;">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; margin: 0;">待辦送件時程提醒</h3>
+        <span style="cursor:pointer; font-size: 1.2rem; color: var(--text-secondary);" id="btn-close-reminder-modal">✕</span>
       </div>
-      <div style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;" id="reminder-list-container">
-        <!-- 提醒列表將動態插入 -->
+
+      <!-- 三欄版面主體 -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; flex: 1; min-height: 320px; overflow: hidden; margin-bottom: 1rem;">
+        
+        <!-- 左欄：已過期需立刻處理 (紅色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(239,68,68,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 4px;">已過期需立刻處理</span>
+            <span id="reminder-expired-count" style="font-size: 0.72rem; background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-expired-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 中欄：今天需送件待辦 (黃色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(245,158,11,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 4px;">今天需送件待辦</span>
+            <span id="reminder-today-count" style="font-size: 0.72rem; background: #f59e0b; color: #000; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-today-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 右欄：未來送件時程預告 (綠色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(34,197,94,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(34,197,94,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #22c55e; display: flex; align-items: center; gap: 4px;">未來送件時程預告</span>
+            <span id="reminder-future-count" style="font-size: 0.72rem; background: #22c55e; color: #fff; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-future-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
       </div>
-      <div style="display: flex; justify-content: flex-end; gap: 8px;">
-        <button class="btn btn-secondary" onclick="toggleReminderModal(false)" style="height: 28px; font-size: 0.75rem; padding: 0 12px;">關閉</button>
+
+      <!-- 底部操作列 -->
+      <div style="display: flex; justify-content: flex-end; flex-shrink: 0; border-top: 1px solid var(--border-color); padding-top: 10px;">
+        <button class="btn" onclick="toggleReminderModal(false)" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">關閉</button>
       </div>
+
     </div>
   </div>
 
@@ -1841,6 +1877,45 @@
   </div>
 
   <script>
+    // Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
+    function getSubmitBtnClass(c) {
+      let baseClass = 'sub-tag-btn';
+      if (!c || !c.cDetails) return baseClass;
+      if (c.cDetails.submitState === 'active') {
+        baseClass += ' active c-submit';
+      }
+      
+      // 若已送件處理，回傳預設樣式
+      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        // 取得預告天數限制
+        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+        
+        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
+        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+        if (sDate < todayStr) {
+          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
+        } else if (sDate === todayStr) {
+          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
+        } else if (sDate > todayStr && sDate <= limitDateStr) {
+          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
+        }
+      }
+      return baseClass;
+    }
+
     // 定義 debugLog 函數將除錯資訊導向 console.log
     function debugLog(msg) {
       console.log("[DEBUG]", msg);
@@ -2668,12 +2743,19 @@
     // === 設定彈窗控制與連線測試 ===
     function switchSettingsTab(tab) {
       document.getElementById('settings-pane-sync').style.display = tab === 'sync' ? 'block' : 'none';
+      document.getElementById('settings-pane-reminder').style.display = tab === 'reminder' ? 'block' : 'none';
       document.getElementById('settings-pane-issues').style.display = tab === 'issues' ? 'block' : 'none';
       document.getElementById('settings-pane-groups').style.display = tab === 'groups' ? 'block' : 'none';
       
       document.getElementById('settings-tab-sync').classList.toggle('active', tab === 'sync');
+      document.getElementById('settings-tab-reminder').classList.toggle('active', tab === 'reminder');
       document.getElementById('settings-tab-issues').classList.toggle('active', tab === 'issues');
       document.getElementById('settings-tab-groups').classList.toggle('active', tab === 'groups');
+      
+      const actionBox = document.getElementById('settings-global-actions');
+      if (actionBox) {
+        actionBox.style.display = (tab === 'sync' || tab === 'reminder') ? 'flex' : 'none';
+      }
       
       if (tab === 'issues') renderIssueList();
       if (tab === 'groups') renderGroupList();
@@ -2922,9 +3004,127 @@
       document.getElementById('btn-settings').addEventListener('click', () => {
         toggleSettingsModal(true);
       });
+      // 綁定喚醒提醒彈窗事件監聽器
+      document.getElementById('btn-open-reminder').addEventListener('click', () => {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(c => {
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(c);
+            } else if (sDate === todayStr) {
+              today.push(c);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(c);
+            }
+          }
+        });
+
+        renderReminderBoard(expired, today, future);
+        toggleReminderModal(true);
+      });
+      // 綁定喚醒提醒彈窗事件監聽器
+      document.getElementById('btn-open-reminder').addEventListener('click', () => {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(c => {
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(c);
+            } else if (sDate === todayStr) {
+              today.push(c);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(c);
+            }
+          }
+        });
+
+        renderReminderBoard(expired, today, future);
+        toggleReminderModal(true);
+      });
+      // 綁定喚醒提醒彈窗事件監聽器
+      document.getElementById('btn-open-reminder').addEventListener('click', () => {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(c => {
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(c);
+            } else if (sDate === todayStr) {
+              today.push(c);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(c);
+            }
+          }
+        });
+
+        renderReminderBoard(expired, today, future);
+        toggleReminderModal(true);
+      });
       document.getElementById('btn-close-settings-modal').addEventListener('click', () => {
         toggleSettingsModal(false);
       });
+      // 綁定時程看板的關閉按鈕
+      const btnCloseReminder = document.getElementById('btn-close-reminder-modal');
+      if (btnCloseReminder) {
+        btnCloseReminder.addEventListener('click', () => {
+          toggleReminderModal(false);
+        });
+      }
       document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
       document.getElementById('btn-test-connection').addEventListener('click', testSettingsConnection);
       
@@ -3446,7 +3646,7 @@
                 <div class="node-dot">C</div>
                 <div class="sub-tag-group c-grid" onclick="event.stopPropagation()">
                   <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : ''}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('文件準備', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.submitState === 'active' ? 'active c-submit' : ''}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
+                  <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
                   <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : ''}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">要保簽署</span>
                   <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : ''}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
                 </div>
@@ -4277,6 +4477,11 @@
       const details = phase === 'oa' ? c.oaDetails :
                       phase === 'pc' ? c.pcDetails :
                       phase === 'c' ? c.cDetails : c.sDetails;
+                      
+      // 照會後重新送件機制：點擊或重設送件按鈕時，自動清除 processed 鎖定
+      if (phase === 'c' && stateKey === 'submitState') {
+        details.submitProcessed = '';
+      }
       
       const isActive = details[stateKey] === 'active';
       if (!isActive) {
@@ -4363,7 +4568,47 @@
         if (field === 'meetDate') {
           c.cDetails.meetState = value ? 'confirmed' : 'pending';
         }
+        // 照會後重新送件機制：修改送件日期後，自動重設 processed 為未處理
+        if (field === 'submitDate') {
+          c.cDetails.submitProcessed = '';
+        }
       }, isNote);
+      
+      // 動態同步：重設日期後，後台立即重新計算提醒狀態並更新右上角 ⚠️ 按鈕計數！
+      if (field === 'submitDate') {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(item => {
+          if (item.cDetails && item.cDetails.submitDate && item.cDetails.submitProcessed !== 'processed') {
+            const sDate = item.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(item);
+            } else if (sDate === todayStr) {
+              today.push(item);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(item);
+            }
+          }
+        });
+        updateGlobalReminderIcon(expired.length, today.length, future.length, expired, today, future);
+      }
       if (!isNote && !isStateOrSlot) {
         openDrawer(caseId, 'C', true);
       } else if (isStateOrSlot) {
@@ -5113,8 +5358,161 @@
       }
     }
 
+// 計算與更新全域提醒喚醒按鈕狀態
+    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
+      const btn = document.getElementById('btn-open-reminder');
+      const badge = document.getElementById('reminder-global-badge');
+      if (!btn || !badge) return;
+
+      const urgentCount = expiredCount + todayCount;
+      const totalCount = urgentCount + futureCount;
+
+      if (totalCount > 0) {
+        btn.style.display = 'inline-block';
+        badge.innerText = totalCount;
+        
+        // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
+        if (urgentCount > 0) {
+          btn.classList.add('reminder-active-glow');
+          btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
+        } else {
+          btn.classList.remove('reminder-active-glow');
+          btn.title = "💡 有 " + futureCount + " 筆未來送件預告。點擊查看看板";
+        }
+      } else {
+        btn.style.display = 'none';
+      }
+    }
+
+// Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
+    function getSubmitBtnClass(c) {
+      let baseClass = 'sub-tag-btn';
+      if (!c || !c.cDetails) return baseClass;
+      if (c.cDetails.submitState === 'active') {
+        baseClass += ' active c-submit';
+      }
+      
+      // 若已送件處理，回傳預設樣式
+      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        // 取得預告天數限制
+        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+        
+        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
+        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+        if (sDate < todayStr) {
+          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
+        } else if (sDate === todayStr) {
+          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
+        } else if (sDate > todayStr && sDate <= limitDateStr) {
+          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
+        }
+      }
+      return baseClass;
+    }
+
+    // 計算與更新全域提醒喚醒按鈕狀態
+    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
+      const btn = document.getElementById('btn-open-reminder');
+      const badge = document.getElementById('reminder-global-badge');
+      if (!btn || !badge) return;
+
+      const urgentCount = expiredCount + todayCount;
+      const totalCount = urgentCount + futureCount;
+
+      if (totalCount > 0) {
+        btn.style.display = 'inline-block';
+        badge.innerText = totalCount;
+        
+        // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
+        if (urgentCount > 0) {
+          btn.classList.add('reminder-active-glow');
+          btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
+        } else {
+          btn.classList.remove('reminder-active-glow');
+          btn.title = "💡 有 " + futureCount + " 筆未來送件預告。點擊查看看板";
+        }
+      } else {
+        btn.style.display = 'none';
+      }
+    }
+
+// Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
+    function getSubmitBtnClass(c) {
+      let baseClass = 'sub-tag-btn';
+      if (!c || !c.cDetails) return baseClass;
+      if (c.cDetails.submitState === 'active') {
+        baseClass += ' active c-submit';
+      }
+      
+      // 若已送件處理，回傳預設樣式
+      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        // 取得預告天數限制
+        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+        
+        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
+        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+        if (sDate < todayStr) {
+          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
+        } else if (sDate === todayStr) {
+          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
+        } else if (sDate > todayStr && sDate <= limitDateStr) {
+          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
+        }
+      }
+      return baseClass;
+    }
+
+    // 計算與更新全域提醒喚醒按鈕狀態
+    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
+      const btn = document.getElementById('btn-open-reminder');
+      const badge = document.getElementById('reminder-global-badge');
+      if (!btn || !badge) return;
+
+      const urgentCount = expiredCount + todayCount;
+      const totalCount = urgentCount + futureCount;
+
+      // 即使 totalCount 為 0，按鈕也要常駐顯示以供使用者點選叫出通知畫面
+      btn.style.display = 'inline-block';
+      badge.innerText = totalCount;
+      
+      // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
+      if (urgentCount > 0) {
+        btn.classList.add('reminder-active-glow');
+        btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
+      } else {
+        btn.classList.remove('reminder-active-glow');
+        btn.title = "💡 時程提醒看板。點擊查看看板";
+      }
+    }
+
     function checkAndShowDailyReminders() {
-      if (!cases || cases.length === 0) return;
+      debugLog("🔔 checkAndShowDailyReminders 開始執行！目前 cases 數量: " + (cases ? cases.length : 0));
       
       const d = new Date();
       const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -5122,81 +5520,200 @@
       const yyyy = twDate.getFullYear();
       const mm = String(twDate.getMonth() + 1).padStart(2, '0');
       const dd = String(twDate.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const todayStr = yyyy + "-" + mm + "-" + dd;
+      debugLog("📅 提醒系統今天判定基準日: " + todayStr);
       
-      const reminders = cases.filter(c => {
-        return c.cDetails && 
-               c.cDetails.submitDate === todayStr && 
-               c.cDetails.submitProcessed !== 'processed';
-      });
+      // 計算預告天數截止日
+      const limitDays = crmSettings.reminderDaysLimit || 14;
+      const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+      const ly = limitDate.getFullYear();
+      const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+      const ld = String(limitDate.getDate()).padStart(2, '0');
+      const limitDateStr = ly + "-" + lm + "-" + ld;
+      debugLog("🔮 預告範圍截止日: " + limitDateStr + " (限制天數: " + limitDays + ")");
       
-      if (reminders.length > 0) {
-        renderReminderList(reminders);
-        toggleReminderModal(true);
+      const expired = [];
+      const today = [];
+      const future = [];
+
+      if (cases && cases.length > 0) {
+        cases.forEach(c => {
+          if (c.cDetails) {
+            debugLog("🔍 客戶: " + c.clientName + " | 送件日: '" + c.cDetails.submitDate + "' | 已處理狀態: '" + c.cDetails.submitProcessed + "'");
+          }
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(c);
+            } else if (sDate === todayStr) {
+              today.push(c);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(c);
+            }
+          }
+        });
       }
+      
+      debugLog("📊 提醒系統統計成果 -> 已過期: " + expired.length + " 筆, 今天送件: " + today.length + " 筆, 未來預告: " + future.length + " 筆");
+      
+      // 更新主畫面喚醒按鈕狀態
+      updateGlobalReminderIcon(expired.length, today.length, future.length, expired, today, future);
+      
+      // 核心修正：即便全部是 0 筆，重新整理也依然彈出三欄看板畫面！
+      renderReminderBoard(expired, today, future);
+      toggleReminderModal(true);
     }
 
-    function renderReminderList(reminders) {
-      const container = document.getElementById('reminder-list-container');
-      if (!container) return;
+    function renderReminderBoard(expired, today, future) {
+      const expiredList = document.getElementById('reminder-expired-list');
+      const todayList = document.getElementById('reminder-today-list');
+      const futureList = document.getElementById('reminder-future-list');
       
-      if (reminders.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:20px; font-size:0.85rem;">🎉 今日送件案件皆已處理完成！</div>`;
-        return;
-      }
-      
-      container.innerHTML = reminders.map(c => {
+      const expiredCount = document.getElementById('reminder-expired-count');
+      const todayCount = document.getElementById('reminder-today-count');
+      const futureCount = document.getElementById('reminder-future-count');
+
+      if (expiredCount) expiredCount.innerText = expired.length;
+      if (todayCount) todayCount.innerText = today.length;
+      if (futureCount) futureCount.innerText = future.length;
+
+      const renderItemHtml = (c, isActionable, colorVar, btnText) => {
         const typeText = c.type === 'life' ? '壽' : '產';
         const typeClass = c.type === 'life' ? 'life' : 'property';
         const issueText = c.issueName || '無議題';
-        return `
-          <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(34, 197, 94, 0.12); padding:10px 12px; border-radius:8px; margin-bottom:8px; gap:8px;">
+        
+        // 過濾短日期格式為 MM-DD 格式，徹底防範年份折行
+        let submitDateText = c.cDetails.submitDate || '';
+        if (submitDateText.includes('-')) {
+          const parts = submitDateText.split('-');
+          if (parts.length === 3) {
+            submitDateText = parts[1] + "-" + parts[2];
+          }
+        } else if (submitDateText.includes('/')) {
+          const parts = submitDateText.split('/');
+          if (parts.length === 3) {
+            submitDateText = parts[1] + "-" + parts[2];
+          }
+        }
+        
+        return `<div class="reminder-row" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.01); border:1px solid rgba(255, 255, 255, 0.05); padding:8px 10px; border-radius:6px; margin-bottom:8px; gap:8px; transition: all 0.4s ease; transform-origin: left center;">
             <div style="display:flex; flex-direction:column; gap:4px; min-width: 0; flex: 1;">
               <div style="display:flex; align-items:center; gap:6px;">
-                <span class="type-badge ${typeClass}" style="flex-shrink:0;">${typeText}</span>
-                <span style="font-weight:700; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.clientName}</span>
+                <span class="type-badge ${typeClass}">${typeText}</span>
+                <span style="font-weight:700; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.clientName}</span>
               </div>
-              <div style="font-size:0.72rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              <div style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 議題：${issueText}
               </div>
+              <div style="font-size:0.65rem; color:${colorVar}; font-family:monospace; white-space:nowrap;">
+                送件：${submitDateText}
+              </div>
             </div>
-            <button class="status-badge-btn active agree" onclick="markReminderProcessed('${c.id}')" style="height:24px; font-size:0.68rem; padding:0 8px; border-radius:4px; flex-shrink:0;">
-              已處理
-            </button>
-          </div>
-        `;
-      }).join('');
-    }
+            ${isActionable ? `
+              <button class="status-badge-btn active agree" 
+                      ondblclick="markReminderProcessed('${c.id}', this)" 
+                      title="雙擊此按鈕結案" 
+                      style="height:22px; font-size:0.65rem; padding:0 6px; border-radius:3px; flex-shrink:0; background:${colorVar}; border-color:${colorVar}; color:#000; font-weight:700; cursor:pointer; user-select:none; transition: all 0.2s;">
+                ${btnText}
+              </button>
+            ` : `
+              <span style="font-size: 0.65rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 3px; flex-shrink:0;">預告</span>
+            `}
+          </div>`;
+      };
 
-    function markReminderProcessed(caseId) {
-      updateCase(caseId, c => {
-        if (!c.cDetails) c.cDetails = {};
-        c.cDetails.submitProcessed = 'processed';
-      });
-      
-      const d = new Date();
-      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-      const twDate = new Date(utc + (3600000 * 8));
-      const yyyy = twDate.getFullYear();
-      const mm = String(twDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(twDate.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
-      
-      const reminders = cases.filter(c => {
-        return c.cDetails && 
-               c.cDetails.submitDate === todayStr && 
-               c.cDetails.submitProcessed !== 'processed';
-      });
-      
-      renderReminderList(reminders);
-      if (reminders.length === 0) {
-        setTimeout(() => {
-          toggleReminderModal(false);
-        }, 800);
+      // 載入多件時配置 max-height 與 overflow 確保完美上下捲動
+      if (expiredList) {
+        expiredList.style.maxHeight = '350px';
+        expiredList.style.overflowY = 'auto';
+        if (expired.length === 0) {
+          expiredList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:30px 10px; font-size:0.75rem;">🎉 無過期未送件！</div>`;
+        } else {
+          expiredList.innerHTML = expired.map(c => renderItemHtml(c, true, '#ef4444', '雙擊銷帳 📤')).join('');
+        }
+      }
+
+      if (todayList) {
+        todayList.style.maxHeight = '350px';
+        todayList.style.overflowY = 'auto';
+        if (today.length === 0) {
+          todayList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:30px 10px; font-size:0.75rem;">🎉 今日皆已處理！</div>`;
+        } else {
+          todayList.innerHTML = today.map(c => renderItemHtml(c, true, '#f59e0b', '雙擊結案 📤')).join('');
+        }
+      }
+
+      if (futureList) {
+        futureList.style.maxHeight = '350px';
+        futureList.style.overflowY = 'auto';
+        if (future.length === 0) {
+          futureList.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:30px 10px; font-size:0.75rem;">暫無未來送件預告</div>`;
+        } else {
+          const sortedFuture = [...future].sort((a, b) => a.cDetails.submitDate.localeCompare(b.cDetails.submitDate));
+          futureList.innerHTML = sortedFuture.map(c => renderItemHtml(c, false, '#22c55e', '')).join('');
+        }
       }
     }
 
+    function markReminderProcessed(caseId, btnEl) {
+      const rowEl = btnEl ? btnEl.closest('.reminder-row') : null;
+      if (rowEl) {
+        rowEl.style.transform = 'translateX(30px)';
+        rowEl.style.opacity = '0';
+      }
 
+      setTimeout(() => {
+        updateCase(caseId, c => {
+          if (!c.cDetails) c.cDetails = {};
+          c.cDetails.submitProcessed = 'processed';
+        });
+
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+
+        // 計算預告天數截止日
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(c => {
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) {
+              expired.push(c);
+            } else if (sDate === todayStr) {
+              today.push(c);
+            } else if (sDate > todayStr && sDate <= limitDateStr) {
+              future.push(c);
+            }
+          }
+        });
+
+        // 動態連動同步更新頂部喚醒按鈕狀態
+        updateGlobalReminderIcon(expired.length, today.length, future.length, expired, today, future);
+        renderReminderBoard(expired, today, future);
+        
+        if (expired.length === 0 && today.length === 0) {
+          setTimeout(() => {
+            toggleReminderModal(false);
+          }, 400);
+        }
+      }, 400);
+    }
+
+    
     function toggleAddCaseModal(show) {
       const modal = document.getElementById('add-case-modal');
       if (show) {
