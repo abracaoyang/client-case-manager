@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>清除快取並重啟</title>
+  <style>
+    body { background: #0f0f15; color: #cdd6f4; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 20px; }
+    .card { background: #181824; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 32px 40px; text-align: center; max-width: 480px; }
+    h1 { color: #f38ba8; margin-bottom: 16px; }
+    .log { background: #0f0f15; border: 1px solid #45475a; border-radius: 8px; padding: 12px; text-align: left; font-size: 0.85rem; min-height: 80px; margin: 16px 0; }
+    .log div { color: #a6e3a1; margin-bottom: 4px; }
+    button { background: #22c55e; color: #000; border: none; border-radius: 8px; padding: 12px 24px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; }
+    button:hover { background: #16a34a; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔧 系統快取清除工具</h1>
+    <p style="color:#94a3b8; margin-bottom:8px;">此工具將清除所有可能損毀的瀏覽器快取，然後自動重新載入主系統。</p>
+    <div class="log" id="log"><div>等待執行...</div></div>
+    <button onclick="clearAndReload()">🗑️ 立即清除並重啟系統</button>
+  </div>
+  <script>
+    function log(msg, color) {
+      const el = document.getElementById('log');
+      el.innerHTML += '<div style="color:' + (color||'#a6e3a1') + '">➔ ' + msg + '</div>';
+    }
+    function clearAndReload() {
+      log('開始清除所有 LocalStorage 快取...');
+      const keys = ['crm_cases', 'crm_cases_order', 'crm_settings', 'global_topics', 'crm_search_history', 'crm_groups', 'crm_risk_groups'];
+      let cleared = 0;
+      keys.forEach(k => {
+        if (localStorage.getItem(k) !== null) {
+          localStorage.removeItem(k);
+          log('已清除: ' + k);
+          cleared++;
+        }
+      });
+      if (cleared === 0) log('所有快取已乾淨，無需清除', '#f9e2af');
+      else log('共清除 ' + cleared + ' 個快取項目', '#cba6f7');
+      log('3 秒後自動重新載入主系統...', '#89b4fa');
+      setTimeout(() => {
+        window.location.href = './index.html';
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

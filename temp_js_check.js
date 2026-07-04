@@ -1,0 +1,3281 @@
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;padding:20px;z-index:999999;font-family:monospace;font-size:14px;white-space:pre-wrap;';
+      div.textContent = '❌ JS錯誤：' + message + '\n行號：' + lineno + '\n來源：' + source;
+      document.body ? document.body.appendChild(div) : document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(div); });
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:60px;left:0;right:0;background:#f97316;color:#fff;padding:20px;z-index:999999;font-family:monospace;font-size:14px;';
+      div.textContent = '❌ Promise錯誤：' + (e.reason ? (e.reason.message || String(e.reason)) : '未知');
+      document.body ? document.body.appendChild(div) : document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(div); });
+    });
+  
+
+    // window.onerror 已移至 <head> 最頂層 (見頁面頂部)
+    // 全域變數用以追蹤並恢復當前開啟的抽屜狀態
+    let activeDrawerState = {
+      caseId: null,
+      section: null
+    };
+
+    // 系統連線設定 (存於 LocalStorage)
+    let crmSettings;
+    try {
+      const _crmRaw = localStorage.getItem('crm_settings');
+      crmSettings = _crmRaw ? JSON.parse(_crmRaw) : null;
+      if (!crmSettings || typeof crmSettings !== 'object') throw new Error('invalid');
+    } catch(e) {
+      console.warn('crm_settings 快取損毀，已重置', e);
+      localStorage.removeItem('crm_settings');
+      crmSettings = { apiUrl: '', isOffline: true };
+    }
+
+    // 預設常規議題維護清單 (存於 LocalStorage)
+    let globalTopics;
+    try {
+      const _topicsRaw = localStorage.getItem('global_topics');
+      globalTopics = _topicsRaw ? JSON.parse(_topicsRaw) : null;
+      if (!Array.isArray(globalTopics)) throw new Error('invalid');
+    } catch(e) {
+      console.warn('global_topics 快取損毀，已重置', e);
+      localStorage.removeItem('global_topics');
+      globalTopics = [
+        "新生兒主附約比較",
+        "退休金儲蓄規劃",
+        "實支實付醫療變革",
+        "汽機車強制險與任意險",
+        "家庭經濟支柱保障"
+      ];
+    }
+
+    // 搜尋狀態與歷史
+    let searchQuery = "";
+    let searchHistory;
+    try {
+      const _histRaw = localStorage.getItem('crm_search_history');
+      searchHistory = _histRaw ? JSON.parse(_histRaw) : [];
+      if (!Array.isArray(searchHistory)) throw new Error('invalid');
+    } catch(e) {
+      console.warn('crm_search_history 快取損毀，已重置', e);
+      localStorage.removeItem('crm_search_history');
+      searchHistory = [];
+    }
+
+    // 模擬案件資料
+    let cases = [
+      {
+        id: "case-1",
+        visitType: "issue", // life=生活訪, issue=議題訪
+        preparedIssues: [], // 生活訪預備議題 (生活訪用)
+        type: "life", // life=壽, property=產
+        caseSource: "inbound", // inbound=自來, outbound=開發
+        source: "referral", // relative=緣故, referral=轉介, cold=陌開
+        referrerName: "張大明", // 轉介紹人
+        relativeTags: ["同學"], // 緣故標籤
+        clientName: "陳小明",
+        contactMethods: ["LINE"], // 聯絡方式
+        contactDetail: "xiaoming123", // 聯絡方式細節
+        issueName: "新生兒主附約比較",
+        issueDate: "2026-06-25",
+        issueNote: "客戶剛生第一胎，想規劃完整的醫療與意外實支實付。",
+        currentPhase: "SA",
+        saDetails: {
+          sendState: "active",
+          sendDate: "2026-06-25",
+          replyState: "active",
+          replyDate: "2026-06-26",
+          intentState: "intent-pending", // intent-yes, intent-no, intent-pending, dim
+          intentDate: "2026-06-26",
+          agreeState: "active",
+          agreeDate: "2026-06-27",
+          meetTimeSlot: "afternoon_1" // 午餐前、午餐、下午一、下午二、晚餐、晚餐後
+        },
+        oaDetails: {
+          meetDate: "2026-06-30",
+          meetState: "pending", // pending=時間喬定中, confirmed=已確定
+          meetTimeSlot: "before_lunch",
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        },
+        pcDetails: {
+          meetDate: "", // 預計遞送日期
+          meetState: "", // 遞送時間狀態: pending=喬時間中, confirmed=已確定
+          meetTimeSlot: "",
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        },
+        cDetails: {
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        },
+        sDetails: {
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        }
+      }
+    ];
+
+    // 依據各階段狀態判斷亮燈大燈 (active / preparing / '')
+    function getNodeStatus(c, phase) {
+      const sa = c.saDetails || {};
+      const oa = c.oaDetails || {};
+      const pc = c.pcDetails || {};
+      const cc = c.cDetails || { planState: "dim", practiceState: "dim", discussState: "dim" };
+      const s = c.sDetails || { planState: "dim", practiceState: "dim", discussState: "dim" };
+
+      if (phase === 'SA') {
+        if (sa.agreeState === 'active') return 'active';
+        if (sa.sendState === 'active') return 'preparing';
+        return '';
+      }
+      if (phase === 'OA') {
+        if (oa.discussState === 'active') return 'active';
+        if (oa.meetDate || oa.meetTimeSlot || oa.planState === 'active' || oa.practiceState === 'active' || c.currentPhase === 'OA') return 'preparing';
+        return '';
+      }
+      if (phase === 'PC') {
+        if (pc.discussState === 'active') return 'active';
+        if (pc.meetDate || pc.meetTimeSlot || pc.planState === 'active' || pc.practiceState === 'active' || c.currentPhase === 'PC') return 'preparing';
+        return '';
+      }
+      if (phase === 'C') {
+        const hasNextPhase = c.currentPhase === 'S';
+        if (cc.discussState === 'active' || hasNextPhase) return 'active';
+        if (cc.meetDate || c.currentPhase === 'C' || cc.meetTimeSlot || cc.planState === 'active' || cc.practiceState === 'active') return 'preparing';
+        return '';
+      }
+      if (phase === 'S') {
+        if (s.discussState === 'active') return 'active';
+        if (s.meetDate || c.currentPhase === 'S' || s.meetTimeSlot || s.planState === 'active' || s.practiceState === 'active') return 'preparing';
+        return '';
+      }
+      return '';
+    }
+
+
+    // 局部重繪抽屜主內容，防範 header 上的完成按鈕消失
+    function refreshDrawerContent(caseId, phase, c) {
+      const mainContainer = document.getElementById(`drawer-main-${caseId}`);
+      const container = mainContainer || document.getElementById(`drawer-content-${caseId}`);
+      if (!container) return;
+      
+      if (phase === 'SA') renderSADrawer(c, container);
+      else if (phase === 'OA') renderOADrawer(c, container);
+      else if (phase === 'PC') renderPCDrawer(c, container);
+      else if (phase === 'C') renderCDrawer(c, container);
+      else if (phase === 'S') renderSDrawer(c, container);
+    }
+
+    function sortCasesBySavedOrder(targetArray = cases) {
+      const orderStr = localStorage.getItem('crm_cases_order');
+      if (orderStr) {
+        try {
+          const order = JSON.parse(orderStr);
+          if (Array.isArray(order) && targetArray && typeof targetArray.sort === 'function') {
+            targetArray.sort((a, b) => {
+              if (!a || !b) return 0;
+              const idxA = order.indexOf(a.id);
+              const idxB = order.indexOf(b.id);
+              if (idxA === -1 && idxB === -1) return 0;
+              if (idxA === -1) return 1;
+              if (idxB === -1) return -1;
+              return idxA - idxB;
+            });
+          }
+        } catch (e) {
+          console.error("排序資料解析失敗，自動重置排序快取:", e);
+          localStorage.removeItem('crm_cases_order');
+        }
+      }
+    }
+
+    function saveCasesToStorage() {
+      localStorage.setItem('crm_cases', JSON.stringify(cases));
+      const order = cases.map(c => c.id);
+      localStorage.setItem('crm_cases_order', JSON.stringify(order));
+    }
+    function loadCasesFromStorage() {
+      const stored = localStorage.getItem('crm_cases');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            cases = parsed;
+            sortCasesBySavedOrder();
+            return;
+          }
+        } catch (e) {
+          console.error("快取案件解析失敗，改載入預設資料:", e);
+        }
+      }
+      cases = [
+        {
+          id: "case-1",
+          visitType: "issue",
+          preparedIssues: [],
+          type: "life",
+          caseSource: "inbound",
+          source: "referral",
+          referrerName: "張大明",
+          relativeTags: ["同學"],
+          clientName: "陳小明",
+          contactMethods: ["LINE"],
+          contactDetail: "xiaoming123",
+          issueName: "新生兒主附約比較",
+          issueDate: "2026-06-25",
+          issueNote: "客戶剛生第一胎，想規劃完整的醫療與意外實支實付。",
+          currentPhase: "SA",
+          saDetails: {
+            sendState: "active",
+            sendDate: "2026-06-25",
+            replyState: "active",
+            replyDate: "2026-06-26",
+            intentState: "intent-pending",
+            intentDate: "2026-06-26",
+            agreeState: "active",
+            agreeDate: "2026-06-27",
+            meetTimeSlot: "afternoon_1"
+          },
+          oaDetails: {
+            meetDate: "2026-06-30",
+            meetState: "pending",
+            meetTimeSlot: "before_lunch",
+            planState: "dim",
+            planDate: "",
+            practiceState: "dim",
+            practiceDate: "",
+            discussState: "dim",
+            discussDate: ""
+          },
+          pcDetails: {
+            meetDate: "",
+            meetState: "",
+            meetTimeSlot: "",
+            planState: "dim",
+            planDate: "",
+            practiceState: "dim",
+            practiceDate: "",
+            discussState: "dim",
+            discussDate: ""
+          },
+          cDetails: {
+            planState: "dim",
+            planDate: "",
+            practiceState: "dim",
+            practiceDate: "",
+            discussState: "dim",
+            discussDate: ""
+          },
+          sDetails: {
+            planState: "dim",
+            planDate: "",
+            practiceState: "dim",
+            practiceDate: "",
+            discussState: "dim",
+            discussDate: ""
+          }
+        }
+      ];
+    }
+
+    // === 雲端與本機資料 CRUD 整合 ===
+    async function updateCase(caseId, updateFn, skipRender = false) {
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+      
+      const originalName = c.clientName;
+      updateFn(c);
+      
+      saveCasesToStorage();
+      if (!skipRender) {
+        renderCases();
+      }
+      
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        const mappedData = mapCaseToSheetData(c);
+        // 背景非同步同步至雲端，不阻塞 UI 介面
+        syncChange('update', originalName, mappedData);
+      }
+    }
+
+    async function addCase(newCase) {
+      addCase(newCase);
+      
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        const mappedData = mapCaseToSheetData(newCase);
+        syncChange('add', null, mappedData);
+      }
+    }
+
+    async function deleteCase(caseId) {
+      const index = cases.findIndex(c => c.id === caseId);
+      if (index === -1) return;
+      const clientName = cases[index].clientName ? cases[index].clientName.trim() : "";
+      cases.splice(index, 1);
+      saveCasesToStorage();
+      renderCases();
+      
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        syncChange('delete', clientName, null);
+      }
+    }
+
+    function parseJsonSafe(str) {
+      try {
+        return str ? JSON.parse(str) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // === Google Sheet Column Mappers ===
+    function mapSheetDataToCases(sheetData) {
+      return sheetData.map((row, index) => {
+        const preparedIssues = row["預計議題"] ? row["預計議題"].split(',') : [];
+        const isLifeVisit = row["預計議題"] && row["預計議題"].includes(',');
+        
+        return {
+          id: row["客戶姓名"] || ("case-" + Date.now() + "-" + index),
+          visitType: isLifeVisit ? 'life' : 'issue',
+          preparedIssues: preparedIssues,
+          type: row["險種分類"] === '壽' ? 'life' : 'property',
+          caseSource: row["開拓管道"] === '開發' ? 'outbound' : 'inbound',
+          source: row["客戶來源"] === '緣故' ? 'relative' : (row["客戶來源"] === '轉介紹' ? 'referral' : 'cold'),
+          referrerName: row["介紹人"] || '',
+          relativeTags: row["緣故標籤"] ? row["緣故標籤"].split(',') : [],
+          clientName: row["客戶姓名"] || '未知',
+          note: row["備註"] || '',
+          issueNote: row["議題發想備忘"] || '',
+          issueName: row["邀約議題"] || '新議題',
+          issueDate: row["ＳＡ"] || '',
+          currentPhase: row["當前階段"] || 'SA',
+          archived: row["是否封存"] === '已封存',
+          contactMethods: (() => {
+            try {
+              return row["聯絡資訊"] ? (JSON.parse(row["聯絡資訊"]).methods || []) : ["LINE"];
+            } catch (e) { return ["LINE"]; }
+          })(),
+          contactDetails: (() => {
+            try {
+              return row["聯絡資訊"] ? (JSON.parse(row["聯絡資訊"]).details || {}) : {};
+            } catch (e) { return {}; }
+          })(),
+          saDetails: {
+            sendState: row["是否已讀"] === '已讀' ? 'active' : 'dim',
+            sendDate: row["ＳＡ"] || '',
+            replyState: row["是否已回覆"] === '已回覆' ? 'active' : 'dim',
+            replyDate: row["ＳＡ"] || '',
+            intentState: row["約定狀態"] || 'intent-pending',
+            agreeState: row["已約定"] ? 'active' : 'dim',
+            agreeDate: row["已約定"] || '',
+            meetTimeSlot: row["約定時段"] || '',
+            notes: row["ＳＡ備忘"] || ''
+          },
+          oaDetails: {
+            meetDate: row["ＯＡ"] || '',
+            meetState: row["ＯＡ已面談"] === '已面談' ? 'confirmed' : (row["ＯＡ已面談"] === '喬時間中' ? 'pending' : ''),
+            meetTimeSlot: row["ＯＡ時段"] || '',
+            planState: row["ＯＡ訪前規劃狀態"] || 'dim',
+            planDate: row["ＯＡ"] || '',
+            practiceState: row["ＯＡ訪前演練狀態"] || 'dim',
+            practiceDate: row["ＯＡ"] || '',
+            discussState: row["ＯＡ訪後討論狀態"] || 'dim',
+            discussDate: row["ＯＡ"] || '',
+            planNotes: row["ＯＡ訪前規劃備忘"] || '',
+            discussNotes: row["ＯＡ訪後討論備忘"] || '',
+            rescheduleHistory: row["ＯＡ改期歷史"] ? parseJsonSafe(row["ＯＡ改期歷史"]) : []
+          },
+          pcDetails: {
+            meetDate: row["ＰＣ"] || '',
+            meetState: row["ＰＣ已遞送"] === '已遞送' ? 'confirmed' : '',
+            meetTimeSlot: row["ＰＣ時段"] || '',
+            planState: row["ＰＣ訪前規劃狀態"] || 'dim',
+            planDate: row["ＰＣ"] || '',
+            practiceState: row["ＰＣ訪前演練狀態"] || 'dim',
+            practiceDate: row["ＰＣ"] || '',
+            discussState: row["ＰＣ訪後討論狀態"] || 'dim',
+            discussDate: row["ＰＣ"] || '',
+            discussNotes: row["ＰＣ訪後討論備忘"] || '',
+            rescheduleHistory: row["ＰＣ改期歷史"] ? parseJsonSafe(row["ＰＣ改期歷史"]) : []
+          },
+          cDetails: {
+            meetDate: row["Ｃ"] || '',
+            meetState: row["Ｃ已成交"] === '已成交' ? 'confirmed' : '',
+            meetTimeSlot: row["Ｃ時段"] || '',
+            planState: row["Ｃ照會防範狀態"] || 'dim',
+            planDate: row["Ｃ"] || '',
+            planNotes: row["Ｃ照會防範備忘"] || '',
+            practiceState: row["Ｃ要保簽署狀態"] || 'dim',
+            practiceDate: row["Ｃ"] || '',
+            discussState: row["Ｃ保費首扣狀態"] || 'dim',
+            discussDate: row["Ｃ"] || '',
+            discussNotes: row["Ｃ保費首扣備忘"] || '',
+            rescheduleHistory: row["Ｃ改期歷史"] ? parseJsonSafe(row["Ｃ改期歷史"]) : []
+          },
+          sDetails: {
+            meetDate: row["Ｓ"] || '',
+            meetTimeSlot: row["Ｓ時段"] || '',
+            planState: row["Ｓ保單送達狀態"] || 'dim',
+            planDate: row["Ｓ"] || '',
+            planNotes: row["Ｓ保單送達備忘"] || '',
+            practiceState: row["Ｓ契撤追蹤狀態"] || 'dim',
+            practiceDate: row["Ｓ"] || '',
+            discussState: row["Ｓ週年服務狀態"] || 'dim',
+            discussDate: row["Ｓ"] || '',
+            discussNotes: row["Ｓ週年服務備忘"] || ''
+          }
+        };
+      });
+      sortCasesBySavedOrder(mapped);
+      return mapped;
+    }
+
+    function mapCaseToSheetData(c) {
+      const sa = c.saDetails || {};
+      const oa = c.oaDetails || {};
+      const pc = c.pcDetails || {};
+      const cc = c.cDetails || {};
+      const s = c.sDetails || {};
+      
+      return {
+        "險種分類": c.type === 'life' ? '壽' : '產',
+        "客戶姓名": c.clientName || '',
+        "預計議題": c.preparedIssues ? c.preparedIssues.join(',') : '',
+        "ＳＡ": c.issueDate || sa.sendDate || '',
+        "邀約議題": c.issueName || '',
+        "是否已讀": sa.sendState === 'active' ? '已讀' : '未讀',
+        "是否已回覆": sa.replyState === 'active' ? '已回覆' : '未回覆',
+        "約定狀態": sa.intentState || 'intent-pending',
+        "已約定": sa.agreeDate || '',
+        "約定時段": sa.meetTimeSlot || '',
+        "ＯＡ": oa.meetDate || '',
+        "ＯＡ已面談": oa.meetState === 'confirmed' ? '已面談' : (oa.meetState === 'pending' ? '喬時間中' : '未面談'),
+        "ＯＡ時段": oa.meetTimeSlot || '',
+        "ＯＡ訪前規劃狀態": oa.planState || 'dim',
+        "ＯＡ訪前演練狀態": oa.practiceState || 'dim',
+        "ＯＡ訪後討論狀態": oa.discussState || 'dim',
+        "ＯＡ訪前規劃備忘": oa.planNotes || '',
+        "ＯＡ訪後討論備忘": oa.discussNotes || '',
+        "ＯＡ改期歷史": JSON.stringify(oa.rescheduleHistory || []),
+        "ＰＣ": pc.meetDate || '',
+        "ＰＣ已遞送": pc.meetState === 'confirmed' ? '已遞送' : '未遞送',
+        "ＰＣ時段": pc.meetTimeSlot || '',
+        "ＰＣ訪前規劃狀態": pc.planState || 'dim',
+        "ＰＣ訪前演練狀態": pc.practiceState || 'dim',
+        "ＰＣ訪後討論狀態": pc.discussState || 'dim',
+        "ＰＣ訪後討論備忘": pc.discussNotes || '',
+        "ＰＣ改期歷史": JSON.stringify(pc.rescheduleHistory || []),
+        "Ｃ": cc.meetDate || '',
+        "Ｃ已成交": cc.meetState === 'confirmed' ? '已成交' : '未成交',
+        "Ｃ照會防範狀態": cc.planState || 'dim',
+        "Ｃ照會防範備忘": cc.planNotes || '',
+        "Ｃ要保簽署狀態": cc.practiceState || 'dim',
+        "Ｃ保費首扣狀態": cc.discussState || 'dim',
+        "Ｃ保費首扣備忘": cc.discussNotes || '',
+        "Ｃ改期歷史": JSON.stringify(cc.rescheduleHistory || []),
+        "Ｓ": s.meetDate || '',
+        "Ｓ保單送達狀態": s.planState || 'dim',
+        "Ｓ保單送達備忘": s.planNotes || '',
+        "Ｓ契撤追蹤狀態": s.practiceState || 'dim',
+        "Ｓ週年服務狀態": s.discussState || 'dim',
+        "Ｓ週年服務備忘": s.discussNotes || '',
+        "當前階段": c.currentPhase || 'SA',
+        "開拓管道": c.caseSource === 'outbound' ? '開發' : '自來',
+        "客戶來源": c.source === 'relative' ? '緣故' : (c.source === 'referral' ? '轉介紹' : '陌生開發'),
+        "介紹人": c.referrerName || '',
+        "緣故標籤": c.relativeTags ? c.relativeTags.join(',') : '',
+        "ＳＡ備忘": sa.notes || '',
+        "是否封存": c.archived ? '已封存' : '未封存',
+        "聯絡資訊": JSON.stringify({ methods: c.contactMethods || [], details: c.contactDetails || {} }),
+        "備註": c.note || '',
+        "議題發想備忘": c.issueNote || '',
+        "Ｃ時段": (c.cDetails ? c.cDetails.meetTimeSlot : '') || '',
+        "Ｓ時段": (c.sDetails ? c.sDetails.meetTimeSlot : '') || ''
+      };
+    }
+
+    // === 雲端 Background API 請求與同步佇列 ===
+    let syncQueue = JSON.parse(localStorage.getItem('crm_sync_queue')) || [];
+
+    function saveSyncQueue() {
+      localStorage.setItem('crm_sync_queue', JSON.stringify(syncQueue));
+    }
+
+    async function processSyncQueue() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl || syncQueue.length === 0) return;
+      
+      updateConnectionStatus('syncing');
+      showToast(`正在同步離線暫存資料 (${syncQueue.length} 筆)...`, 'success');
+      
+      let successCount = 0;
+      let failCount = 0;
+      const currentQueue = [...syncQueue];
+      syncQueue = []; 
+      saveSyncQueue();
+
+      for (let i = 0; i < currentQueue.length; i++) {
+        const item = currentQueue[i];
+        try {
+          const payload = {
+            action: item.action,
+            customerName: item.customerName,
+            data: item.data
+          };
+          
+          const response = await fetch(crmSettings.apiUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) throw new Error('雲端回應異常');
+          const result = await response.json();
+          if (result.status === 'success') {
+            successCount++;
+          } else {
+            throw new Error(result.message || '雲端同步錯誤');
+          }
+        } catch (err) {
+          console.error("同步佇列單筆同步失敗:", err);
+          failCount++;
+          syncQueue.push(item); 
+        }
+      }
+      
+      saveSyncQueue();
+      
+      if (successCount > 0) {
+        showToast(`成功同步 ${successCount} 筆暫存資料至雲端！`, 'success');
+      }
+      if (failCount > 0) {
+        showToast(`${failCount} 筆暫存同步失敗，保留至下次連線`, 'error');
+        updateConnectionStatus('error');
+      } else {
+        updateConnectionStatus('connected');
+      }
+    }
+
+    async function syncChange(action, originalName, mappedData) {
+      const queueItem = {
+        action: action,
+        customerName: originalName || (mappedData ? mappedData["客戶姓名"] : ""),
+        data: mappedData
+      };
+
+      if (crmSettings.isOffline || !crmSettings.apiUrl) {
+        syncQueue.push(queueItem);
+        saveSyncQueue();
+        updateConnectionStatus();
+        return;
+      }
+
+      updateConnectionStatus('syncing');
+      
+      try {
+        const response = await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(queueItem)
+        });
+        
+        if (!response.ok) throw new Error('雲端回應異常');
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+          updateConnectionStatus('connected');
+          if (syncQueue.length > 0) {
+            setTimeout(processSyncQueue, 500);
+          }
+        } else {
+          throw new Error(result.message || '雲端同步錯誤');
+        }
+      } catch (err) {
+        console.error("雲端背景備份失敗，寫入暫存佇列:", err);
+        updateConnectionStatus('error');
+        syncQueue.push(queueItem);
+        saveSyncQueue();
+        showToast("雲端同步失敗，已儲存至本機暫存", "error");
+      }
+    }
+
+    async function fetchCases() {
+      debugLog("fetchCases() 內部執行中...");
+      if (crmSettings.isOffline || !crmSettings.apiUrl) {
+        loadCasesFromStorage();
+        renderCases();
+        updateConnectionStatus();
+        return;
+      }
+      
+      // 先從 LocalStorage 載入並渲染，達到秒開效果
+      loadCasesFromStorage();
+      const hasCachedData = (cases && cases.length > 0);
+      if (hasCachedData) {
+        renderCases();
+        updateConnectionStatus('syncing'); // 顯示同步中
+      } else {
+        // 沒有快取資料時，才顯示全螢幕阻塞式遮罩
+        toggleLoading(true, "正在載入雲端客戶資料...");
+      }
+      
+      try {
+        // 加入時間戳記避免瀏覽器快取 GET 請求
+        const cacheBusterUrl = crmSettings.apiUrl + (crmSettings.apiUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        debugLog("發送雲端 GET 請求到: " + cacheBusterUrl);
+        const response = await fetch(cacheBusterUrl, { method: 'GET', mode: 'cors' });
+        debugLog("雲端 HTTP 狀態碼: " + response.status);
+        if (!response.ok) throw new Error('雲端回應異常');
+        const result = await response.json();
+        
+        debugLog("接收到雲端資料，案件數: " + (result.data ? result.data.length : 0));
+        if (result.status === 'success' && Array.isArray(result.data)) {
+          cases = mapSheetDataToCases(result.data);
+          saveCasesToStorage();
+          renderCases();
+          updateConnectionStatus('connected');
+          if (!hasCachedData) {
+            showToast("雲端資料同步成功！", "success");
+          }
+          if (syncQueue.length > 0) {
+            setTimeout(processSyncQueue, 800);
+          }
+        } else {
+          throw new Error(result.message || '資料格式不正確');
+        }
+      } catch (err) {
+        console.error("讀取雲端資料失敗:", err);
+        // 如果原本就沒有快取資料才需要警告，不然只是背景同步失敗，顯示連線異常即可
+        if (!hasCachedData) {
+          showToast("無法連線至雲端，改載入本機快取資料", "error");
+          loadCasesFromStorage();
+          renderCases();
+        } else {
+          showToast("雲端同步失敗，目前顯示本機快取資料", "error");
+        }
+        updateConnectionStatus('error');
+      } finally {
+        if (!hasCachedData) {
+          toggleLoading(false);
+        }
+      }
+    }
+
+    // === 介面指示燈 & 遮罩控制 ===
+    function updateConnectionStatus(state) {
+      const dot = document.getElementById('connection-dot');
+      const text = document.getElementById('connection-text');
+      if (!dot || !text) return;
+      
+      dot.className = '';
+      const parentBar = document.getElementById('connection-status-bar');
+      
+      if (crmSettings.isOffline) {
+        dot.style.background = '#eab308';
+        text.innerText = '離線模擬中';
+        text.style.color = '#eab308';
+        if (parentBar) parentBar.setAttribute('title', '目前處於離線模擬模式下，所有操作僅暫存於本機。');
+      } else {
+        const current = state || 'connected';
+        if (current === 'syncing') {
+          dot.style.background = '#eab308';
+          dot.classList.add('dot-syncing');
+          text.innerText = '背景備份中...';
+          text.style.color = '#eab308';
+          if (parentBar) parentBar.setAttribute('title', '正在與雲端同步資料中，請稍候。');
+        } else if (current === 'connected') {
+          dot.style.background = '#22c55e';
+          dot.classList.add('dot-connected');
+          text.innerText = '雲端已連線';
+          text.style.color = '#22c55e';
+          if (parentBar) parentBar.setAttribute('title', '已成功與 Google Sheet 雲端連線，資料即時同步中。');
+        } else {
+          dot.style.background = '#ef4444';
+          text.innerText = '連線異常 (本機執行)';
+          text.style.color = '#ef4444';
+          const errorMsg = "原因：\n1. 尚未設定 Google Apps Script Web App API 網址，或網址有誤。\n2. 您的網路連線中斷。\n\n建議操作步驟：\n1. 點擊右上角 ⚙️ 設定按鈕檢查 API 網址。\n2. 確認您的網路連線狀態。\n3. 您可繼續使用，所有變更將存於本機，並於連線恢復時自動後台備份。";
+          if (parentBar) parentBar.setAttribute('title', errorMsg);
+        }
+      }
+    }
+
+    function toggleLoading(show, text = '載入中，請稍候...') {
+      const overlay = document.getElementById('loading-overlay');
+      const textEl = document.getElementById('loading-text');
+      if (!overlay) return;
+      
+      if (show) {
+        textEl.innerText = text;
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+
+    // === 設定彈窗控制與連線測試 ===
+    function switchSettingsTab(tab) {
+      document.getElementById('settings-pane-sync').style.display = tab === 'sync' ? 'block' : 'none';
+      document.getElementById('settings-pane-issues').style.display = tab === 'issues' ? 'block' : 'none';
+      document.getElementById('settings-pane-groups').style.display = tab === 'groups' ? 'block' : 'none';
+      
+      document.getElementById('settings-tab-sync').classList.toggle('active', tab === 'sync');
+      document.getElementById('settings-tab-issues').classList.toggle('active', tab === 'issues');
+      document.getElementById('settings-tab-groups').classList.toggle('active', tab === 'groups');
+      
+      if (tab === 'issues') renderIssueList();
+      if (tab === 'groups') renderGroupList();
+    }
+
+    function toggleSettingsModal(show) {
+      const modal = document.getElementById('settings-modal');
+      if (!modal) return;
+      
+      if (show) {
+        document.getElementById('settings-api-url').value = crmSettings.apiUrl || '';
+        document.getElementById('settings-mode-offline').checked = crmSettings.isOffline;
+        document.getElementById('settings-mode-cloud').checked = !crmSettings.isOffline;
+        switchSettingsTab('sync');
+        modal.classList.add('active');
+        rebuildGroupSelect();
+      } else {
+        modal.classList.remove('active');
+      }
+    }
+
+    function saveSettings() {
+      const apiUrl = document.getElementById('settings-api-url').value.trim();
+      const isOffline = document.getElementById('settings-mode-offline').checked;
+      
+      crmSettings.apiUrl = apiUrl;
+      crmSettings.isOffline = isOffline;
+      localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
+      
+      toggleSettingsModal(false);
+      showToast("系統設定已儲存！", "success");
+      
+      fetchCases();
+    }
+
+    async function testSettingsConnection() {
+      const url = document.getElementById('settings-api-url').value.trim();
+      if (!url) {
+        showToast('請輸入 URL 以利測試！', 'error');
+        return;
+      }
+      toggleLoading(true, '正在測試雲端連線...');
+      try {
+        const response = await fetch(url, { method: 'GET', mode: 'cors' });
+        if (!response.ok) throw new Error('連線回應異常: ' + response.statusText);
+        const result = await response.json();
+        if (result.status === 'success') {
+          showToast('連線測試成功！伺服器回應正常。', 'success');
+        } else {
+          showToast('連線失敗：' + (result.message || '未知錯誤'), 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('連線失敗：' + err.message, 'error');
+      } finally {
+        toggleLoading(false);
+      }
+    }
+
+    // 初始化載入
+    async function init() {
+      debugLog("init() 流程啟動");
+      try {
+        updateConnectionStatus();
+        debugLog("連線狀態更新完畢");
+
+        rebuildIssueSelects();
+        debugLog("議題選單初始化完畢");
+
+      // 點擊 modal-overlay 遮罩外部區域自動關閉彈窗
+      const modalCloseMap = {
+        'add-case-modal':   () => toggleAddCaseModal(false),
+        'settings-modal':   () => toggleSettingsModal(false),
+        'risk-lock-modal':  () => toggleRiskLockModal(false),
+        'weekly-report-modal': () => toggleWeeklyReport(false),
+      };
+      Object.entries(modalCloseMap).forEach(([id, closeFn]) => {
+        const overlay = document.getElementById(id);
+        if (overlay) {
+          overlay.addEventListener('click', (e) => {
+            // 只有點到 overlay 本身（非內部 modal-box）才關閉
+            if (e.target === overlay) closeFn();
+          });
+        }
+      });
+
+      // 初始化與綁定全站字體大小縮放 (A- / A+)
+      let currentFontSize = parseInt(localStorage.getItem('crm_font_size')) || 18;
+      document.documentElement.style.fontSize = currentFontSize + 'px';
+
+      document.getElementById('btn-font-dec').addEventListener('click', () => {
+        if (currentFontSize > 12) {
+          currentFontSize--;
+          document.documentElement.style.fontSize = currentFontSize + 'px';
+          localStorage.setItem('crm_font_size', currentFontSize);
+        }
+      });
+      document.getElementById('btn-font-inc').addEventListener('click', () => {
+        if (currentFontSize < 22) {
+          currentFontSize++;
+          document.documentElement.style.fontSize = currentFontSize + 'px';
+          localStorage.setItem('crm_font_size', currentFontSize);
+        }
+      });
+      
+      // 綁定按鈕事件監聽器
+      document.getElementById('btn-add-case').addEventListener('click', () => {
+        toggleAddCaseModal(true);
+      });
+      document.getElementById('btn-settings').addEventListener('click', () => {
+        toggleSettingsModal(true);
+      });
+      document.getElementById('btn-close-settings-modal').addEventListener('click', () => {
+        toggleSettingsModal(false);
+      });
+      document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+      document.getElementById('btn-test-connection').addEventListener('click', testSettingsConnection);
+
+      // Tablet Fix: 啟用行動裝置 Drag & Drop Polyfill，設定 holdToDrag 以避免與頁面滾動衝突
+      if (typeof MobileDragDrop !== 'undefined') {
+        MobileDragDrop.polyfill({
+          holdToDrag: 200
+        });
+      }
+
+      // 初始化拖曳排序
+      debugLog("準備初始化拖曳排序...");
+      initDragAndDrop();
+      debugLog("拖曳排序初始化完畢");
+
+      // 搜尋欄位事件綁定
+      const searchInput = document.getElementById('global-search-input');
+      const searchClear = document.getElementById('search-clear-btn');
+      if (searchInput) {
+        searchInput.addEventListener('focus', showSearchDropdown);
+        searchInput.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showSearchDropdown();
+        });
+        searchInput.addEventListener('input', handleSearchInput);
+        searchInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            saveSearchHistory(searchInput.value);
+            hideSearchDropdown();
+          }
+        });
+      }
+      if (searchClear) {
+        searchClear.addEventListener('click', (e) => {
+          e.stopPropagation();
+          searchInput.value = '';
+          searchQuery = '';
+          searchClear.style.display = 'none';
+          renderCases();
+          searchInput.focus();
+          showSearchDropdown();
+        });
+      }
+      // 點擊外部收合搜尋選單
+      document.addEventListener('click', (e) => {
+        const container = document.getElementById('search-container');
+        const dropdown = document.getElementById('search-dropdown');
+        if (container && dropdown && !container.contains(e.target)) {
+          dropdown.style.display = 'none';
+        }
+      });
+
+      debugLog("連線模式判定中... 離線模式: " + crmSettings.isOffline + ", API網址: " + crmSettings.apiUrl);
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        debugLog("啟動雲端同步載入 (fetchCases)...");
+        await fetchCases();
+      } else {
+        debugLog("啟動本機快取載入...");
+        loadCasesFromStorage();
+        debugLog("本機快取載入完畢，準備渲染 (renderCases)...");
+        renderCases();
+        debugLog("本機案件渲染完畢");
+      }
+      } catch (e) {
+        debugLog("<span style='color:#ff4444;'>💥 init() 過程中崩潰：" + e.message + "</span>");
+        console.error(e);
+      }
+    }
+
+    // 短日期格式化輔助函數 (例如將 2026-06-28 轉為 06/28)
+    function formatShortDate(dateStr) {
+      if (!dateStr || dateStr.trim() === '' || dateStr === '&nbsp;') return '';
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return parts[1] + '/' + parts[2];
+      }
+      return dateStr;
+    }
+
+    // 渲染案件列表
+    // 控制是否顯示已封存案件（預設僅顯示未封存）
+    let showingArchived = false;
+
+    function toggleArchivedView() {
+      showingArchived = !showingArchived;
+      const btn = document.getElementById('btn-show-archived');
+      if (btn) {
+        btn.style.opacity = showingArchived ? '1' : '0.65';
+        btn.style.background = showingArchived ? 'rgba(245,158,11,0.15)' : '';
+        btn.style.borderColor = showingArchived ? 'rgba(245,158,11,0.5)' : '';
+        btn.style.color = showingArchived ? 'var(--accent-amber)' : '';
+        btn.textContent = showingArchived ? '📦 已封存（顯示中）' : '📦 已封存';
+      }
+      renderCases();
+    }
+
+    // --- 搜尋功能邏輯 ---
+
+    // 遞迴取案件內所有屬性值
+    function getCaseValuesString(obj) {
+      if (obj === null || obj === undefined) return '';
+      if (typeof obj === 'string') return obj;
+      if (typeof obj === 'number') return String(obj);
+      if (Array.isArray(obj)) return obj.map(getCaseValuesString).join(' ');
+      if (typeof obj === 'object') {
+        return Object.values(obj).map(getCaseValuesString).join(' ');
+      }
+      return '';
+    }
+
+    // 建立案件文字搜尋索引
+    function buildCaseSearchString(c) {
+      let extra = [];
+      extra.push(c.type === 'life' ? '壽 壽險' : '產 產險');
+      extra.push(c.caseSource === 'inbound' ? '自 自來' : '開 開發');
+      if (c.source === 'relative') extra.push('緣 緣故');
+      else if (c.source === 'referral') extra.push('轉 轉介');
+      else extra.push('陌 陌開');
+      
+      return (getCaseValuesString(c) + ' ' + extra.join(' ')).toLowerCase();
+    }
+
+    // 儲存搜尋歷史
+    function saveSearchHistory(query) {
+      if (!query || query.trim() === '') return;
+      const trimmed = query.trim();
+      // 移除重複並推入最前端
+      searchHistory = searchHistory.filter(q => q !== trimmed);
+      searchHistory.unshift(trimmed);
+      if (searchHistory.length > 5) {
+        searchHistory = searchHistory.slice(0, 5);
+      }
+      localStorage.setItem('crm_search_history', JSON.stringify(searchHistory));
+      renderSearchDropdown();
+    }
+
+    // 刪除特定搜尋歷史
+    function deleteSearchHistory(index, event) {
+      if (event) event.stopPropagation(); // 阻止氣泡事件，防止觸發輸入框搜尋
+      searchHistory.splice(index, 1);
+      localStorage.setItem('crm_search_history', JSON.stringify(searchHistory));
+      renderSearchDropdown();
+      document.getElementById('global-search-input').focus();
+    }
+
+    // 渲染搜尋下拉選單
+    function renderSearchDropdown() {
+      const historyList = document.getElementById('search-history-list');
+      const tagsList = document.getElementById('search-tags-list');
+      if (!historyList || !tagsList) return;
+
+      // 1. 渲染歷史紀錄
+      if (searchHistory.length === 0) {
+        historyList.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-secondary); padding: 6px 8px; opacity: 0.6;">（尚無搜尋紀錄）</div>`;
+      } else {
+        historyList.innerHTML = searchHistory.map((q, idx) => `
+          <div class="search-history-item" onclick="selectSearchItem('${q.replace(/'/g, "\\'")}')">
+            <span>⏱️ ${q}</span>
+            <button class="delete-history-btn" onclick="deleteSearchHistory(${idx}, event)">✕</button>
+          </div>
+        `).join('');
+      }
+
+      // 2. 渲染議題標籤 (抓取 getCustomIssues() 的前 12 個，避免版面過大)
+      const issues = getCustomIssues();
+      if (issues.length === 0) {
+        tagsList.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-secondary); padding: 4px; opacity: 0.6;">（尚無議題）</div>`;
+      } else {
+        const uniqueNames = [...new Set(issues.map(item => item.name))].slice(0, 12);
+        tagsList.innerHTML = uniqueNames.map(name => `
+          <span class="search-tag-item" onclick="selectSearchItem('${name.replace(/'/g, "\\'")}')">${name}</span>
+        `).join('');
+      }
+    }
+
+    // 選擇搜尋項目 (點擊歷史或標籤時)
+    function selectSearchItem(query) {
+      const input = document.getElementById('global-search-input');
+      if (!input) return;
+      input.value = query;
+      searchQuery = query;
+      
+      const clearBtn = document.getElementById('search-clear-btn');
+      if (clearBtn) clearBtn.style.display = 'block';
+
+      saveSearchHistory(query);
+      renderCases();
+      hideSearchDropdown();
+    }
+
+    // 顯示與隱藏下拉選單
+    function showSearchDropdown() {
+      const dropdown = document.getElementById('search-dropdown');
+      if (dropdown) {
+        renderSearchDropdown();
+        dropdown.style.display = 'flex';
+      }
+    }
+
+    function hideSearchDropdown() {
+      // 延遲隱藏，確保點擊項目的事件能被優先觸發
+      setTimeout(() => {
+        const dropdown = document.getElementById('search-dropdown');
+        if (dropdown) dropdown.style.display = 'none';
+      }, 200);
+    }
+
+    // 搜尋防抖
+    let searchDebounceTimer = null;
+    function handleSearchInput(e) {
+      const value = e.target.value;
+      searchQuery = value;
+
+      const clearBtn = document.getElementById('search-clear-btn');
+      if (clearBtn) {
+        clearBtn.style.display = value ? 'block' : 'none';
+      }
+
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        renderCases();
+        if (e.key === 'Enter') {
+          saveSearchHistory(value);
+          hideSearchDropdown();
+        }
+      }, 200);
+    }
+
+    // 拖曳排序事件綁定 (一次性綁定)
+    function initDragAndDrop() {
+      const container = document.getElementById('case-list-body');
+      if (!container) return;
+
+      container.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('.case-row');
+        if (!row) return;
+        row.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', row.dataset.id);
+        
+        // 拖曳時關閉所有抽屜，避免版面跳動
+        closeAllDrawers();
+      });
+
+      container.addEventListener('dragend', (e) => {
+        const row = e.target.closest('.case-row');
+        if (!row) return;
+        row.classList.remove('dragging');
+        
+        // 清理所有過渡的 drag-over 樣式
+        document.querySelectorAll('.case-row').forEach(el => el.classList.remove('drag-over'));
+
+        // 更新資料庫中的順序
+        updateCasesOrderFromDOM();
+      });
+
+      container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggingRow = document.querySelector('.case-row.dragging');
+        if (!draggingRow) return;
+
+        const row = e.target.closest('.case-row');
+        if (!row || row === draggingRow) return;
+
+        const bounding = row.getBoundingClientRect();
+        const offset = e.clientY - bounding.top;
+        const isAfter = offset > bounding.height / 2;
+
+        // 清理其他行的 drag-over
+        document.querySelectorAll('.case-row').forEach(el => el.classList.remove('drag-over'));
+        
+        row.classList.add('drag-over');
+
+        if (isAfter) {
+          if (row.nextSibling) {
+            container.insertBefore(draggingRow, row.nextSibling);
+          } else {
+            container.appendChild(draggingRow);
+          }
+        } else {
+          container.insertBefore(draggingRow, row);
+        }
+        
+        // 拖曳過程中動態調整對應 drawer-row 的 DOM 位置 (使其緊隨 case-row)
+        const drawerId = `drawer-row-${draggingRow.dataset.id}`;
+        const drawerDom = document.getElementById(drawerId);
+        if (drawerDom) {
+          draggingRow.after(drawerDom);
+        }
+      });
+      
+      container.addEventListener('dragleave', (e) => {
+        const row = e.target.closest('.case-row');
+        if (row) row.classList.remove('drag-over');
+      });
+    }
+
+    // 將 DOM 目前的順序對應回 cases 陣列並儲存
+    function updateCasesOrderFromDOM() {
+      const container = document.getElementById('case-list-body');
+      if (!container) return;
+
+      const rowElements = container.querySelectorAll('.case-row');
+      const newOrderIds = Array.from(rowElements).map(el => el.dataset.id);
+
+      // 重新整理 cases 陣列
+      const orderedCases = [];
+      newOrderIds.forEach(id => {
+        const c = cases.find(item => item.id === id);
+        if (c) orderedCases.push(c);
+      });
+
+      // 把那些不在 DOM 中的案件（例如被過濾掉或已封存的）也保留並加到後面，防止遺失
+      cases.forEach(c => {
+        if (!orderedCases.some(item => item.id === c.id)) {
+          orderedCases.push(c);
+        }
+      });
+
+      cases = orderedCases;
+      saveCasesToStorage();
+      
+      // 若開啟了雲端同步，則進行備份
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        // 調用背景同步 update
+        cases.forEach(c => {
+          const mappedData = mapCaseToSheetData(c);
+          syncChange('update', c.clientName, mappedData);
+        });
+      }
+    }
+
+    function renderCases() {
+      const body = document.getElementById('case-list-body');
+      body.innerHTML = '';
+
+      // 根據封存狀態過濾案件
+      let visibleCases = cases.filter(c => showingArchived ? c.archived === true : !c.archived);
+
+      // 根據搜尋關鍵字過濾案件
+      if (searchQuery && searchQuery.trim() !== '') {
+        const query = searchQuery.trim().toLowerCase();
+        visibleCases = visibleCases.filter(c => buildCaseSearchString(c).includes(query));
+      }
+
+      visibleCases.forEach((c) => {
+        // 確保所有案件子屬性結構完整，相容舊有本機快取資料，防止 TypeError 崩潰
+        c.saDetails = Object.assign({ sendState: "dim", sendDate: "", replyState: "dim", replyDate: "", intentState: "intent-pending", agreeState: "dim", agreeDate: "", meetTimeSlot: "" }, c.saDetails || {});
+        c.oaDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.oaDetails || {});
+        c.pcDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", discussNotes: "", rescheduleHistory: [] }, c.pcDetails || {});
+        c.cDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.cDetails || {});
+        c.sDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "" }, c.sDetails || {});
+
+        // 建立卡片列
+        const row = document.createElement('div');
+        row.className = 'case-row';
+        row.dataset.id = c.id;
+        row.setAttribute('draggable', 'true');
+
+        // 1. 險種 (壽/產)
+        const typeText = c.type === 'life' ? '壽' : '產';
+        const typeClass = c.type === 'life' ? 'life' : 'property';
+        const typeBadge = `<span class="type-badge ${typeClass}">${typeText}</span>`;
+
+        // 2. 案源 (自/開)
+        const caseSourceText = c.caseSource === 'inbound' ? '自' : '開';
+        const caseSourceClass = c.caseSource === 'inbound' ? 'inbound' : 'outbound';
+        const caseSourceBadge = `<span class="source-badge ${caseSourceClass}" title="案源: ${c.caseSource === 'inbound' ? '自來' : '開發'}">${caseSourceText}</span>`;
+
+        // 3. 來源 (緣/轉/陌)
+        let sourceBadge = '';
+        if (c.source === 'relative') {
+          const tagsText = (c.relativeTags && c.relativeTags.length > 0) ? c.relativeTags.join(', ') : '無標籤';
+          sourceBadge = `<span class="source-badge relative" title="緣故 (${tagsText})">緣</span>`;
+        } else if (c.source === 'referral') {
+          const refText = c.referrerName || '未填寫介紹人';
+          sourceBadge = `<span class="source-badge referral" title="轉介人: ${refText}">轉</span>`;
+        } else {
+          sourceBadge = `<span class="source-badge cold" title="陌開開發">陌</span>`;
+        }
+
+        // 動態計算 SA 回覆與意願標籤狀態
+        let replyText = '未回覆';
+        let replyClass = '';
+        if (c.saDetails.replyState === 'active') {
+          if (c.saDetails.intentState === 'intent-pending') {
+            replyText = '互動中';
+            replyClass = 'active intent-pending';
+          } else if (c.saDetails.intentState === 'intent-no') {
+            replyText = '無意願';
+            replyClass = 'active intent-no';
+          } else {
+            replyText = '互動中';
+            replyClass = 'active intent-pending';
+          }
+        }
+
+        // 算出 SA 第三個按鈕「約定」的三種狀態 (未約定、喬時間、已約定) - 不顯示日期
+        let agreeText = '未約定';
+        let agreeClass = '';
+        if (c.saDetails.agreeState === 'active') {
+          agreeText = '已約定';
+          agreeClass = 'active agree';
+        } else if (c.oaDetails.meetState === 'pending') {
+          agreeText = '喬時間';
+          agreeClass = 'active pending';
+        } else {
+          agreeText = '未約定';
+          agreeClass = '';
+        }
+
+        const saDateText = formatShortDate(c.saDetails.sendDate || '');
+        const oaDateText = formatShortDate(c.oaDetails.meetDate || '');
+        const pcDateText = formatShortDate((c.pcDetails && c.pcDetails.meetDate) || '');
+        const cDateText = formatShortDate((c.cDetails && c.cDetails.meetDate) || '');
+        const sDateText = formatShortDate((c.sDetails && c.sDetails.meetDate) || '');
+
+        const visitTypeText = c.visitType === 'life' ? '生' : '議';
+        const visitTypeClass = c.visitType === 'life' ? 'life-visit' : 'issue-visit';
+        const visitTypeBadge = `<span class="source-badge ${visitTypeClass}" title="訪談類型: ${c.visitType === 'life' ? '生活訪' : '議題訪'}">${visitTypeText}</span>`;
+
+        // 迫切度微章 (今日約訪與喬時間中)
+        let urgencyBadge = '';
+        const todayStr = new Date().toISOString().split('T')[0];
+        const sa = c.saDetails || {};
+        const oa = c.oaDetails || {};
+        const pc = c.pcDetails || {};
+        const cc = c.cDetails || {};
+        const s = c.sDetails || {};
+        
+        let hasTodayMeet = false;
+        let hasPendingMeet = false;
+        
+        if (c.currentPhase === 'SA' && sa.agreeDate === todayStr) hasTodayMeet = true;
+        if (c.currentPhase === 'OA' && oa.meetDate === todayStr) hasTodayMeet = true;
+        if (c.currentPhase === 'PC' && pc.meetDate === todayStr) hasTodayMeet = true;
+        if (c.currentPhase === 'C' && cc.meetDate === todayStr) hasTodayMeet = true;
+        if (c.currentPhase === 'S' && s.meetDate === todayStr) hasTodayMeet = true;
+        
+        if (c.currentPhase === 'OA' && oa.meetState === 'pending') hasPendingMeet = true;
+        if (c.currentPhase === 'PC' && pc.meetState === 'pending') hasPendingMeet = true;
+        if (c.currentPhase === 'C' && cc.meetState === 'pending') hasPendingMeet = true;
+        if (c.currentPhase === 'S' && s.meetState === 'pending') hasPendingMeet = true;
+        
+        if (hasTodayMeet) {
+          urgencyBadge = `<span class="urgency-badge today-visit" title="今日有約訪流程！">🔥 今日約訪</span>`;
+        } else if (hasPendingMeet) {
+          urgencyBadge = `<span class="urgency-badge pending-visit" title="時間喬定中">⚡️ 待確認</span>`;
+        }
+
+        row.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 4px; min-width: 0; flex-shrink: 0;">
+            <div style="display: flex; gap: 2px; flex-shrink: 0; align-items: center;">
+              ${typeBadge}
+              ${visitTypeBadge}
+              ${sourceBadge}
+              ${caseSourceBadge}
+            </div>
+            <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
+            <div class="client-name" onclick="openDrawer('${c.id}', 'client')">${(c.clientName || '').slice(0, 5)}</div>
+            <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
+            <div class="issue-start" onclick="openDrawer('${c.id}', 'issue')">${(c.issueName || '').slice(0, 5)}</div>
+          </div>
+          <div class="flow-track">
+            <!-- SA (以發出日期為主亮燈) -->
+            <div class="flow-node ${getNodeStatus(c, 'SA')}" data-phase="SA" 
+                 onclick="onNodeClick(event, '${c.id}', 'SA')">
+              <div class="node-core-container">
+                <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${saDateText}</div>
+                <div class="node-dot">SA</div>
+                <div class="sub-tag-group" onclick="event.stopPropagation()">
+                  <span class="sub-tag-btn ${c.saDetails.sendState === 'active' ? 'active send' : ''}" onclick="toggleSASendDirect('${c.id}', event)">${c.saDetails.sendState === 'active' ? '已發出' : '未發出'}</span>
+                  <span class="sub-tag-btn ${replyClass}" onclick="cycleSAReplyDirect('${c.id}', event)">${replyText}</span>
+                  <span class="sub-tag-btn ${agreeClass}" onclick="toggleSAAgreeDirect('${c.id}', event)">${agreeText}</span>
+                </div>
+              </div>
+            </div>
+            <!-- OA (以會面日期為主亮燈) -->
+            <div class="flow-node ${getNodeStatus(c, 'OA')}" data-phase="OA" onclick="onNodeClick(event, '${c.id}', 'OA')">
+              <div class="node-core-container">
+                <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${oaDateText}</div>
+                <div class="node-dot">OA</div>
+                <div class="sub-tag-group" onclick="event.stopPropagation()">
+                  <span class="sub-tag-btn ${c.oaDetails.planState === 'active' ? 'active plan' : ''}" onclick="toggleOAPlanDirect('${c.id}', event)">${fmtSubLabel('訪前規劃', c.oaDetails.planState === 'active' ? c.oaDetails.planDate : '')}</span>
+                  <span class="sub-tag-btn ${c.oaDetails.practiceState === 'active' ? 'active practice' : ''}" onclick="toggleOAPracticeDirect('${c.id}', event)">${fmtSubLabel('訪前演練', c.oaDetails.practiceState === 'active' ? c.oaDetails.practiceDate : '')}</span>
+                  <span class="sub-tag-btn ${c.oaDetails.discussState === 'active' ? 'active discuss' : ''}" onclick="toggleOADiscussDirect('${c.id}', event)">${fmtSubLabel('訪後討論', c.oaDetails.discussState === 'active' ? c.oaDetails.discussDate : '')}</span>
+                </div>
+              </div>
+            </div>
+            <!-- PC (以遞送日期為主亮燈) -->
+            <div class="flow-node ${getNodeStatus(c, 'PC')}" data-phase="PC" onclick="onNodeClick(event, '${c.id}', 'PC')">
+              <div class="node-core-container">
+                <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${pcDateText}</div>
+                <div class="node-dot">PC</div>
+                <div class="sub-tag-group" onclick="event.stopPropagation()">
+                  <span class="sub-tag-btn ${c.pcDetails.planState === 'active' ? 'active pc-plan' : ''}" onclick="togglePCPlanDirect('${c.id}', event)">${fmtSubLabel('規劃建議', c.pcDetails.planState === 'active' ? c.pcDetails.planDate : '')}</span>
+                  <span class="sub-tag-btn ${c.pcDetails.discussState === 'active' ? 'active pc-discuss' : ''}" onclick="togglePCDiscussDirect('${c.id}', event)">${fmtSubLabel('已傳建議', c.pcDetails.discussState === 'active' ? c.pcDetails.discussDate : '')}</span>
+                  <span class="sub-tag-btn ${c.pcDetails.practiceState === 'active' ? 'active pc-practice' : ''}" onclick="togglePCPracticeDirect('${c.id}', event)">${fmtSubLabel('講解演練', c.pcDetails.practiceState === 'active' ? c.pcDetails.practiceDate : '')}</span>
+                </div>
+              </div>
+            </div>
+            <!-- C -->
+            <div class="flow-node ${getNodeStatus(c, 'C')}" data-phase="C" onclick="onNodeClick(event, '${c.id}', 'C')">
+              <div class="node-core-container">
+                <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${cDateText}</div>
+                <div class="node-dot">C</div>
+                <div class="sub-tag-group" onclick="event.stopPropagation()">
+                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : ''}" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('照會防範', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : ''}" onclick="toggleCPracticeDirect('${c.id}', event)">${fmtSubLabel('要保簽署', c.cDetails.practiceState === 'active' ? c.cDetails.practiceDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : ''}" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
+                </div>
+              </div>
+            </div>
+            <!-- S -->
+            <div class="flow-node ${getNodeStatus(c, 'S')}" data-phase="S" onclick="onNodeClick(event, '${c.id}', 'S')">
+              <div class="node-core-container">
+                <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${sDateText}</div>
+                <div class="node-dot">S</div>
+                <div class="sub-tag-group" onclick="event.stopPropagation()">
+                  <span class="sub-tag-btn ${c.sDetails.planState === 'active' ? 'active s-plan' : ''}" onclick="toggleSPlanDirect('${c.id}', event)">${fmtSubLabel('保單送達', c.sDetails.planState === 'active' ? c.sDetails.planDate : '')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.practiceState === 'active' ? 'active s-practice' : ''}" onclick="toggleSPracticeDirect('${c.id}', event)">${fmtSubLabel('契撤追蹤', c.sDetails.practiceState === 'active' ? c.sDetails.practiceDate : '')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : ''}" onclick="toggleSDiscussDirect('${c.id}', event)">${fmtSubLabel('週年服務', c.sDetails.discussState === 'active' ? c.sDetails.discussDate : '')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        body.appendChild(row);
+
+        // 建立對應的抽屜列
+        const drawerRow = document.createElement('div');
+        drawerRow.className = 'drawer-row';
+        drawerRow.id = `drawer-row-${c.id}`;
+        drawerRow.innerHTML = `
+          <div class="drawer-handle" onclick="closeAllDrawers()"></div>
+          <div class="drawer-arrow" id="drawer-arrow-${c.id}"></div>
+          <div class="drawer-container" id="drawer-content-${c.id}"></div>
+        `;
+        body.appendChild(drawerRow);
+      });
+
+      // 恢復先前開啟的抽屜狀態 (防止更新時關閉，並防呆已刪除案件)
+      if (activeDrawerState.caseId && activeDrawerState.section) {
+        const caseExists = cases.some(item => item.id === activeDrawerState.caseId);
+        if (caseExists) {
+          openDrawer(activeDrawerState.caseId, activeDrawerState.section, true);
+        } else {
+          activeDrawerState.caseId = null;
+          activeDrawerState.section = null;
+        }
+      }
+
+      // 更新週約訪統計
+      renderWeeklyFunnel();
+    }
+
+    // 全域關閉所有抽屜的方法
+    function closeAllDrawers() {
+      document.querySelectorAll('.drawer-row').forEach(row => {
+        row.style.display = 'none';
+        row.dataset.activeSection = '';
+      });
+      activeDrawerState.caseId = null;
+      activeDrawerState.section = null;
+    }
+
+    // 開啟抽屜，動態定位箭頭並渲染特定內容
+    function openDrawer(caseId, section, forceOpen = false) {
+      const c = cases.find(item => item.id === caseId);
+      const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+      const arrow = document.getElementById(`drawer-arrow-${caseId}`);
+      
+      // 如果已經點擊了同一個 section，且不是強制開啟，則關閉抽屜
+      if (!forceOpen && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === section) {
+        drawerRow.style.display = 'none';
+        drawerRow.dataset.activeSection = '';
+        activeDrawerState.caseId = null;
+        activeDrawerState.section = null;
+        return;
+      }
+
+      // 關閉所有其他抽屜
+      document.querySelectorAll('.drawer-row').forEach(row => {
+        if (row.id !== `drawer-row-${caseId}`) {
+          row.style.display = 'none';
+          row.dataset.activeSection = '';
+        }
+      });
+
+      // 記錄當前開啟的狀態
+      activeDrawerState.caseId = caseId;
+      activeDrawerState.section = section;
+
+      const rowElement = document.querySelector(`.case-row[data-id="${caseId}"]`);
+      if (!rowElement) return; // 防呆安全退出，防止 JS 崩潰中斷後續代碼
+      let targetElement;
+      if (section === 'issue') {
+        targetElement = rowElement.querySelector('.issue-start');
+      } else if (section === 'client') {
+        targetElement = rowElement.querySelector('.client-name');
+      } else {
+        targetElement = rowElement.querySelector(`.flow-node[data-phase="${section}"]`);
+      }
+
+      const rowRect = rowElement.getBoundingClientRect();
+      const targetRect = targetElement.getBoundingClientRect();
+      const elementLeft = targetRect.left - rowRect.left;
+      const elementWidth = targetRect.width;
+      const rowWidth = rowRect.width;
+
+      // 依據不同階段與裝置設定檔決定抽屜總寬度 (drawerWidth)
+      let drawerWidth = 720;
+      if (section === 'client' || section === 'SA') {
+        drawerWidth = 800;
+      } else if (section === 'S') {
+        drawerWidth = 520;
+      } else if (section === 'OA' || section === 'PC' || section === 'C' || section === 'issue') {
+        drawerWidth = 680;
+      }
+      
+      let alignOffset = 300;
+
+      // Tablet Fix: 重新調整平板與桌機之 RWD 斷點，並做響應式定位與對齊，防止橫向溢出
+      if (window.innerWidth >= 1024) {
+        const lightCenter = elementLeft + elementWidth / 2;
+        let computedLeft = lightCenter - (drawerWidth / 2);
+        
+        // 避免超出右邊界
+        if (computedLeft + drawerWidth > rowWidth - 20) {
+          computedLeft = rowWidth - 20 - drawerWidth;
+        }
+        
+        // 避免超出左邊界
+        if (computedLeft < 10) computedLeft = 10;
+
+        drawerContent.style.marginLeft = `${computedLeft}px`;
+        drawerContent.style.width = `${drawerWidth}px`;
+
+        // 箭頭定位在亮燈中心
+        const arrowLeft = (targetRect.left + targetRect.width / 2) - rowRect.left;
+        arrow.style.left = `${arrowLeft - 8}px`;
+      } else if (window.innerWidth >= 768 && window.innerWidth < 1024) {
+        // Tablet Fix: 平板裝置 (768px ~ 1024px)，寬度動態計算，避免超出邊界
+        const padding = 20;
+        const dynamicWidth = rowWidth - padding * 2;
+        const computedLeft = padding; // 置中對齊
+
+        drawerContent.style.marginLeft = `${computedLeft}px`;
+        drawerContent.style.width = `${dynamicWidth}px`;
+
+        // 箭頭定位在亮燈中心
+        const arrowLeft = (targetRect.left + targetRect.width / 2) - rowRect.left;
+        arrow.style.left = `${arrowLeft - 8}px`;
+      } else {
+        // 手機版寬度滿格、無 margin
+        drawerContent.style.marginLeft = '0';
+        drawerContent.style.width = '100%';
+        arrow.style.left = '50%';
+      }
+
+      // 初始化抽屜內容容器，並渲染頂部統一控制列
+      drawerContent.innerHTML = '';
+
+      if (['OA', 'PC', 'C', 'S'].includes(section)) {
+        const headerDiv = document.createElement('div');
+        headerDiv.style.cssText = 'display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:6px; margin-bottom:10px;';
+
+        const titleSpan = document.createElement('span');
+        titleSpan.style.cssText = 'font-size:0.82rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;';
+        
+        let titlePrefix = '💼 案件基本管理';
+        if (section === 'issue') titlePrefix = '📋 邀約議題設定';
+        else if (section === 'OA') titlePrefix = '📋 需求分析 OA 設定';
+        else if (section === 'PC') titlePrefix = '📋 建議草案 PC 設定';
+        else if (section === 'C') titlePrefix = '📋 成交簽約 C 設定';
+        else if (section === 'S') titlePrefix = '📋 售後服務 S 設定';
+        
+        titleSpan.innerHTML = titlePrefix;
+        headerDiv.appendChild(titleSpan);
+
+        const btnGroup = document.createElement('div');
+        btnGroup.style.cssText = 'display:flex; gap:6px; align-items:center;';
+
+
+
+        // 完成按鈕
+        const doneBtn = document.createElement('button');
+        doneBtn.className = 'btn btn-primary';
+        doneBtn.style.cssText = 'padding: 2px 6px; font-size: 0.72rem; height: 22px; background:var(--color-c); color:#000; font-weight:700;';
+        doneBtn.innerHTML = '✓ 完成';
+        doneBtn.onclick = () => {
+          drawerRow.style.display = 'none';
+          drawerRow.dataset.activeSection = '';
+          activeDrawerState.caseId = null;
+          activeDrawerState.section = null;
+        };
+        btnGroup.appendChild(doneBtn);
+
+        headerDiv.appendChild(btnGroup);
+        drawerContent.appendChild(headerDiv);
+      }
+
+      // 建立抽屜主體容器
+      const mainContainer = document.createElement('div');
+      mainContainer.id = `drawer-main-${caseId}`;
+      drawerContent.appendChild(mainContainer);
+
+      if (section === 'issue') {
+        renderIssueDrawer(c, mainContainer);
+      } else if (section === 'client') {
+        renderClientDrawer(c, mainContainer);
+      } else if (section === 'SA') {
+        renderSADrawer(c, mainContainer);
+      } else if (section === 'OA') {
+        renderOADrawer(c, mainContainer);
+      } else if (section === 'PC') {
+        renderPCDrawer(c, mainContainer);
+      } else if (section === 'C') {
+        renderCDrawer(c, mainContainer);
+      } else if (section === 'S') {
+        renderSDrawer(c, mainContainer);
+      } else {
+        mainContainer.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 20px 0;">此階段 [${section}] 的小流程設計正在對齊中...<br><span style="font-size:0.75rem; color:var(--color-sa);">[提示] 雙擊節點可以直接切換至該進度階段</span></div>`;
+      }
+
+      // 顯示抽屜
+      drawerRow.style.display = 'block';
+      drawerRow.dataset.activeSection = section;
+
+      // 自動聚焦輸入欄位 (Auto-focus) - ADHD UX
+      if (section === 'issue') {
+        const input = document.getElementById(`input-issue-name-${c.id}`);
+        if (input) {
+          input.focus();
+          const len = input.value.length;
+          input.setSelectionRange(len, len);
+        }
+      } else if (section === 'client') {
+        const input = document.getElementById(`input-client-name-${c.id}`);
+        if (input) {
+          input.focus();
+          const len = input.value.length;
+          input.setSelectionRange(len, len);
+        }
+      }
+    }
+    function closeCaseDrawer(caseId) {
+      const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+      if (drawerRow) {
+        drawerRow.style.display = 'none';
+        drawerRow.dataset.activeSection = '';
+        activeDrawerState.caseId = null;
+        activeDrawerState.section = null;
+      }
+    }
+
+    // 登記新改期紀錄
+    function showRescheduleRegisterForm(caseId, phase) {
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+      
+      const phaseKey = phase + 'Details';
+      const details = c[phaseKey];
+      if (!details) return;
+
+      const dateFieldPlaceholder = "請選擇新改期日期";
+      const htmlBody = `
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+          <div class="form-group">
+            <label style="font-size:0.75rem; color:var(--text-secondary); white-space:nowrap;">⏰ 新的預定日期</label>
+            <input type="text" id="reschedule-new-date" readonly placeholder="${dateFieldPlaceholder}" onclick="showCustomDatePicker(this, '${caseId}', '', 'none')" style="height: 28px; font-size:0.8rem; padding: 4px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; width:100%; cursor:pointer;">
+          </div>
+          <div class="form-group">
+            <label style="font-size:0.75rem; color:var(--text-secondary); white-space:nowrap;">📝 改期原因備忘</label>
+            <textarea id="reschedule-reason" placeholder="請輸入本次改期的原因或約定細節..." style="height:50px; resize:none; font-size:0.8rem; padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; width:100%;"></textarea>
+          </div>
+        </div>
+      `;
+
+      showConfirm({
+        icon: '📅',
+        title: '登記新的改期紀錄',
+        body: htmlBody,
+        okText: '登記送出',
+        okStyle: 'background:var(--color-sa); color:#000; font-weight:700; border-color:var(--color-sa);',
+        onOk: () => {
+          const newDate = document.getElementById('reschedule-new-date').value;
+          const reason = document.getElementById('reschedule-reason').value;
+          if (!newDate) {
+            showToast("未選擇改期日期，登記失敗", "error");
+            return;
+          }
+
+          if (!details.rescheduleHistory) details.rescheduleHistory = [];
+          
+          updateCase(caseId, item => {
+            const itemDetails = item[phase + 'Details'];
+            if (!itemDetails.rescheduleHistory) itemDetails.rescheduleHistory = [];
+            itemDetails.rescheduleHistory.push({
+              newDate: newDate,
+              reason: reason,
+              recordedAt: new Date().toISOString().split('T')[0]
+            });
+            itemDetails.meetDate = newDate;
+          });
+          showToast("已登記改期紀錄", "success");
+
+          // 重新整理抽屜內容
+          const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+          if (drawerContent) {
+            const activeSection = document.getElementById(`drawer-row-${caseId}`).dataset.activeSection;
+            openDrawer(caseId, activeSection, true);
+          }
+        }
+      });
+    }
+
+    // 顯示與管理改期細節 (支援刪除)
+    function showRescheduleDetail(caseId, phase, index) {
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+      const phaseKey = phase + 'Details';
+      const details = c[phaseKey];
+      if (!details || !details.rescheduleHistory) return;
+      const item = details.rescheduleHistory[index];
+      if (!item) return;
+
+      showConfirm({
+        icon: '📝',
+        title: `第 ${index + 1} 次改期詳情`,
+        body: `
+          <div style="font-size:0.8rem; line-height:1.5;">
+            <div><b>登記時間：</b>${item.recordedAt || '無紀錄'}</div>
+            <div style="margin-top:4px;"><b>改期至：</b><span style="color:#fb923c; font-weight:700;">${item.newDate}</span></div>
+            <div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px;">
+              <b>原因備忘：</b><br>
+              <div style="color:var(--text-secondary); white-space:pre-wrap; margin-top:4px; background:rgba(0,0,0,0.15); padding:6px; border-radius:4px; max-height:120px; overflow-y:auto;">${item.reason || '未填寫原因'}</div>
+            </div>
+          </div>
+        `,
+        okText: '刪除此紀錄',
+        okStyle: 'background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#ef4444;',
+        onOk: () => {
+          updateCase(caseId, item => {
+            const itemDetails = item[phase + 'Details'];
+            itemDetails.rescheduleHistory.splice(index, 1);
+          });
+          showToast("已刪除該筆改期紀錄", "success");
+          
+          // 重新整理抽屜內容
+          const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+          if (drawerContent) {
+            const activeSection = document.getElementById(`drawer-row-${caseId}`).dataset.activeSection;
+            openDrawer(caseId, activeSection, true);
+          }
+        }
+      });
+    }
+
+
+    // === NBS Risk Lock & Confetti ===
+    let pendingPhaseTransition = null;
+
+    function closeRiskLockModal() {
+      document.getElementById('risk-lock-modal').classList.remove('active');
+      document.getElementById('risk-lock-form').reset();
+      pendingPhaseTransition = null;
+    }
+
+    function submitRiskLock(event) {
+      event.preventDefault();
+      if (!pendingPhaseTransition) return;
+      
+      const { caseId, newPhase } = pendingPhaseTransition;
+      const radio = document.querySelector('input[name="nbs-risk-focus"]:checked');
+      if (!radio) return;
+      
+      const selectedFocus = radio.value;
+      
+      updateCase(caseId, c => {
+        if (!c.preparedIssues) {
+          c.preparedIssues = [];
+        }
+        if (!c.preparedIssues.includes(selectedFocus)) {
+          c.preparedIssues.push(selectedFocus);
+        }
+        c.currentPhase = newPhase;
+      });
+      
+      showToast(`已解鎖！案件進度推移至 [${newPhase}] 階段`, 'success');
+      triggerConfetti();
+      closeRiskLockModal();
+      openDrawer(caseId, newPhase, true);
+    }
+
+    // === Canvas Confetti 粒子紙花動畫 ===
+    function triggerConfetti() {
+      let canvas = document.getElementById('confetti-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'confetti-canvas';
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100vw';
+        canvas.style.height = '100vh';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '9999';
+        document.body.appendChild(canvas);
+      }
+      
+      const ctx = canvas.getContext('2d');
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      
+      const particles = [];
+      const colors = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#ec4899'];
+      
+      for (let i = 0; i < 120; i++) {
+        particles.push({
+          x: width / 2 + (Math.random() - 0.5) * 50,
+          y: height + 20,
+          vx: (Math.random() - 0.5) * 15,
+          vy: -Math.random() * 20 - 10,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          size: Math.random() * 6 + 4,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 10
+        });
+      }
+      
+      let animationFrameId;
+      function update() {
+        ctx.clearRect(0, 0, width, height);
+        let active = false;
+        
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.4;
+          p.vx *= 0.98;
+          p.rotation += p.rotationSpeed;
+          
+          if (p.y < height + 20) {
+            active = true;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rotation * Math.PI / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            ctx.restore();
+          }
+        });
+        
+        if (active) {
+          animationFrameId = requestAnimationFrame(update);
+        } else {
+          cancelAnimationFrame(animationFrameId);
+          canvas.remove();
+        }
+      }
+      
+      update();
+    }
+
+    // 雙擊主幹道節點 - 直接變更案件當前階段 (誤觸防呆)
+    function changePhaseDirect(caseId, phase) {
+      const c = cases.find(item => item.id === caseId);
+      if (c) {
+        const stageOrder = ['SA', 'OA', 'PC', 'C', 'S'];
+        const currentIdx = stageOrder.indexOf(c.currentPhase);
+        const newIdx = stageOrder.indexOf(phase);
+        
+        if (newIdx > currentIdx) {
+          // 前進階段：觸發 NBS 防呆鎖
+          pendingPhaseTransition = { caseId, newPhase: phase };
+          document.getElementById('risk-lock-modal').classList.add('active');
+        } else {
+          // 後退或相同階段：直接變更
+          updateCase(caseId, c => {
+            c.currentPhase = phase;
+          });
+          showToast(`已雙擊！案件進度回退至 [${phase}] 階段`, 'success');
+          openDrawer(caseId, phase, true);
+        }
+      }
+    }
+
+    // 雙擊「時間已確定」按鈕 - 聯動推移至 OA 階段 (防呆)
+    function triggerOAPhaseDirect(caseId) {
+      const c = cases.find(item => item.id === caseId);
+      if (c) {
+        showConfirm({
+          icon: '🤝',
+          title: '切換至 OA 階段',
+          body: '您即將設定 OA 需求面談，是否確認將案件進度推移至需求分析 (OA) 階段？',
+          okText: '確認切換',
+          okStyle: 'background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #34d399;',
+          onOk: () => {
+            c.currentPhase = 'OA';
+            c.oaDetails.meetState = 'confirmed';
+            showToast('已雙擊時間已確定！進度已切換至需求分析 (OA)', 'success');
+            renderCases();
+            openDrawer(caseId, 'SA'); // 保持 SA 抽屜觀察聯動
+          }
+        });
+      }
+    }
+
+    // 取得統一的案件基本管理區塊 HTML (左半部)
+    function getUnifiedLeftColumnHTML(c, isClientDrawer = false) {
+      if (!c.contactMethods) c.contactMethods = [];
+      if (!c.contactDetails) c.contactDetails = {};
+      
+      const contactItems = [
+        { key: 'LINE',  label: 'LINE',  placeholder: '輸入 LINE 帳號', inputLabel: '名稱' },
+        { key: 'FB',    label: 'FB',    placeholder: '輸入 FB 帳號', inputLabel: '帳號' },
+        { key: 'IG',    label: 'IG',    placeholder: '輸入 IG 帳號', inputLabel: '帳號' },
+      ];
+
+      const contactHTML = contactItems.map(item => {
+        const isChecked = c.contactMethods.includes(item.key);
+        const val = c.contactDetails[item.key] || '';
+        return `
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,${isChecked ? '0.12' : '0.04'}); border-radius: 6px; padding: 4px 6px; display: flex; align-items: center; gap: 8px;">
+            <label class="checkbox-tag-label" style="margin: 0; min-width: 44px; text-align: center; font-size: 0.72rem; padding: 2px 4px;">
+              <input type="checkbox" value="${item.key}" ${isChecked ? 'checked' : ''} onchange="toggleContactMethod('${c.id}', '${item.key}')" style="display:none;">
+              ${item.label}
+            </label>
+            <div style="flex: 1; display: flex; align-items: center;">
+              <input type="text" value="${val}" placeholder="${item.placeholder}" style="flex:1; font-size: 0.78rem; padding: 2px 6px; height: 22px; ${!isChecked ? 'opacity:0.35; pointer-events:none;' : ''}" onchange="updateContactDetail('${c.id}', '${item.key}', this.value)">
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="drawer-left-column">
+          
+          <div class="form-group">
+            <label style="font-size: 0.75rem;">客戶姓名</label>
+            <input type="text" id="input-client-name-${c.id}" value="${c.clientName}" onchange="updateCaseField('${c.id}', 'clientName', this.value)" style="height: 26px; font-size: 0.78rem; padding: 4px 6px;">
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.75rem;">聯絡管道與帳號</label>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              ${contactHTML}
+            </div>
+          </div>
+
+          ${isClientDrawer ? `
+          <!-- 移到右面版底部，此處保留空白以利視覺延伸 -->
+          ` : `
+          <div style="margin-top: auto; padding-top: 10px; display: flex; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn" onclick="deleteCase('${c.id}')" style="flex: 1; padding: 4px 6px; font-size: 0.72rem; justify-content: center; height: 26px; color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05);">
+              🗑️ 刪除案件
+            </button>
+          </div>
+          `}
+        </div>
+      `;
+    }
+
+
+
+    // 渲染「客戶資料維護」抽屜內容    function renderClientDrawer(c, container) {
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          ${getUnifiedLeftColumnHTML(c, true)}
+          
+          <!-- 中面版：案件分類 -->
+          <div style="flex: 1.1; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border-color); padding-right: 20px; min-width: 0; justify-content: center;">
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; width: 100%;">
+              <div>
+                <label style="display: block; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600;">訪談類型</label>
+                <div style="display: flex; gap: 6px; width: 100%;">
+                  <button type="button" class="btn btn-tab ${c.visitType !== 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'issue')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">議題訪</button>
+                  <button type="button" class="btn btn-tab ${c.visitType === 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'life')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">生活訪</button>
+                </div>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600;">險種分類</label>
+                <div style="display: flex; gap: 6px; width: 100%;">
+                  <button type="button" class="btn btn-tab ${c.type === 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'type', 'life')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">壽險</button>
+                  <button type="button" class="btn btn-tab ${c.type === 'property' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'type', 'property')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">產險</button>
+                </div>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600;">開拓管道</label>
+                <div style="display: flex; gap: 6px; width: 100%;">
+                  <button type="button" class="btn btn-tab ${c.caseSource === 'outbound' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'caseSource', 'outbound')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">開發客</button>
+                  <button type="button" class="btn btn-tab ${c.caseSource === 'inbound' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'caseSource', 'inbound')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">自來客</button>
+                </div>
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600;">客戶來源</label>
+                <div style="display: flex; gap: 6px; width: 100%;">
+                  <button type="button" class="btn btn-tab ${c.source === 'relative' ? 'active' : ''}" onclick="updateClientSource('${c.id}', 'relative')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">緣故</button>
+                  <button type="button" class="btn btn-tab ${c.source === 'referral' ? 'active' : ''}" onclick="updateClientSource('${c.id}', 'referral')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">轉介</button>
+                  <button type="button" class="btn btn-tab ${c.source === 'cold' ? 'active' : ''}" onclick="updateClientSource('${c.id}', 'cold')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">陌開</button>
+                </div>
+              </div>
+            </div>
+            <div id="referral-field-${c.id}" class="form-group" style="display: ${c.source === 'referral' ? 'flex' : 'none'}; margin-top: 4px;">
+              <label style="font-size: 0.75rem;">介紹人姓名</label>
+              <input type="text" value="${c.referrerName || ''}" placeholder="是誰介紹來的？" onchange="updateCaseField('${c.id}', 'referrerName', this.value)" style="height: 24px; font-size: 0.78rem; padding: 4px 6px;">
+            </div>
+          </div>
+
+          <!-- 右面版：備忘備註 -->
+          <div style="flex: 1.2; display: flex; flex-direction: column; gap: 10px; min-width: 0; justify-content: space-between;">
+            <div class="form-group" style="margin-top: 6px; flex: 1; display: flex; flex-direction: column;">
+              <label style="font-size: 0.75rem;">全局備忘備註</label>
+              <textarea placeholder="記下此客戶的性格特色、拜訪偏好或家庭狀況..." style="flex: 1; min-height: 100px; font-size: 0.78rem; resize: none; padding: 6px; width: 100%; box-sizing: border-box;" onchange="updateCaseField('${c.id}', 'note', this.value)">${c.note || ''}</textarea>
+            </div>
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 5px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button type="button" class="btn" onclick="deleteCase('${c.id}')" style="flex: 1; padding: 4px 5px; font-size: 0.65rem; justify-content: center; height: 24px; color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05);">🗑️ 刪除</button>
+              <button type="button" class="btn" onclick="toggleArchive('${c.id}')" style="flex: 1; padding: 4px 5px; font-size: 0.65rem; justify-content: center; height: 24px;">${c.archived ? '🔓 解除' : '📦 封存'}</button>
+              <button type="button" class="btn btn-primary" onclick="closeCaseDrawer('${c.id}')" style="flex: 1; padding: 4px 5px; font-size: 0.65rem; justify-content: center; height: 24px; background:var(--color-c); color:#000; font-weight:700;">✓ 儲存</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+
+
+
+
+    // 封存 / 解除封存
+    function toggleArchive(caseId) {
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+
+      if (!c.archived) {
+        // 封存確認
+        showConfirm({
+          icon: '📦',
+          title: '確認封存此案件',
+          body: `<b>${c.clientName}</b> 的案件將從主列表中隱藏。<br>所有資料完整保留，可隨時解除封存。`,
+          okText: '確定封存',
+          okStyle: 'background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;',
+          onOk: () => {
+            updateCase(caseId, item => {
+              item.archived = true;
+            });
+            showToast(`已封存：${c.clientName}`, 'success');
+          }
+        });
+      } else {
+        // 解除封存確認
+        showConfirm({
+          icon: '🔓',
+          title: '確認解除封存',
+          body: `<b>${c.clientName}</b> 的案件將重新顯示於主列表中。`,
+          okText: '確定解除',
+          okStyle: 'background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.4); color: #818cf8;',
+          onOk: () => {
+            updateCase(caseId, item => {
+              item.archived = false;
+            });
+            showToast(`已解除封存：${c.clientName}`, 'success');
+          }
+        });
+      }
+    }
+
+    // 更新客戶來源類型
+    function updateClientSource(caseId, sourceValue) {
+      updateCase(caseId, item => {
+        item.source = sourceValue;
+        if (sourceValue !== 'referral') item.referrerName = '';
+        if (sourceValue !== 'relative') item.relativeTags = [];
+      });
+      const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+      if (drawerRow && drawerRow.style.display === 'block') {
+        const activeSection = drawerRow.dataset.activeSection;
+        openDrawer(caseId, activeSection, true);
+      }
+    }
+
+
+
+
+    // 複選聯絡方式
+    function toggleContactMethod(caseId, method) {
+      updateCase(caseId, item => {
+        if (!item.contactMethods) item.contactMethods = [];
+        const index = item.contactMethods.indexOf(method);
+        if (index > -1) {
+          item.contactMethods.splice(index, 1);
+        } else {
+          item.contactMethods.push(method);
+        }
+      });
+      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+      if (drawerContent) {
+        const c = cases.find(item => item.id === caseId);
+        renderClientDrawer(c, drawerContent);
+      }
+    }
+
+    // 儲存各聯絡方式的個別帳號/名稱
+    function updateContactDetail(caseId, key, value) {
+      updateCase(caseId, item => {
+        if (!item.contactDetails) item.contactDetails = {};
+        item.contactDetails[key] = value;
+      }, true); // 跳過重新渲染以利輸入流暢
+    }
+
+
+    // 渲染「議題起點」抽屜內容    function renderIssueDrawer(c, container) {
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          
+          <!-- 左面版：基本資訊 -->
+          <div class="drawer-left-column" style="gap: 10px; justify-content: center; min-width: 0; border-right: 1px solid var(--border-color); padding-right: 20px;">
+            <div class="form-group autocomplete-wrapper" style="margin: 0; width: 100%;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 4px;">輸入或選擇議題名稱</label>
+              <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                <input type="text" id="input-issue-name-${c.id}" value="${c.issueName}" 
+                       placeholder="請輸入或點選議題名稱..." 
+                       oninput="showTopicAutocomplete('${c.id}', this.value)"
+                       onfocus="showTopicAutocomplete('${c.id}', this.value)"
+                       onchange="updateCaseField('${c.id}', 'issueName', this.value)"
+                       style="padding-right: 28px; height: 26px; font-size: 0.78rem; width: 100%;">
+                <span class="dropdown-arrow-icon" style="position: absolute; right: 10px; cursor: pointer; pointer-events: none;">▼</span>
+              </div>
+              <div class="autocomplete-dropdown" id="dropdown-${c.id}"></div>
+            </div>
+            
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 4px;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: #b4befe;">議題想法產出日期</label>
+              <input type="text" readonly value="${c.issueDate}" placeholder="點擊選擇日期..." onclick="showCustomDatePicker(this, '${c.id}', 'issueDate', 'case')" style="width: 100%; padding: 0 10px; font-size: 0.78rem; height: 26px; line-height: 26px; cursor: pointer; background: #11111b; color: #fff; border: 1px solid #45475a; border-radius: 6px; text-align: center; outline: none; transition: var(--transition-smooth); box-sizing: border-box;">
+            </div>
+          </div>
+          
+          <!-- 右面版：發想備忘與確認按鈕 -->
+          <div style="flex: 1.2; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+            <div class="form-group" style="margin: 0; display: flex; flex-direction: column; gap: 4px; width: 100%; flex: 1;">
+              <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">議題發想備忘</label>
+              <textarea style="flex: 1; min-height: 54px; resize: none; font-size: 0.78rem; padding: 6px; box-sizing: border-box; width: 100%;" placeholder="簡單記下為什麼會有這個想法..." onchange="updateCaseField('${c.id}', 'issueNote', this.value)">${c.issueNote || ''}</textarea>
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }    function renderSADrawer(c, container) {
+      const sa = c.saDetails;
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          <div class="drawer-left-column" style="gap: 10px; justify-content: center; min-width: 0; border-right: 1px solid var(--border-color); padding-right: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px; height: 32px; flex-shrink: 0; width: 100%;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: #b4befe; width: 72px; white-space: nowrap;">發出日期</span>
+              <input type="text" readonly value="${sa.sendDate}" onclick="showCustomDatePicker(this, '${c.id}', 'sendDate', 'sa')" style="flex: 1; min-width: 0; padding: 0 10px; font-size: 0.8rem; height: 30px; line-height: 30px; cursor: pointer; background: #11111b; color: #fff; border: 1px solid #45475a; border-radius: 6px; text-align: center; transition: var(--transition-smooth); outline: none; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; height: 32px; flex-shrink: 0; width: 100%;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: #b4befe; width: 72px; white-space: nowrap;">回覆日期</span>
+              <input type="text" readonly value="${sa.replyDate}" onclick="showCustomDatePicker(this, '${c.id}', 'replyDate', 'sa')" style="flex: 1; min-width: 0; padding: 0 10px; font-size: 0.8rem; height: 30px; line-height: 30px; cursor: pointer; background: #11111b; color: #fff; border: 1px solid #45475a; border-radius: 6px; text-align: center; transition: var(--transition-smooth); outline: none; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; height: 32px; flex-shrink: 0; width: 100%;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: #b4befe; width: 72px; white-space: nowrap;">約定日期</span>
+              <input type="text" readonly value="${sa.agreeDate}" onclick="showCustomDatePicker(this, '${c.id}', 'agreeDate', 'sa')" style="flex: 1; min-width: 0; padding: 0 10px; font-size: 0.8rem; height: 30px; line-height: 30px; cursor: pointer; background: #11111b; color: #fff; border: 1px solid #45475a; border-radius: 6px; text-align: center; transition: var(--transition-smooth); outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+          <div style="flex: 1.1; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border-color); padding-right: 20px; min-width: 0; justify-content: center;">
+            <button class="status-badge-btn" onclick="updateOAField('${c.id}', 'meetState', 'pending')" style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid ${c.oaDetails.meetState !== 'confirmed' ? '#f38ba8' : '#313244'}; background: ${c.oaDetails.meetState !== 'confirmed' ? 'rgba(243, 139, 168, 0.15)' : '#313244'}; color: ${c.oaDetails.meetState !== 'confirmed' ? '#f38ba8' : '#a6adc8'};">喬時間中</button>
+            <button class="status-badge-btn" onclick="updateOAField('${c.id}', 'meetState', 'confirmed')" ondblclick="triggerOAPhaseDirect('${c.id}')" style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid ${c.oaDetails.meetState === 'confirmed' ? '#a6e3a1' : '#313244'}; background: ${c.oaDetails.meetState === 'confirmed' ? 'rgba(166, 227, 161, 0.15)' : '#313244'}; color: ${c.oaDetails.meetState === 'confirmed' ? '#a6e3a1' : '#a6adc8'};" title="雙擊此按鈕以直接切換進度至 OA 階段">時間已確定 🚀</button>
+            <div class="form-group" style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px; width: 100%;">
+              <label style="font-size: 0.75rem; color: #a6adc8; width: 100%;">預計會面日期</label>
+              <input type="text" readonly value="${c.oaDetails.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 'oa')" style="width: 100%; padding: 0 10px; font-size: 0.8rem; height: 30px; line-height: 30px; cursor: pointer; background: #11111b; color: #fff; border: 1px solid #45475a; border-radius: 6px; text-align: center; transition: var(--transition-smooth); outline: none; box-sizing: border-box;">
+            </div>
+          </div>
+          <div style="flex: 1.2; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+            <div class="form-group" style="margin-top: 6px; flex: 1; display: flex; flex-direction: column;">
+              <label style="font-size: 0.75rem;">約定階段備忘</label>
+              <textarea placeholder="" style="flex: 1; min-height: 70px; font-size: 0.78rem; resize: none; padding: 6px; width: 100%; box-sizing: border-box;" onchange="updateSADate('${c.id}', 'notes', this.value)">${sa.notes || ''}</textarea>
+            </div>
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+
+
+    function renderModalTopicList() {
+      const list = document.getElementById('modal-topic-list');
+      list.innerHTML = '';
+      globalTopics.forEach((t, index) => {
+        const item = document.createElement('div');
+        item.className = 'topic-list-item';
+        item.innerHTML = `
+          <span>${t}</span>
+          <button class="btn-delete-topic" onclick="deleteGlobalTopic(${index})">刪除</button>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    // 新增常規議題
+    function addGlobalTopic() {
+      const input = document.getElementById('new-topic-input');
+      const val = input.value.trim();
+      if (val) {
+        globalTopics.push(val);
+        localStorage.setItem('global_topics', JSON.stringify(globalTopics));
+        input.value = '';
+        renderModalTopicList();
+      }
+    }
+
+    // 刪除常規議題
+    function deleteGlobalTopic(index) {
+      globalTopics.splice(index, 1);
+      localStorage.setItem('global_topics', JSON.stringify(globalTopics));
+      renderModalTopicList();
+    }
+
+    // === 子流程按鈕點擊亮燈與抽屜引導連動邏輯 ===
+    function handleSubTagToggle(caseId, phase, stateKey, dateKey, dateFieldForSelector, event, forcePhase = null) {
+      if (event) event.stopPropagation();
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+      
+      const details = phase === 'oa' ? c.oaDetails :
+                      phase === 'pc' ? c.pcDetails :
+                      phase === 'c' ? c.cDetails : c.sDetails;
+      
+      const isActive = details[stateKey] === 'active';
+      if (!isActive) {
+        details[stateKey] = 'active';
+        details[dateKey] = ''; // 不預先設定今日日期，留空引導使用者設定
+        if (forcePhase) c.currentPhase = forcePhase;
+        
+        saveCasesToStorage();
+        renderCases();
+        
+        // 自動呼叫開啟對應階段的抽屜
+        openDrawer(caseId, phase.toUpperCase());
+        
+        // 彈出行事曆日期選擇器
+        setTimeout(() => {
+          const inputEl = document.querySelector(`#drawer-row-${caseId} input[onclick*="${dateFieldForSelector}"][onclick*="${phase}"]`);
+          if (inputEl) {
+            inputEl.click();
+          }
+        }, 150);
+      } else {
+        // 雙擊取消亮燈，清空日期
+        if (event && event.detail >= 2) {
+          updateCase(caseId, item => {
+            const itemDetails = phase === 'oa' ? item.oaDetails :
+                                phase === 'pc' ? item.pcDetails :
+                                phase === 'c' ? item.cDetails : item.sDetails;
+            itemDetails[stateKey] = 'dim';
+            itemDetails[dateKey] = '';
+          });
+        }
+      }
+    }
+
+    function toggleOAPlanDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'oa', 'planState', 'planDate', 'planDate', event);
+    }
+    function toggleOAPracticeDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'oa', 'practiceState', 'practiceDate', 'practiceDate', event);
+    }
+    function toggleOADiscussDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'oa', 'discussState', 'discussDate', 'discussDate', event, 'OA');
+    }
+
+    function togglePCPlanDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'pc', 'planState', 'planDate', 'planDate', event);
+    }
+    function togglePCPracticeDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'pc', 'practiceState', 'practiceDate', 'practiceDate', event);
+    }
+    function togglePCDiscussDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'pc', 'discussState', 'discussDate', 'discussDate', event, 'PC');
+    }
+
+    function toggleCPlanDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'c', 'planState', 'planDate', 'planDate', event);
+    }
+    function toggleCPracticeDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'c', 'practiceState', 'practiceDate', 'practiceDate', event);
+    }
+    function toggleCDiscussDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'c', 'discussState', 'discussDate', 'discussDate', event, 'C');
+    }
+
+    function toggleSPlanDirect(caseId, event) {
+      handleSubTagToggle(caseId, 's', 'planState', 'planDate', 'planDate', event);
+    }
+    function toggleSPracticeDirect(caseId, event) {
+      handleSubTagToggle(caseId, 's', 'practiceState', 'practiceDate', 'practiceDate', event);
+    }
+    function toggleSDiscussDirect(caseId, event) {
+      handleSubTagToggle(caseId, 's', 'discussState', 'discussDate', 'discussDate', event, 'S');
+    }
+
+    function updateCField(caseId, field, value) {
+      const isNote = field.endsWith('Notes') || field.endsWith('Note');
+      const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
+      updateCase(caseId, c => {
+        if (!c.cDetails) c.cDetails = {};
+        c.cDetails[field] = value;
+        if (field === 'meetDate') {
+          c.cDetails.meetState = value ? 'confirmed' : 'pending';
+        }
+      }, isNote);
+      if (!isNote && !isStateOrSlot) {
+        openDrawer(caseId, 'C', true);
+      } else if (isStateOrSlot) {
+        saveCasesToStorage();
+        const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'C') {
+          const c = cases.find(item => item.id === caseId);
+          refreshDrawerContent(caseId, 'C', c);
+        }
+      }
+    }
+
+    function updateSField(caseId, field, value) {
+      const isNote = field.endsWith('Notes') || field.endsWith('Note');
+      const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
+      updateCase(caseId, c => {
+        if (!c.sDetails) c.sDetails = {};
+        c.sDetails[field] = value;
+        if (field === 'meetDate') {
+          c.sDetails.meetState = value ? 'confirmed' : 'pending';
+        }
+      }, isNote);
+      if (!isNote && !isStateOrSlot) {
+        openDrawer(caseId, 'S', true);
+      } else if (isStateOrSlot) {
+        saveCasesToStorage();
+        const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'S') {
+          const c = cases.find(item => item.id === caseId);
+          refreshDrawerContent(caseId, 'S', c);
+        }
+      }
+    }
+
+    function updatePCField(caseId, field, value) {
+      const isNote = field.endsWith('Notes') || field.endsWith('Note');
+      const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
+      updateCase(caseId, c => {
+        c.pcDetails[field] = value;
+        if (field === 'meetDate') {
+          c.pcDetails.meetState = value ? 'confirmed' : 'pending';
+        }
+      }, isNote);
+      if (!isNote && !isStateOrSlot) {
+        openDrawer(caseId, 'PC', true);
+      } else if (isStateOrSlot) {
+        saveCasesToStorage();
+        const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'PC') {
+          const c = cases.find(item => item.id === caseId);
+          refreshDrawerContent(caseId, 'PC', c);
+        }
+      }
+    }
+
+    // 渲染「OA 需求分析」抽屜內容    function renderOADrawer(c, container) {
+      const oa = c.oaDetails;
+      if (!oa.rescheduleHistory) oa.rescheduleHistory = [];
+
+      let historyListHtml = '';
+      if (oa.rescheduleHistory.length === 0) {
+        historyListHtml = `<div style="color:var(--text-secondary); font-size:0.72rem; text-align:center; padding:15px 0;">無改期歷史紀錄</div>`;
+      } else {
+        historyListHtml = oa.rescheduleHistory.map((item, idx) => {
+          return `
+            <div onclick="showRescheduleDetail('${c.id}', 'oa', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
+              <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
+              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const isPlanDone = oa.planState === 'active';
+      const isPracticeDone = oa.practiceState === 'active';
+      const isDiscussDone = oa.discussState === 'active';
+
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          <div style="flex: 1.1; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; justify-content:space-between; min-width: 0;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">改期歷史 (${oa.rescheduleHistory.length})</div>
+              <div style="max-height: 140px; overflow-y: auto; padding-right: 2px;">
+                ${historyListHtml}
+              </div>
+            </div>
+            <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'oa')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; margin-top:6px; border:1px dashed var(--color-oa); color:var(--color-oa); font-size:0.7rem;">登記新改期</button>
+          </div>
+
+          <div style="flex: 1.2; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; gap:6px; min-width: 0;">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 會面時間與時段</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
+              <span style="font-size:0.75rem; color:var(--text-primary);">預計會面日期</span>
+              <input type="text" readonly value="${oa.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 'oa')" style="width:90px; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer;">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">會面時間狀態</span>
+              <div style="display:flex; gap:4px;">
+                <button class="status-badge-btn ${oa.meetState === 'pending' ? 'active' : ''}" data-type="intent-pending" onclick="updateOAField('${c.id}', 'meetState', 'pending')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">喬時間中</button>
+                <button class="status-badge-btn ${oa.meetState === 'confirmed' ? 'active' : ''}" data-type="agree" onclick="updateOAField('${c.id}', 'meetState', 'confirmed')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">時間已確定</button>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">約定時間時段</span>
+              <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:3px;">
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'before_lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'before_lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐前</button>
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐</button>
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'afternoon_1' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'afternoon_1')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午一</button>
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'afternoon_2' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'afternoon_2')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午二</button>
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐</button>
+                <button type="button" class="status-badge-btn ${oa.meetTimeSlot === 'after_dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'oa', 'after_dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐後</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex: 1.7; min-width: 0; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 訪前訪後準備工作</div>
+              <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 訪前規劃</span>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${oa.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'oa')" placeholder="規劃確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="備忘或討論要點..." onchange="updateOAField('${c.id}', 'planNotes', this.value)">${oa.planNotes || ''}</textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">⚔️ 訪前演練</span>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${oa.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'oa')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#34d399; font-weight:700;">💬 訪後討論</span>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${oa.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'oa')" placeholder="討論確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="討論心得或邀約方向..." onchange="updateOAField('${c.id}', 'discussNotes', this.value)">${oa.discussNotes || ''}</textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }    function renderPCDrawer(c, container) {
+      const pc = c.pcDetails;
+      if (!pc.rescheduleHistory) pc.rescheduleHistory = [];
+      
+      let historyListHtml = '';
+      if (pc.rescheduleHistory.length === 0) {
+        historyListHtml = `<div style="color:var(--text-secondary); font-size:0.72rem; text-align:center; padding:15px 0;">無改期歷史紀錄</div>`;
+      } else {
+        historyListHtml = pc.rescheduleHistory.map((item, idx) => {
+          return `
+            <div onclick="showRescheduleDetail('${c.id}', 'pc', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
+              <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
+              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const isPlanDone = pc.planState === 'active';
+      const isDiscussDone = pc.discussState === 'active';
+      const isPracticeDone = pc.practiceState === 'active';
+
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          <div style="flex: 1.1; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; justify-content:space-between; min-width: 0;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">改期歷史 (${pc.rescheduleHistory.length})</div>
+              <div style="max-height: 140px; overflow-y: auto; padding-right: 2px;">
+                ${historyListHtml}
+              </div>
+            </div>
+            <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'pc')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; margin-top:6px; border:1px dashed var(--color-pc); color:var(--color-pc); font-size:0.7rem;">登記新改期</button>
+          </div>
+
+          <div style="flex: 1.2; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; gap:6px; min-width: 0;">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 講解時間與時段</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
+              <span style="font-size:0.75rem; color:var(--text-primary);">預計講解日期</span>
+              <input type="text" readonly value="${pc.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 'pc')" style="width:90px; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer;">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">講解時間狀態</span>
+              <div style="display:flex; gap:4px;">
+                <button class="status-badge-btn ${pc.meetState === 'pending' ? 'active' : ''}" data-type="intent-pending" onclick="updatePCField('${c.id}', 'meetState', 'pending')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">喬時間中</button>
+                <button class="status-badge-btn ${pc.meetState === 'confirmed' ? 'active' : ''}" data-type="agree" onclick="updatePCField('${c.id}', 'meetState', 'confirmed')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">時間已確定</button>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">約定時間時段</span>
+              <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:3px;">
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'before_lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'before_lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐前</button>
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐</button>
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'afternoon_1' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'afternoon_1')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午一</button>
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'afternoon_2' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'afternoon_2')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午二</button>
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐</button>
+                <button type="button" class="status-badge-btn ${pc.meetTimeSlot === 'after_dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'pc', 'after_dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐後</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex: 1.7; min-width: 0; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 建議草案規劃與演練</div>
+              <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 規劃建議</span>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${pc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'pc')" placeholder="建議書發想製作日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="規劃要點與搭配險種..." onchange="updatePCField('${c.id}', 'planNotes', this.value)">${pc.planNotes || ''}</textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">✉️ 已傳建議</span>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${pc.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'pc')" placeholder="建議書遞交日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="遞交回饋與討論備忘..." onchange="updatePCField('${c.id}', 'discussNotes', this.value)">${pc.discussNotes || ''}</textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#f59e0b; font-weight:700;">⚔️ 說明演練</span>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${pc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'pc')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+              </div>
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }    function renderCDrawer(c, container) {
+      const cc = c.cDetails;
+      if (!cc.rescheduleHistory) cc.rescheduleHistory = [];
+
+      let historyListHtml = '';
+      if (cc.rescheduleHistory.length === 0) {
+        historyListHtml = `<div style="color:var(--text-secondary); font-size:0.72rem; text-align:center; padding:15px 0;">無改期歷史紀錄</div>`;
+      } else {
+        historyListHtml = cc.rescheduleHistory.map((item, idx) => {
+          return `
+            <div onclick="showRescheduleDetail('${c.id}', 'c', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
+              <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
+              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const isPlanDone = cc.planState === 'active';
+      const isPracticeDone = cc.practiceState === 'active';
+      const isDiscussDone = cc.discussState === 'active';
+
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          <div style="flex: 1.1; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; justify-content:space-between; min-width: 0;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">改期歷史 (${cc.rescheduleHistory.length})</div>
+              <div style="max-height: 140px; overflow-y: auto; padding-right: 2px;">
+                ${historyListHtml}
+              </div>
+            </div>
+            <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'c')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; margin-top:6px; border:1px dashed var(--color-c); color:var(--color-c); font-size:0.7rem;">登記新改期</button>
+          </div>
+
+          <div style="flex: 1.2; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; gap:6px; min-width: 0;">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 成交簽約設定</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
+              <span style="font-size:0.75rem; color:var(--text-primary);">預計成交日期</span>
+              <input type="text" readonly value="${cc.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 'c')" style="width:90px; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer;">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">成交簽署狀態</span>
+              <div style="display:flex; gap:4px;">
+                <button class="status-badge-btn ${cc.meetState === 'pending' ? 'active' : ''}" data-type="intent-pending" onclick="updateCField('${c.id}', 'meetState', 'pending')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">簽單處理中</button>
+                <button class="status-badge-btn ${cc.meetState === 'confirmed' ? 'active' : ''}" data-type="agree" onclick="updateCField('${c.id}', 'meetState', 'confirmed')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">已送件簽署</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex: 1.7; min-width: 0; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 成交及核保追蹤</div>
+              <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 照會防範</span>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${cc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'c')" placeholder="預防照會日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="體檢或財務說明備忘..." onchange="updateCField('${c.id}', 'planNotes', this.value)">${cc.planNotes || ''}</textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">🖋️ 要保簽署</span>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${cc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'c')" placeholder="親簽或行動投保日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#34d399; font-weight:700;">💳 保費首扣</span>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${cc.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'c')" placeholder="第一次保費扣款日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="扣帳防呆備忘..." onchange="updateCField('${c.id}', 'discussNotes', this.value)">${cc.discussNotes || ''}</textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }    function renderSDrawer(c, container) {
+      const s = c.sDetails;
+      
+      const isPlanDone = s.planState === 'active';
+      const isPracticeDone = s.practiceState === 'active';
+      const isDiscussDone = s.discussState === 'active';
+
+      container.innerHTML = `
+        <div class="drawer-grid-horizontal">
+          <div style="flex: 1; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 8px; display:flex; flex-direction:column; gap:6px; min-width: 0;">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 售後服務設定</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04); width:100%; box-sizing:border-box;">
+              <span style="font-size:0.75rem; color:var(--text-primary);">預計服務日期</span>
+              <input type="text" readonly value="${s.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 's')" style="width:100px; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer;">
+            </div>
+          </div>
+
+          <div style="flex: 1.3; min-width: 0; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 售後服務工作項目</div>
+              <div style="display:flex; flex-direction:column; gap:6px; max-height: 220px; overflow-y: auto; padding-right: 2px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 保單送達</span>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${s.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 's')" placeholder="親交保單與簽收回條日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="保單回條簽收狀態或備忘..." onchange="updateSField('${c.id}', 'planNotes', this.value)">${s.planNotes || ''}</textarea>
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">⏱️ 契撤追蹤</span>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${s.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 's')" placeholder="契撤期提醒與確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#34d399; font-weight:700;">💬 週年服務</span>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${s.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 's')" placeholder="定期維繫與二次開發日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="週年聯絡記錄 or 轉介紹發掘備忘..." onchange="updateSField('${c.id}', 'discussNotes', this.value)">${s.discussNotes || ''}</textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+
+
+
+    function renderDatePicker(dp) {
+      const year = datePickerCurrentDate.getFullYear();
+      const month = datePickerCurrentDate.getMonth();
+
+      const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
+      
+      const firstDayIndex = new Date(year, month, 1).getDay(); // 0 是週日
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      let html = `
+        <div class="datepicker-header">
+          <button type="button" class="datepicker-btn" onclick="changeDatePickerMonth(-1, event)">◄</button>
+          <span class="datepicker-title">${year}年 ${monthNames[month]}</span>
+          <button type="button" class="datepicker-btn" onclick="changeDatePickerMonth(1, event)">►</button>
+        </div>
+        <div class="datepicker-weekdays">
+          <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+        </div>
+        <div class="datepicker-days">
+      `;
+
+      // 填充空白
+      for (let i = 0; i < firstDayIndex; i++) {
+        html += `<div class="datepicker-day empty"></div>`;
+      }
+
+      // 比對並亮燈當前日期
+      const targetVal = currentDatePickerTarget.element.value;
+      const targetDate = targetVal ? new Date(targetVal) : null;
+      const isSameMonthYear = targetDate && targetDate.getFullYear() === year && targetDate.getMonth() === month;
+
+      for (let day = 1; day <= totalDays; day++) {
+        const isActive = isSameMonthYear && targetDate.getDate() === day ? 'active' : '';
+        html += `<div class="datepicker-day ${isActive}" onclick="selectDatePickerDate(${year}, ${month}, ${day})">${day}</div>`;
+      }
+
+      html += `</div>`;
+      
+      // 新增清除日期按鈕區塊
+      html += `
+        <div style="display: flex; justify-content: center; padding: 6px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.15); margin-top: 4px; border-radius: 0 0 8px 8px;">
+          <button type="button" class="btn" onclick="clearDatePickerDate(event)" style="padding: 2px 8px; font-size: 0.72rem; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; width: 100%; height: 22px; justify-content: center; border-radius: 4px; cursor: pointer;">✕ 清除日期</button>
+        </div>
+      `;
+      dp.innerHTML = html;
+    }
+
+    // 全域清除日期處理函式
+    function clearDatePickerDate(event) {
+      if (event) event.stopPropagation();
+      const dp = document.getElementById('custom-datepicker');
+      if (dp) dp.style.display = 'none';
+
+      const target = currentDatePickerTarget;
+      if (!target) return;
+      target.element.value = '';
+
+      if (target.type === 'case') {
+        updateCaseField(target.caseId, target.field, '');
+      } else if (target.type === 'sa') {
+        updateSADate(target.caseId, target.field, '');
+      } else if (target.type === 'oa') {
+        updateOAField(target.caseId, target.field, '');
+      } else if (target.type === 'pc') {
+        updatePCField(target.caseId, target.field, '');
+      } else if (target.type === 'c') {
+        updateCField(target.caseId, target.field, '');
+      } else if (target.type === 's') {
+        updateSField(target.caseId, target.field, '');
+      }
+    }
+
+    function selectQuickDatePickerDate(daysOffset) {
+      const today = new Date();
+      today.setDate(today.getDate() + daysOffset);
+      selectDatePickerDate(today.getFullYear(), today.getMonth(), today.getDate());
+    }
+
+    // 依據傳入偏移量變更月份，並重新渲染 (阻擋冒泡事件防範關閉)
+    function changeDatePickerMonth(offset, event) {
+      if (event) event.stopPropagation();
+      datePickerCurrentDate.setMonth(datePickerCurrentDate.getMonth() + offset);
+      const dp = document.getElementById('custom-datepicker');
+      if (dp) renderDatePicker(dp);
+    }
+
+    function selectDatePickerDate(year, month, day) {
+      const dp = document.getElementById('custom-datepicker');
+      if (dp) dp.style.display = 'none';
+
+      const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      
+      const target = currentDatePickerTarget;
+      target.element.value = formattedDate;
+
+      if (target.type === 'case') {
+        updateCaseField(target.caseId, target.field, formattedDate);
+      } else if (target.type === 'sa') {
+        updateSADate(target.caseId, target.field, formattedDate);
+      } else if (target.type === 'oa') {
+        updateOAField(target.caseId, target.field, formattedDate);
+      } else if (target.type === 'pc') {
+        updatePCField(target.caseId, target.field, formattedDate);
+      } else if (target.type === 'c') {
+        updateCField(target.caseId, target.field, formattedDate);
+      } else if (target.type === 's') {
+        updateSField(target.caseId, target.field, formattedDate);
+      }
+    }
+
+    // 格式化子標籤（加日期後綴 MM/D）
+    function fmtSubLabel(label, dateStr) {
+      if (!dateStr) return label;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return label;
+      return `${label} ${d.getMonth()+1}/${d.getDate()}`;
+    }
+
+    // === 新增約訪時段、漏斗看板與案件建立輔助函式 ===
+    function updateTimeSlot(caseId, phase, slot) {
+      const c = cases.find(item => item.id === caseId);
+      if (!c) return;
+      const lowerPhase = phase.toLowerCase();
+      updateCase(caseId, item => {
+        if (lowerPhase === 'sa') {
+          item.saDetails.meetTimeSlot = item.saDetails.meetTimeSlot === slot ? '' : slot;
+        } else if (lowerPhase === 'oa') {
+          item.oaDetails.meetTimeSlot = item.oaDetails.meetTimeSlot === slot ? '' : slot;
+        } else if (lowerPhase === 'pc') {
+          item.pcDetails.meetTimeSlot = item.pcDetails.meetTimeSlot === slot ? '' : slot;
+        } else if (lowerPhase === 'c') {
+          if (!item.cDetails) item.cDetails = {};
+          item.cDetails.meetTimeSlot = item.cDetails.meetTimeSlot === slot ? '' : slot;
+        } else if (lowerPhase === 's') {
+          if (!item.sDetails) item.sDetails = {};
+          item.sDetails.meetTimeSlot = item.sDetails.meetTimeSlot === slot ? '' : slot;
+        }
+      });
+      
+      // 直接更新所有時段按鈕 class，避免重建整個抽屜 DOM
+      const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+      if (drawerRow && drawerRow.style.display === 'block') {
+        const currentSlotValue =
+          lowerPhase === 'oa' ? c.oaDetails.meetTimeSlot :
+          lowerPhase === 'pc' ? c.pcDetails.meetTimeSlot :
+          lowerPhase === 'c' ? (c.cDetails ? c.cDetails.meetTimeSlot : '') :
+          lowerPhase === 's' ? (c.sDetails ? c.sDetails.meetTimeSlot : '') :
+          c.saDetails.meetTimeSlot;
+        // 找到所有時段按鈕，更新 active class
+        const allSlots = ['before_lunch','lunch','afternoon_1','afternoon_2','dinner','after_dinner'];
+        allSlots.forEach(s => {
+          const btns = drawerRow.querySelectorAll(`[onclick*="updateTimeSlot('${caseId}', '${phase}', '${s}')"]`);
+          btns.forEach(btn => {
+            if (s === currentSlotValue) btn.classList.add('active');
+            else btn.classList.remove('active');
+          });
+        });
+      }
+    }
+
+    // === 議題維護相關函數 ===
+    const DEFAULT_GROUPS = [
+      { key: 'family',  emoji: '👶', label: '家庭與兒女' },
+      { key: 'life',    emoji: '🚗', label: '生活與財產' },
+      { key: 'service', emoji: '🔍', label: '專業檢視服務' },
+    ];
+    const DEFAULT_ISSUES = [
+      { name: '新生兒保單', group: 'family' },
+      { name: '子女教育基金', group: 'family' },
+      { name: '車險', group: 'life' },
+      { name: '旅平卡', group: 'life' },
+      { name: '保單檢視', group: 'service' },
+      { name: '財務檢視', group: 'service' },
+    ];
+
+    // 分群資料存取
+    function getCustomGroups() {
+      return JSON.parse(localStorage.getItem('crm_groups') || 'null') || DEFAULT_GROUPS;
+    }
+    function saveCustomGroups(groups) {
+      localStorage.setItem('crm_groups', JSON.stringify(groups));
+    }
+
+    // 議題資料存取
+    function getCustomIssues() {
+      return JSON.parse(localStorage.getItem('crm_issues') || 'null') || DEFAULT_ISSUES;
+    }
+    function saveCustomIssues(issues) {
+      localStorage.setItem('crm_issues', JSON.stringify(issues));
+    }
+
+    // 取得分群完整 label（含 emoji）
+    function getGroupLabel(key) {
+      const g = getCustomGroups().find(g => g.key === key);
+      return g ? `${g.emoji} ${g.label}` : key;
+    }
+
+    // --- 議題列表渲染 ---
+    function renderIssueList() {
+      const container = document.getElementById('issue-list-container');
+      if (!container) return;
+      const issues = getCustomIssues();
+      const groups = getCustomGroups();
+      const grouped = {};
+      issues.forEach((item, idx) => {
+        if (!grouped[item.group]) grouped[item.group] = [];
+        grouped[item.group].push({ ...item, idx });
+      });
+      let html = '';
+      groups.forEach(g => {
+        const items = grouped[g.key] || [];
+        const label = `${g.emoji} ${g.label}`;
+        html += `<div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--color-sa); margin-bottom: 6px;">${label}</div>`;
+        if (items.length === 0) {
+          html += `<div style="font-size: 0.78rem; color: var(--text-secondary); padding: 4px 8px; opacity: 0.6;">（尚無議題）</div>`;
+        } else {
+          items.forEach(item => {
+            html += `<div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--bg-input); border-radius: 4px; margin-bottom: 4px;">
+              <span style="font-size: 0.85rem;">${item.name}</span>
+              <button class="btn" onclick="deleteCustomIssue(${item.idx})" style="padding: 2px 8px; font-size: 0.72rem; color: #ef4444; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08);">刪除</button>
+            </div>`;
+          });
+        }
+        html += `</div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    // --- 分群選單渲染（Modal 內的 select）---
+    function rebuildGroupSelect() {
+      const sel = document.getElementById('issue-new-group');
+      if (!sel) return;
+      const groups = getCustomGroups();
+      sel.innerHTML = groups.map(g => `<option value="${g.key}">${g.emoji} ${g.label}</option>`).join('');
+    }
+
+    // --- 分群清單渲染 ---
+    function renderGroupList() {
+      const container = document.getElementById('group-list-container');
+      if (!container) return;
+      const groups = getCustomGroups();
+      if (groups.length === 0) {
+        container.innerHTML = `<div style="font-size:0.82rem;color:var(--text-secondary);padding:8px;">（尚無分群）</div>`;
+        return;
+      }
+      let html = '';
+      groups.forEach((g, idx) => {
+        html += `<div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg-input); border-radius: 6px; margin-bottom: 6px;">
+          <span style="font-size: 0.9rem;">${g.emoji} <strong>${g.label}</strong></span>
+          <button class="btn" onclick="deleteCustomGroup(${idx})" style="padding: 2px 8px; font-size: 0.72rem; color: #ef4444; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08);">刪除</button>
+        </div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    // --- 新增議題 ---
+    function addCustomIssue() {
+      const name = document.getElementById('issue-new-name').value.trim();
+      const group = document.getElementById('issue-new-group').value;
+      if (!name) { showToast('請輸入議題名稱', 'error'); return; }
+      const issues = getCustomIssues();
+      if (issues.some(i => i.name === name)) { showToast('此議題已存在', 'error'); return; }
+      issues.push({ name, group });
+      saveCustomIssues(issues);
+      document.getElementById('issue-new-name').value = '';
+      renderIssueList();
+      showToast(`已新增議題：${name}`, 'success');
+    }
+
+    // --- 刪除議題 ---
+    function deleteCustomIssue(idx) {
+      const issues = getCustomIssues();
+      const removed = issues.splice(idx, 1);
+      saveCustomIssues(issues);
+      renderIssueList();
+      if (removed.length) showToast(`已刪除議題：${removed[0].name}`, 'success');
+    }
+
+    // --- 新增分群 ---
+    function addCustomGroup() {
+      const emoji = document.getElementById('group-new-emoji').value.trim() || '📌';
+      const label = document.getElementById('group-new-label').value.trim();
+      if (!label) { showToast('請輸入分群名稱', 'error'); return; }
+      const groups = getCustomGroups();
+      // 用 label 文字產生 key
+      const key = 'grp_' + Date.now();
+      if (groups.some(g => g.label === label)) { showToast('此分群已存在', 'error'); return; }
+      groups.push({ key, emoji, label });
+      saveCustomGroups(groups);
+      document.getElementById('group-new-emoji').value = '';
+      document.getElementById('group-new-label').value = '';
+      renderGroupList();
+      rebuildGroupSelect(); // 同步新增議題的分群選單
+      showToast(`已新增分群：${emoji} ${label}`, 'success');
+    }
+
+    // --- 刪除分群（連帶移除該分群下所有議題）---
+    function deleteCustomGroup(idx) {
+      const groups = getCustomGroups();
+      const removed = groups.splice(idx, 1);
+      saveCustomGroups(groups);
+      if (removed.length) {
+        // 移除屬於該分群的所有議題
+        const deletedKey = removed[0].key;
+        const issues = getCustomIssues().filter(i => i.group !== deletedKey);
+        saveCustomIssues(issues);
+        showToast(`已刪除分群：${removed[0].emoji} ${removed[0].label}`, 'success');
+      }
+      renderGroupList();
+      rebuildGroupSelect();
+    }
+
+    // --- 同步快速選取下拉選單 ---
+    function rebuildIssueSelects() {
+      const issues = getCustomIssues();
+      const groups = getCustomGroups();
+      const buildOptions = () => {
+        const grouped = {};
+        issues.forEach(i => {
+          if (!grouped[i.group]) grouped[i.group] = [];
+          grouped[i.group].push(i.name);
+        });
+        let html = '<option value=""></option>';
+        groups.forEach(g => {
+          if (!grouped[g.key] || !grouped[g.key].length) return;
+          html += `<optgroup label="${g.emoji} ${g.label}">`;
+          grouped[g.key].forEach(name => { html += `<option value="${name}">${name}</option>`; });
+          html += `</optgroup>`;
+        });
+        return html;
+      };
+      const opts = buildOptions();
+      ['add-issue-select', 'add-issue-select-2'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = opts;
+      });
+    }
+
+
+    function toggleAddCaseModal(show) {
+      const modal = document.getElementById('add-case-modal');
+      if (show) {
+        modal.classList.add('active');
+        document.getElementById('add-client-name').value = '';
+        document.getElementById('add-visit-type').value = 'issue';
+        document.getElementById('add-case-type').value = 'life';
+        document.getElementById('add-case-source').value = 'outbound'; // 規格預設為開發客 (outbound)
+        document.getElementById('add-source').value = 'relative';
+        document.getElementById('add-issue-name').value = '';
+        document.getElementById('add-issue-name-2').value = '';
+        document.getElementById('add-second-issue-row').style.display = 'none';
+        document.getElementById('add-contact-detail').value = '';
+
+        // 重置轉介紹連動欄位
+        document.getElementById('add-referrer-name').value = '';
+        document.getElementById('add-referrer-row').style.display = 'none';
+        document.getElementById('add-referrer-name').required = false;
+
+        // 重置次標籤按鈕的 active 狀態
+        modal.querySelectorAll('.btn-tab').forEach(btn => btn.classList.remove('active'));
+        modal.querySelectorAll('[onclick*="\'add-visit-type\', \'issue\'"]').forEach(btn => btn.classList.add('active'));
+        modal.querySelectorAll('[onclick*="\'add-case-type\', \'life\'"]').forEach(btn => btn.classList.add('active'));
+        modal.querySelectorAll('[onclick*="\'add-case-source\', \'outbound\'"]').forEach(btn => btn.classList.add('active'));
+        modal.querySelectorAll('[onclick*="\'add-source\', \'relative\'"]').forEach(btn => btn.classList.add('active'));
+      } else {
+        modal.classList.remove('active');
+      }
+    }
+
+    function selectFormTab(inputId, value, element) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      input.value = value;
+
+      // 切換 class
+      const buttons = element.parentElement.querySelectorAll('.btn-tab');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      element.classList.add('active');
+
+      // 連動生活約訪準備議題
+      if (inputId === 'add-visit-type') {
+        toggleAddPreparedIssues(value);
+      }
+
+      // 連動轉介紹人姓名輸入框
+      if (inputId === 'add-source') {
+        toggleReferrerInput(value);
+      }
+    }
+
+    function toggleReferrerInput(value) {
+      const row = document.getElementById('add-referrer-row');
+      if (row) {
+        row.style.display = value === 'referral' ? 'block' : 'none';
+        const input = document.getElementById('add-referrer-name');
+        if (input) {
+          input.required = (value === 'referral');
+        }
+      }
+    }
+
+    function toggleAddPreparedIssues(value) {
+      // 舊的 wrapper 已移除，改為控制第二議題欄位
+      const secondRow = document.getElementById('add-second-issue-row');
+      const issueLabel = document.querySelector('#add-case-form label[data-issue-label]');
+      if (secondRow) {
+        secondRow.style.display = value === 'life' ? 'block' : 'none';
+      }
+      // 若是生活訪，清空第二議題欄位
+      if (value !== 'life') {
+        const input2 = document.getElementById('add-issue-name-2');
+        if (input2) input2.value = '';
+      }
+    }
+
+    function submitAddCase(event) {
+      // 防止 form 原生送出導致頁面重整
+      if (event) event.preventDefault();
+      const name = document.getElementById('add-client-name').value.trim();
+      const issue = document.getElementById('add-issue-name').value.trim();
+      if (!name) {
+        showToast('請填寫客戶姓名！', 'error');
+        return;
+      }
+      if (!issue) {
+        showToast('請填寫議題名稱！', 'error');
+        return;
+      }
+
+      const visitType = document.getElementById('add-visit-type').value;
+      const type = document.getElementById('add-case-type').value;
+      const caseSource = document.getElementById('add-case-source').value;
+      const source = document.getElementById('add-source').value;
+      const referrerName = document.getElementById('add-referrer-name').value.trim();
+      const contactDetail = document.getElementById('add-contact-detail').value.trim();
+
+      // 取得第二議題（生活訪專屬）
+      const issue2El = document.getElementById('add-issue-name-2');
+      const issue2 = issue2El ? issue2El.value.trim() : '';
+
+      const newCase = {
+        id: "case-" + Date.now(),
+        visitType: visitType,
+        preparedIssues: visitType === 'life' ? [issue, issue2].filter(Boolean) : [],
+        type: type,
+        caseSource: caseSource,
+        source: source,
+        clientName: name,
+        referrerName: source === 'referral' ? referrerName : '',
+        contactMethods: ["LINE"],
+        contactDetail: contactDetail,
+        issueName: issue,
+        issueDate: new Date().toISOString().split('T')[0],
+        issueNote: "",
+        currentPhase: "SA",
+        saDetails: {
+          sendState: "dim",
+          sendDate: "",
+          replyState: "dim",
+          replyDate: "",
+          intentState: "dim",
+          intentDate: "",
+          agreeState: "dim",
+          agreeDate: "",
+          meetTimeSlot: ""
+        },
+        oaDetails: {
+          meetDate: "",
+          meetState: "",
+          meetTimeSlot: "",
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        },
+        pcDetails: {
+          meetDate: "",
+          meetState: "",
+          meetTimeSlot: "",
+          planState: "dim",
+          planDate: "",
+          practiceState: "dim",
+          practiceDate: "",
+          discussState: "dim",
+          discussDate: ""
+        }
+      };
+
+      addCase(newCase);
+      toggleAddCaseModal(false);
+      showToast('成功建立案件！', 'success');
+
+      // 自動開啟新案件的抽屜
+      setTimeout(() => {
+        openDrawer(newCase.id, 'client');
+      }, 300);
+    }
+
+    // === Urgency Countdown Badge ===
+    function getUrgencyBadge(c) {
+      return ''; // 已移除剛幾天功能
+    }
+
+    // === 週約訪統計看板 ===
+    function renderWeeklyFunnel() {
+      const funnel = document.getElementById('weekly-funnel');
+      if (!funnel) return;
+      funnel.innerHTML = '';
+      
+      const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      for (let i = 0; i < 7; i++) {
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + i);
+        const dateStr = targetDate.toISOString().split('T')[0];
+        
+        // 篩選當天排定的約訪案件
+        const dayCases = cases.filter(c => {
+          let cDate = '';
+          if (c.currentPhase === 'SA') cDate = (c.saDetails && c.saDetails.agreeDate) || '';
+          else if (c.currentPhase === 'OA') cDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+          else if (c.currentPhase === 'PC') cDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+          else if (c.currentPhase === 'C') cDate = (c.cDetails && c.cDetails.meetDate) || '';
+          else if (c.currentPhase === 'S') cDate = (c.sDetails && c.sDetails.meetDate) || '';
+          return cDate === dateStr;
+        });
+
+        const count = dayCases.length;
+        const isToday = i === 0 ? 'today' : '';
+        const dayLabel = i === 0 ? '今天' : weekdays[targetDate.getDay()];
+        const displayDate = (targetDate.getMonth() + 1) + '/' + targetDate.getDate();
+        
+        // 客戶名單 title
+        const namesText = count > 0 ? dayCases.map(c => c.clientName).join(', ') : '無約訪';
+        
+        const card = document.createElement('div');
+        card.className = `funnel-day-card ${isToday}`;
+        card.title = `日期：${dateStr}\n約訪名單：${namesText}`;
+        card.innerHTML = `
+          <div style="font-size:0.75rem; color:var(--text-secondary);">${dayLabel}</div>
+          <div style="font-size:0.65rem; color:rgba(255,255,255,0.4); margin-bottom: 4px;">${displayDate}</div>
+          <div style="font-size:1.15rem; font-weight:700; color:${count > 0 ? 'var(--color-sa)' : 'var(--text-secondary)'};">${count}</div>
+        `;
+
+        if (count > 0) {
+          card.style.cursor = 'pointer';
+          card.onclick = () => {
+            dayCases.forEach((dc, index) => {
+              setTimeout(() => {
+                const el = document.querySelector(`.case-row[data-id="${dc.id}"]`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  // 邊框閃爍高亮
+                  el.style.transition = 'all 0.3s ease';
+                  el.style.outline = '2px dashed var(--color-sa)';
+                  el.style.boxShadow = '0 0 15px rgba(245, 158, 11, 0.4)';
+                  el.style.background = 'rgba(245, 158, 11, 0.05)';
+                  
+                  setTimeout(() => {
+                    el.style.outline = '';
+                    el.style.boxShadow = '';
+                    el.style.background = '';
+                  }, 2000);
+                }
+              }, index * 400);
+            });
+            showToast(`已為您定位當日約訪案件！`, 'success');
+          };
+        }
+
+        funnel.appendChild(card);
+      }
+    }
+
+    // === 單擊與雙擊防呆調度器 ===
+    let clickTimer = null;
+    function onNodeClick(event, caseId, phase) {
+      event.stopPropagation();
+      // Tablet Fix: 觸控裝置偵測，稍微拉長雙擊判定間隔至 300ms 以配合觸控動作，一般滑鼠則維持 220ms
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const delay = isTouch ? 300 : 220;
+
+      if (clickTimer) {
+        // 雙擊事件
+        clearTimeout(clickTimer);
+        clickTimer = null;
+        changePhaseDirect(caseId, phase);
+      } else {
+        // 單擊事件
+        clickTimer = setTimeout(() => {
+          clickTimer = null;
+          openDrawer(caseId, phase);
+        }, delay);
+      }
+    }
+
+    // 頁面載入初始化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        debugLog("DOMContentLoaded 觸發，執行 init()");
+        init();
+      });
+    } else {
+      debugLog("document 已載入完畢，直接執行 init()");
+      init();
+    }
+  
