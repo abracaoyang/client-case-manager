@@ -1720,93 +1720,122 @@
   </div>
 
   <!-- 系統與議題綜合設定對話框 -->
+<!-- 系統與議題綜合設定對話框 -->
   <div class="modal-overlay" id="settings-modal">
-    <div class="modal-box" style="width: 540px; max-height: 85vh; overflow-y: auto;">
-      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">⚙️ 系統設定與維護中心</h3>
-        <span style="cursor:pointer;" id="btn-close-settings-modal">✕</span>
+    <div class="modal-box" style="width: 720px; max-width: 95vw; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;">
+      
+      <!-- 頂部 Header -->
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem; border-bottom: 1px solid var(--border-color); margin: 0; flex-shrink: 0;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">⚙️ 系統設定與維護中心</h3>
+        <span style="cursor:pointer; font-size: 1.2rem;" id="btn-close-settings-modal">✕</span>
       </div>
 
-      <!-- Tab 切換列 -->
-      <div style="display: flex; gap: 6px; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-        <button class="btn btn-tab active" id="settings-tab-sync" onclick="switchSettingsTab('sync')" style="font-size: 0.82rem; padding: 5px 14px;">雲端串接設定</button>
-        <button class="btn btn-tab" id="settings-tab-issues" onclick="switchSettingsTab('issues')" style="font-size: 0.82rem; padding: 5px 14px;">常規議題維護</button>
-        <button class="btn btn-tab" id="settings-tab-groups" onclick="switchSettingsTab('groups')" style="font-size: 0.82rem; padding: 5px 14px;">分群管理</button>
+      <!-- 左右分欄主體 -->
+      <div style="display: flex; flex: 1; min-height: 380px; overflow: hidden;">
+        
+        <!-- 左側：項目垂直選單 -->
+        <div style="width: 170px; border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.1); padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+          <button class="btn btn-tab active" id="settings-tab-sync" onclick="switchSettingsTab('sync')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🌐 雲端串接設定</button>
+          <button class="btn btn-tab" id="settings-tab-reminder" onclick="switchSettingsTab('reminder')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📅 時程提醒設定</button>
+          <button class="btn btn-tab" id="settings-tab-issues" onclick="switchSettingsTab('issues')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">💬 常規議題維護</button>
+          <button class="btn btn-tab" id="settings-tab-groups" onclick="switchSettingsTab('groups')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📂 分群管理維護</button>
+        </div>
+
+        <!-- 右側：設定內容區 -->
+        <div style="flex: 1; min-width: 0; padding: 1.25rem; display: flex; flex-direction: column; overflow-y: auto; justify-content: space-between;">
+          <div style="flex: 1;">
+            
+            <!-- 雲端串接設定 Tab -->
+            <div id="settings-pane-sync">
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">連線模式</label>
+                <div style="display: flex; gap: 10px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="radio" name="crm-offline-mode" id="settings-mode-offline" value="1" checked> 離線模擬 (LocalStorage)
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="radio" name="crm-offline-mode" id="settings-mode-cloud" value="0"> 雲端同步模式
+                  </label>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">Google Apps Script Web App URL</label>
+                <input type="text" id="settings-api-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; font-size: 0.8rem;">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-top: 4px; line-height: 1.45;">
+                  * 請輸入以 /exec 結尾的 GAS 網頁應用程式網址。<br>
+                  * 首次切換為雲端模式時，會從雲端覆蓋拉取客戶清單。
+                </span>
+              </div>
+
+              <!-- 離線同步暫存提示與強制同步按鈕 -->
+              <div id="settings-sync-status-box" style="margin-bottom: 1.25rem; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; display: none; align-items: center; justify-content: space-between; gap: 10px;">
+                <div>
+                  <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">離線未同步資料</span>
+                  <strong id="settings-sync-queue-count" style="font-size: 1.1rem; color: var(--color-sa);">0 筆</strong>
+                </div>
+                <button class="btn" id="btn-force-sync" style="background: var(--color-sa); color: #1e1e24; border: none; font-size: 0.78rem; padding: 6px 12px; font-weight: bold;">立即手動同步 📤</button>
+              </div>
+
+              <!-- 診斷詳情區塊 -->
+              <div id="settings-diagnostic-log" style="display: none; background: #18181b; border: 1px solid #ef444455; border-radius: 6px; padding: 10px; margin-bottom: 1.25rem; font-family: monospace;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #ef444433; padding-bottom: 4px;">
+                  <span style="color: #ef4444; font-size: 0.75rem; font-weight: bold;">🔍 雲端連線診斷報告</span>
+                  <span id="btn-clear-diagnostic" style="color: var(--text-secondary); font-size: 0.7rem; cursor: pointer;">清除</span>
+                </div>
+                <div id="settings-diagnostic-text" style="color: #fca5a5; font-size: 0.72rem; max-height: 120px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4;"></div>
+              </div>
+            </div>
+
+            <!-- 時程提醒設定 Tab -->
+            <div id="settings-pane-reminder" style="display: none;">
+              <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary); font-weight: bold;">未來送件預告範圍 (天)</label>
+                <input type="number" id="settings-reminder-days" min="1" max="90" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; font-size: 0.8rem;">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-top: 6px; line-height: 1.45;">
+                  * 設定多少天以內的送件預告，會顯示在未來預告欄中。<br>
+                  * 預設為 14 天，最大可設 90 天，防範資訊過度稠密。
+                </span>
+              </div>
+            </div>
+
+            <!-- 議題管理 Tab -->
+            <div id="settings-pane-issues" style="display:none;">
+              <div style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增議題到清單</p>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 8px;">
+                  <input type="text" id="issue-new-name" placeholder="議題名稱（例如：癌症權益說明）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; width: 100%;">
+                  <button class="btn btn-primary" onclick="addCustomIssue()" style="white-space: nowrap;">新增</button>
+                </div>
+                <select id="issue-new-group" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+                </select>
+              </div>
+              <div id="issue-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- 分群管理 Tab -->
+            <div id="settings-pane-groups" style="display:none;">
+              <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增自訂分群</p>
+                <div style="display: grid; grid-template-columns: 60px 1fr auto; gap: 8px;">
+                  <input type="text" id="group-new-emoji" placeholder="🏥" maxlength="4" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; text-align: center; font-size: 1.1rem;">
+                  <input type="text" id="group-new-label" placeholder="分群名稱（例如：健康醫療）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+                  <button class="btn btn-primary" onclick="addCustomGroup()" style="white-space: nowrap;">新增</button>
+                </div>
+                <p style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px;">刪除分群時，該分群下的所有議題也會一併移除。</p>
+              </div>
+              <div id="group-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+
+          </div>
+
+          <!-- 全局通用儲存/測試動作欄 -->
+          <div id="settings-global-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; flex-shrink: 0; margin-top: 1rem;">
+            <button class="btn" id="btn-test-connection" style="border-color: var(--color-sa); color: var(--color-sa); cursor: pointer;">測試連線 ⚡</button>
+            <button class="btn btn-primary" id="btn-save-settings" style="cursor: pointer;">儲存設定</button>
+          </div>
+
+        </div>
       </div>
-
-      <!-- 雲端串接設定 Tab -->
-      <div id="settings-pane-sync">
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">連線模式</label>
-          <div style="display: flex; gap: 10px;">
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
-              <input type="radio" name="crm-offline-mode" id="settings-mode-offline" value="1" checked> 離線模擬 (LocalStorage)
-            </label>
-            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
-              <input type="radio" name="crm-offline-mode" id="settings-mode-cloud" value="0"> 雲端同步模式
-            </label>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom: 1.25rem;">
-          <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">Google Apps Script Web App URL</label>
-          <input type="text" id="settings-api-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; font-size: 0.8rem;">
-          <span style="font-size: 0.7rem; color: var(--text-secondary); display: block; margin-top: 4px; line-height: 1.35;">
-            * 請輸入發布的 GAS 網頁應用程式 URL。首次切換到雲端同步時，會從雲端覆蓋拉取客戶清單。
-          </span>
-        </div>
-
-        <!-- 離線同步暫存提示與強制同步按鈕 -->
-        <div id="settings-sync-status-box" style="margin-bottom: 1.25rem; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; display: none; align-items: center; justify-content: space-between; gap: 10px;">
-          <div>
-            <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">離線未同步資料</span>
-            <strong id="settings-sync-queue-count" style="font-size: 1.1rem; color: var(--color-sa);">0 筆</strong>
-          </div>
-          <button class="btn" id="btn-force-sync" style="background: var(--color-sa); color: #1e1e24; border: none; font-size: 0.78rem; padding: 6px 12px; font-weight: bold;">立即手動同步 📤</button>
-        </div>
-
-        <!-- 診斷詳情區塊 -->
-        <div id="settings-diagnostic-log" style="display: none; background: #18181b; border: 1px solid #ef444455; border-radius: 6px; padding: 10px; margin-bottom: 1.25rem; font-family: monospace;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #ef444433; padding-bottom: 4px;">
-            <span style="color: #ef4444; font-size: 0.75rem; font-weight: bold;">🔍 雲端連線診斷報告</span>
-            <span id="btn-clear-diagnostic" style="color: var(--text-secondary); font-size: 0.7rem; cursor: pointer;">清除</span>
-          </div>
-          <div id="settings-diagnostic-text" style="color: #fca5a5; font-size: 0.72rem; max-height: 120px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4;"></div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-          <button class="btn" id="btn-test-connection" style="border-color: var(--color-sa); color: var(--color-sa);">測試連線 ⚡</button>
-          <button class="btn btn-primary" id="btn-save-settings">儲存設定</button>
-        </div>
-      </div>
-
-      <!-- 議題管理 Tab -->
-      <div id="settings-pane-issues" style="display:none;">
-        <div style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
-          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增議題到清單</p>
-          <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 8px;">
-            <input type="text" id="issue-new-name" placeholder="議題名稱（例如：癌症權益說明）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; width: 100%;">
-            <button class="btn btn-primary" onclick="addCustomIssue()" style="white-space: nowrap;">新增</button>
-          </div>
-          <select id="issue-new-group" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
-          </select>
-        </div>
-        <div id="issue-list-container"></div>
-      </div>
-
-      <!-- 分群管理 Tab -->
-      <div id="settings-pane-groups" style="display:none;">
-        <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
-          <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增自訂分群</p>
-          <div style="display: grid; grid-template-columns: 60px 1fr auto; gap: 8px;">
-            <input type="text" id="group-new-emoji" placeholder="🏥" maxlength="4" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; text-align: center; font-size: 1.1rem;">
-            <input type="text" id="group-new-label" placeholder="分群名稱（例如：健康醫療）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
-            <button class="btn btn-primary" onclick="addCustomGroup()" style="white-space: nowrap;">新增</button>
-          </div>
-          <p style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px;">刪除分群時，該分群下的所有議題也會一併移除。</p>
-        </div>
-        <div id="group-list-container"></div>
-      </div>
-
     </div>
   </div>
 
@@ -2165,6 +2194,7 @@
 
     function sortCasesBySavedOrder(targetArray = cases) {
       const orderStr = localStorage.getItem('crm_cases_order');
+      debugLog("🔄 sortCasesBySavedOrder 偵測到目前本機排序快取為: " + orderStr);
       if (orderStr) {
         try {
           const order = JSON.parse(orderStr);
@@ -2173,6 +2203,7 @@
               if (!a || !b) return 0;
               const idxA = order.indexOf(a.id);
               const idxB = order.indexOf(b.id);
+              debugLog("📊 [Sort] 比對 " + a.clientName + " (id: " + a.id + ", index: " + idxA + ") vs " + b.clientName + " (id: " + b.id + ", index: " + idxB + ")");
               if (idxA === -1 && idxB === -1) return 0;
               if (idxA === -1) return 1;
               if (idxB === -1) return -1;
@@ -2186,10 +2217,12 @@
       }
     }
 
-    function saveCasesToStorage() {
+    function saveCasesToStorage(updateOrderCache = false) {
       localStorage.setItem('crm_cases', JSON.stringify(cases));
-      const order = cases.map(c => c.id);
-      localStorage.setItem('crm_cases_order', JSON.stringify(order));
+      if (updateOrderCache) {
+        const order = cases.map(c => c.id);
+        localStorage.setItem('crm_cases_order', JSON.stringify(order));
+      }
     }
     function loadCasesFromStorage() {
       const stored = localStorage.getItem('crm_cases');
@@ -2329,7 +2362,7 @@
 
     // === Google Sheet Column Mappers ===
     function mapSheetDataToCases(sheetData) {
-      return sheetData.map((row, index) => {
+      const mapped = sheetData.map((row, index) => {
         const preparedIssues = row["預計議題"] ? row["預計議題"].split(',') : [];
         const isLifeVisit = row["預計議題"] && row["預計議題"].includes(',');
         
@@ -2920,6 +2953,52 @@
     }
 
     // 初始化載入
+    // === 客製化非同步確認彈窗元件 ===
+    let confirmCallback = null;
+    function showConfirm(options = {}) {
+      const modal = document.getElementById('confirm-modal');
+      const titleEl = document.getElementById('confirm-modal-title');
+      const bodyEl = document.getElementById('confirm-modal-body');
+      const btnOk = document.getElementById('confirm-modal-btn-ok');
+      const btnCancel = document.getElementById('confirm-modal-btn-cancel');
+      
+      if (!modal || !titleEl || !bodyEl || !btnOk || !btnCancel) {
+        // 退回原生 confirm 防呆
+        if (confirm(options.title || '確定操作？')) {
+          if (options.onOk) options.onOk();
+        }
+        return;
+      }
+
+      titleEl.innerHTML = (options.icon ? options.icon + ' ' : '') + (options.title || '確認操作');
+      bodyEl.innerHTML = options.body || '確定要執行此操作嗎？';
+      
+      btnOk.innerText = options.okText || '確定';
+      btnOk.style = options.okStyle || '';
+      btnOk.className = 'btn btn-primary';
+
+      const cleanup = () => {
+        modal.classList.remove('active');
+        btnOk.removeEventListener('click', handleOk);
+        btnCancel.removeEventListener('click', handleCancel);
+      };
+
+      const handleOk = () => {
+        cleanup();
+        if (options.onOk) options.onOk();
+      };
+
+      const handleCancel = () => {
+        cleanup();
+        if (options.onCancel) options.onCancel();
+      };
+
+      btnOk.addEventListener('click', handleOk);
+      btnCancel.addEventListener('click', handleCancel);
+      
+      modal.classList.add('active');
+    }
+
     async function init() {
       debugLog("init() 流程啟動");
       try {
@@ -3458,7 +3537,8 @@
       });
 
       cases = orderedCases;
-      saveCasesToStorage();
+      saveCasesToStorage(true); // 只有拖曳排序時，才更新順序快取排序檔案！
+      debugLog("💾 拖曳重排已寫入本機排序快取! 目前順序陣列: " + JSON.stringify(cases.map(c => c.id)));
       
       // 若開啟了雲端同步，則進行備份
       if (!crmSettings.isOffline && crmSettings.apiUrl) {
@@ -6242,6 +6322,18 @@
       init();
     }
   </script>
+  <!-- 客製化確認對話框元件 (ADHD 減法高對比) -->
+  <div class="modal-overlay" id="confirm-modal" style="z-index: 9999;">
+    <div class="modal-box" style="width: 380px; border-color: var(--border-color); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); padding: 1.25rem;">
+      <div style="font-size: 1rem; font-weight: bold; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;" id="confirm-modal-title">確認操作</div>
+      <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.25rem;" id="confirm-modal-body">確定要執行此操作嗎？</div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn" id="confirm-modal-btn-cancel" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">取消</button>
+        <button class="btn btn-primary" id="confirm-modal-btn-ok" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">確定</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 
