@@ -330,6 +330,11 @@
       border-color: rgba(245,158,11,0.5);
       background: rgba(245,158,11,0.06);
     }
+    .week-day-card.selected-filter {
+      border-color: #f59e0b !important;
+      background: rgba(245,158,11,0.2) !important;
+      box-shadow: 0 0 12px rgba(245,158,11,0.4);
+    }
     .week-day-label {
       font-size: 0.65rem;
       font-weight: 700;
@@ -2176,6 +2181,7 @@
 
     // 搜尋狀態與歷史
     let searchQuery = "";
+    let filterWeeklyDate = "";
     let searchHistory;
     try {
       const _histRaw = localStorage.getItem('crm_search_history');
@@ -3771,21 +3777,31 @@
         });
       }
 
-      // 掃描所有未封存案件，依階段找對應日期
+      // 掃描所有未封存案件，依階段找對應日期 (僅包含已確認約訪的日期)
       const activeCases = cases.filter(c => !c.archived);
       activeCases.forEach(c => {
         let targetDate = '';
         const phase = c.currentPhase || 'SA';
         if (phase === 'SA') {
-          targetDate = (c.saDetails && c.saDetails.agreeDate) || '';
+          if (c.saDetails && c.saDetails.agreeState === 'active') {
+            targetDate = c.saDetails.agreeDate || '';
+          }
         } else if (phase === 'OA') {
-          targetDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+          if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
+            targetDate = c.oaDetails.meetDate || '';
+          }
         } else if (phase === 'PC') {
-          targetDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+          if (c.pcDetails && c.pcDetails.meetState === 'confirmed') {
+            targetDate = c.pcDetails.meetDate || '';
+          }
         } else if (phase === 'C') {
-          targetDate = (c.cDetails && c.cDetails.meetDate) || '';
+          if (c.cDetails && c.cDetails.meetState === 'confirmed') {
+            targetDate = c.cDetails.meetDate || '';
+          }
         } else if (phase === 'S') {
-          targetDate = (c.sDetails && c.sDetails.meetDate) || '';
+          if (c.sDetails && c.sDetails.meetState === 'confirmed') {
+            targetDate = c.sDetails.meetDate || '';
+          }
         }
         if (!targetDate) return;
         const normalized = targetDate.replace(/\//g, '-');
@@ -3796,10 +3812,12 @@
       // 渲染卡片
       bar.innerHTML = days.map(day => {
         const hasVisit = day.cases.length > 0;
+        const isSelected = filterWeeklyDate === day.dateStr;
         const classes = [
           'week-day-card',
           hasVisit ? 'has-visit' : '',
-          day.isToday ? 'is-today' : ''
+          day.isToday ? 'is-today' : '',
+          isSelected ? 'selected-filter' : ''
         ].filter(Boolean).join(' ');
 
         const tooltipItems = day.cases.map(c =>
@@ -3815,8 +3833,9 @@
             ${tooltipItems}
           </div>` : '';
 
+        // 單擊滾動高亮，雙擊進行篩選
         const clickAttr = hasVisit
-          ? `onclick="scrollToFirstCaseOnDay('${day.dateStr}')"`
+          ? `onclick="onWeeklyCardClick('${day.dateStr}', event)" ondblclick="onWeeklyCardDblClick('${day.dateStr}', event)"`
           : '';
 
         return `
@@ -3842,11 +3861,17 @@
       for (const c of activeCases) {
         let targetDate = '';
         const phase = c.currentPhase || 'SA';
-        if (phase === 'SA') targetDate = (c.saDetails && c.saDetails.agreeDate) || '';
-        else if (phase === 'OA') targetDate = (c.oaDetails && c.oaDetails.meetDate) || '';
-        else if (phase === 'PC') targetDate = (c.pcDetails && c.pcDetails.meetDate) || '';
-        else if (phase === 'C') targetDate = (c.cDetails && c.cDetails.meetDate) || '';
-        else if (phase === 'S') targetDate = (c.sDetails && c.sDetails.meetDate) || '';
+        if (phase === 'SA') {
+          if (c.saDetails && c.saDetails.agreeState === 'active') targetDate = c.saDetails.agreeDate || '';
+        } else if (phase === 'OA') {
+          if (c.oaDetails && c.oaDetails.meetState === 'confirmed') targetDate = c.oaDetails.meetDate || '';
+        } else if (phase === 'PC') {
+          if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
+        } else if (phase === 'C') {
+          if (c.cDetails && c.cDetails.meetState === 'confirmed') targetDate = c.cDetails.meetDate || '';
+        } else if (phase === 'S') {
+          if (c.sDetails && c.sDetails.meetState === 'confirmed') targetDate = c.sDetails.meetDate || '';
+        }
         if (targetDate.replace(/\//g, '-') === dateStr) { targetCase = c; break; }
       }
       if (!targetCase) return;
@@ -3858,6 +3883,27 @@
         setTimeout(() => row.classList.remove('neon-flash'), 2100);
       }, 300);
     }
+
+    window.onWeeklyCardClick = function(dateStr, event) {
+      scrollToFirstCaseOnDay(dateStr);
+    };
+
+    window.onWeeklyCardDblClick = function(dateStr, event) {
+      if (event) event.stopPropagation();
+      if (filterWeeklyDate === dateStr) {
+        filterWeeklyDate = '';
+        showToast('已清除日期篩選', 'success');
+      } else {
+        filterWeeklyDate = dateStr;
+        showToast(`已篩選出 ${dateStr.slice(5)} 的約訪案件`, 'success');
+      }
+      renderCases();
+    };
+
+    window.clearWeeklyDateFilter = function() {
+      filterWeeklyDate = '';
+      renderCases();
+    };
 
     function renderCases() {
       const body = document.getElementById('case-list-body');
@@ -3873,6 +3919,35 @@
       if (searchQuery && searchQuery.trim() !== '') {
         const query = searchQuery.trim().toLowerCase();
         visibleCases = visibleCases.filter(c => buildCaseSearchString(c).includes(query));
+      }
+
+      // 根據週看板雙擊日期進行篩選
+      if (filterWeeklyDate) {
+        visibleCases = visibleCases.filter(c => {
+          let targetDate = '';
+          const phase = c.currentPhase || 'SA';
+          if (phase === 'SA') {
+            if (c.saDetails && c.saDetails.agreeState === 'active') targetDate = c.saDetails.agreeDate || '';
+          } else if (phase === 'OA') {
+            if (c.oaDetails && c.oaDetails.meetState === 'confirmed') targetDate = c.oaDetails.meetDate || '';
+          } else if (phase === 'PC') {
+            if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
+          } else if (phase === 'C') {
+            if (c.cDetails && c.cDetails.meetState === 'confirmed') targetDate = c.cDetails.meetDate || '';
+          } else if (phase === 'S') {
+            if (c.sDetails && c.sDetails.meetState === 'confirmed') targetDate = c.sDetails.meetDate || '';
+          }
+          return targetDate.replace(/\//g, '-') === filterWeeklyDate;
+        });
+
+        // 建立並顯示篩選狀態提示列
+        const filterBar = document.createElement('div');
+        filterBar.style = 'background: rgba(245,158,11,0.08); border-bottom: 1px solid rgba(245,158,11,0.2); padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #f59e0b; font-weight: 600; border-radius: 6px; margin-bottom: 10px;';
+        filterBar.innerHTML = `
+          <span>📅 正在顯示 ${filterWeeklyDate} 的約訪案件 (${visibleCases.length} 件)</span>
+          <span onclick="clearWeeklyDateFilter()" style="cursor: pointer; text-decoration: underline; color: #a6adc8;">清除篩選</span>
+        `;
+        body.appendChild(filterBar);
       }
 
       visibleCases.forEach((c) => {
