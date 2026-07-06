@@ -6551,21 +6551,42 @@
       const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
       updateCase(caseId, c => {
         if (!c.oaDetails) c.oaDetails = {};
+        if (!c.saDetails) c.saDetails = {};
         if (field === 'meetState') {
           const targetValue = (c.oaDetails.meetState === value) ? '' : value;
           c.oaDetails.meetState = targetValue;
           if (targetValue === '') {
+            // 完全清空：OA 時間清除，SA 亮燈同步還原
             c.oaDetails.meetDate = '';
-            if (c.saDetails) {
-              c.saDetails.agreeState = 'dim';
-              c.saDetails.agreeDate = '';
+            c.saDetails.agreeState = 'dim';
+            c.saDetails.agreeDate = '';
+          } else if (targetValue === 'confirmed') {
+            // 時間已確定：同步點亮 SA「已約定」
+            c.saDetails.agreeState = 'active';
+            if (!c.saDetails.agreeDate) {
+              c.saDetails.agreeDate = new Date().toISOString().split('T')[0];
             }
+          } else if (targetValue === 'pending') {
+            // 喬時間中：SA「已約定」退回暗燈
+            c.saDetails.agreeState = 'dim';
+            c.saDetails.agreeDate = '';
           }
         } else {
           c.oaDetails[field] = value;
         }
         if (field === 'meetDate') {
-          c.oaDetails.meetState = value ? 'confirmed' : '';
+          // 直接在 OA 抽屜設定會面日期時，自動推進狀態並同步 SA
+          if (value) {
+            c.oaDetails.meetState = 'confirmed';
+            c.saDetails.agreeState = 'active';
+            if (!c.saDetails.agreeDate) {
+              c.saDetails.agreeDate = new Date().toISOString().split('T')[0];
+            }
+          } else {
+            c.oaDetails.meetState = '';
+            c.saDetails.agreeState = 'dim';
+            c.saDetails.agreeDate = '';
+          }
         }
       }, isNote);
       if (!isNote && !isStateOrSlot) {
