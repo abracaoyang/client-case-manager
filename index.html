@@ -285,6 +285,133 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
 
+    /* ===== 週約訪看板 ===== */
+    #weekly-calendar-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #weekly-calendar-bar::-webkit-scrollbar { display: none; }
+
+    .week-day-card {
+      flex: 1;
+      min-width: 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      transition: all 0.2s ease;
+      position: relative;
+      cursor: default;
+      user-select: none;
+    }
+    .week-day-card.has-visit {
+      border-color: rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.05);
+      cursor: pointer;
+    }
+    .week-day-card.has-visit:hover {
+      background: rgba(255,255,255,0.09);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    }
+    .week-day-card.is-today {
+      border-color: rgba(245,158,11,0.5);
+      background: rgba(245,158,11,0.06);
+    }
+    .week-day-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: 0.05em;
+    }
+    .week-day-date {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+    .week-day-count {
+      margin-top: 4px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: rgba(255,255,255,0.15);
+      transition: color 0.2s;
+    }
+    .week-day-card.has-visit .week-day-count {
+      color: #f59e0b;
+      text-shadow: 0 0 8px rgba(245,158,11,0.6);
+    }
+    .week-day-card.is-today .week-day-label {
+      color: #f59e0b;
+    }
+    .week-day-card.is-today .week-day-date {
+      color: #f59e0b;
+    }
+
+    /* 懸停名單提示 */
+    .week-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e1e2e;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 8px 12px;
+      min-width: 130px;
+      max-width: 200px;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    .week-day-card.has-visit:hover .week-tooltip {
+      display: block;
+    }
+    .week-tooltip-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #f59e0b;
+      margin-bottom: 5px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding-bottom: 3px;
+    }
+    .week-tooltip-item {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.8);
+      padding: 2px 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* 案件列霓虹高亮動畫 */
+    @keyframes neon-highlight {
+      0%   { box-shadow: none; }
+      25%  { box-shadow: 0 0 0 2px #f59e0b, 0 0 16px rgba(245,158,11,0.6); }
+      50%  { box-shadow: 0 0 0 2px #f59e0b, 0 0 32px rgba(245,158,11,0.8); }
+      75%  { box-shadow: 0 0 0 2px #f59e0b, 0 0 16px rgba(245,158,11,0.6); }
+      100% { box-shadow: none; }
+    }
+    .case-row.neon-flash {
+      animation: neon-highlight 0.5s ease-in-out 4;
+      border-radius: 6px;
+      position: relative;
+      z-index: 2;
+    }
+
     .case-row {
       display: flex;
       align-items: center;
@@ -1549,6 +1676,9 @@
       <button class="btn btn-primary" id="btn-add-case">＋ 新增議題案件</button>
     </div>
   </header>
+
+  <!-- 週約訪看板 -->
+  <div id="weekly-calendar-bar"></div>
 
   <div class="canvas-container" id="canvas-container">
     <!-- 表頭已隱藏 -->
@@ -3613,9 +3743,128 @@
       }
     }
 
+    // ===== 週約訪看板 =====
+    function renderWeeklyCalendar() {
+      const bar = document.getElementById('weekly-calendar-bar');
+      if (!bar) return;
+
+      // 取得台灣時間今日
+      const now = new Date();
+      const twOffset = 8 * 60 * 60 * 1000;
+      const twNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + twOffset);
+
+      const dayLabels = ['日', '一', '二', '三', '四', '五', '六'];
+      const days = [];
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(twNow);
+        d.setDate(twNow.getDate() + i);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        days.push({
+          dateStr: `${yyyy}-${mm}-${dd}`,
+          label: i === 0 ? '今天' : dayLabels[d.getDay()],
+          display: `${mm}/${dd}`,
+          isToday: i === 0,
+          cases: []
+        });
+      }
+
+      // 掃描所有未封存案件，依階段找對應日期
+      const activeCases = cases.filter(c => !c.archived);
+      activeCases.forEach(c => {
+        let targetDate = '';
+        const phase = c.currentPhase || 'SA';
+        if (phase === 'SA') {
+          targetDate = (c.saDetails && c.saDetails.agreeDate) || '';
+        } else if (phase === 'OA') {
+          targetDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+        } else if (phase === 'PC') {
+          targetDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+        } else if (phase === 'C') {
+          targetDate = (c.cDetails && c.cDetails.meetDate) || '';
+        } else if (phase === 'S') {
+          targetDate = (c.sDetails && c.sDetails.meetDate) || '';
+        }
+        if (!targetDate) return;
+        const normalized = targetDate.replace(/\//g, '-');
+        const dayObj = days.find(d => d.dateStr === normalized);
+        if (dayObj) dayObj.cases.push(c);
+      });
+
+      // 渲染卡片
+      bar.innerHTML = days.map(day => {
+        const hasVisit = day.cases.length > 0;
+        const classes = [
+          'week-day-card',
+          hasVisit ? 'has-visit' : '',
+          day.isToday ? 'is-today' : ''
+        ].filter(Boolean).join(' ');
+
+        const tooltipItems = day.cases.map(c =>
+          `<div class="week-tooltip-item">
+            <span style="color:${getPhaseColor(c.currentPhase)}; font-weight:700; font-size:0.6rem;">${c.currentPhase}</span>
+            <span>${(c.clientName || '').slice(0, 6)}</span>
+          </div>`
+        ).join('');
+
+        const tooltip = hasVisit ? `
+          <div class="week-tooltip">
+            <div class="week-tooltip-title">📋 ${day.display} 約訪名單</div>
+            ${tooltipItems}
+          </div>` : '';
+
+        const clickAttr = hasVisit
+          ? `onclick="scrollToFirstCaseOnDay('${day.dateStr}')"`
+          : '';
+
+        return `
+          <div class="${classes}" ${clickAttr}>
+            <div class="week-day-label">${day.label}</div>
+            <div class="week-day-date">${day.display}</div>
+            <div class="week-day-count">${hasVisit ? day.cases.length : '—'}</div>
+            ${tooltip}
+          </div>`;
+      }).join('');
+    }
+
+    // 取得各階段顏色，供週看板 tooltip 使用
+    function getPhaseColor(phase) {
+      const colors = { SA: '#f59e0b', OA: '#f97316', PC: '#a855f7', C: '#22c55e', S: '#3b82f6' };
+      return colors[phase] || '#a6adc8';
+    }
+
+    // 點擊週看板卡片：滾動至第一個符合日期的案件列並霓虹閃爍
+    function scrollToFirstCaseOnDay(dateStr) {
+      const activeCases = cases.filter(c => !c.archived);
+      let targetCase = null;
+      for (const c of activeCases) {
+        let targetDate = '';
+        const phase = c.currentPhase || 'SA';
+        if (phase === 'SA') targetDate = (c.saDetails && c.saDetails.agreeDate) || '';
+        else if (phase === 'OA') targetDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+        else if (phase === 'PC') targetDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+        else if (phase === 'C') targetDate = (c.cDetails && c.cDetails.meetDate) || '';
+        else if (phase === 'S') targetDate = (c.sDetails && c.sDetails.meetDate) || '';
+        if (targetDate.replace(/\//g, '-') === dateStr) { targetCase = c; break; }
+      }
+      if (!targetCase) return;
+      const row = document.querySelector(`.case-row[data-id="${targetCase.id}"]`);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        row.classList.add('neon-flash');
+        setTimeout(() => row.classList.remove('neon-flash'), 2100);
+      }, 300);
+    }
+
     function renderCases() {
       const body = document.getElementById('case-list-body');
       body.innerHTML = '';
+
+      // 每次重繪時同步刷新週約訪看板
+      renderWeeklyCalendar();
 
       // 根據封存狀態過濾案件
       let visibleCases = cases.filter(c => showingArchived ? c.archived === true : !c.archived);
