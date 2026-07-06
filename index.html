@@ -288,8 +288,8 @@
     /* ===== 週約訪看板 ===== */
     #weekly-calendar-bar {
       display: flex;
-      gap: 8px;
-      padding: 10px 16px;
+      gap: 6px;
+      padding: 6px 12px;
       background: var(--bg-card);
       border: 1px solid var(--border-color);
       border-radius: 12px;
@@ -302,13 +302,13 @@
 
     .week-day-card {
       flex: 1;
-      min-width: 90px;
+      min-width: 65px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
-      padding: 8px 6px;
-      border-radius: 10px;
+      gap: 1px;
+      padding: 4px 6px;
+      border-radius: 8px;
       border: 1px solid rgba(255,255,255,0.06);
       background: rgba(255,255,255,0.02);
       transition: all 0.2s ease;
@@ -342,14 +342,14 @@
       letter-spacing: 0.05em;
     }
     .week-day-date {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 600;
       color: var(--text-secondary);
       font-family: monospace;
     }
     .week-day-count {
-      margin-top: 4px;
-      font-size: 1.1rem;
+      margin-top: 2px;
+      font-size: 0.95rem;
       font-weight: 800;
       color: rgba(255,255,255,0.15);
       transition: color 0.2s;
@@ -363,6 +363,31 @@
     }
     .week-day-card.is-today .week-day-date {
       color: #f59e0b;
+    }
+
+    /* 篩選條件吻合之階段紅色亮線呼吸框與發光樣式 */
+    .flow-node.filter-matched-node .node-core-container {
+      border: 2px solid #ef4444 !important;
+      border-radius: 8px;
+      padding: 6px 10px;
+      background: rgba(239, 68, 68, 0.15) !important;
+      animation: red-neon-pulse 1.8s infinite ease-in-out !important;
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.7);
+    }
+
+    @keyframes red-neon-pulse {
+      0% {
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+        border-color: rgba(239, 68, 68, 0.5);
+      }
+      50% {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.9);
+        border-color: rgba(239, 68, 68, 1);
+      }
+      100% {
+        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+        border-color: rgba(239, 68, 68, 0.5);
+      }
     }
 
     /* 懸停名單提示 */
@@ -3762,7 +3787,7 @@
       const dayLabels = ['日', '一', '二', '三', '四', '五', '六'];
       const days = [];
 
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 14; i++) {
         const d = new Date(twNow);
         d.setDate(twNow.getDate() + i);
         const yyyy = d.getFullYear();
@@ -3852,6 +3877,24 @@
     function getPhaseColor(phase) {
       const colors = { SA: '#f59e0b', OA: '#f97316', PC: '#a855f7', C: '#22c55e', S: '#3b82f6' };
       return colors[phase] || '#a6adc8';
+    }
+
+    // 取得篩選匹配的階段樣式類別
+    function getFilterMatchedClass(c, phase) {
+      if (!filterWeeklyDate) return '';
+      let targetDate = '';
+      if (phase === 'SA') {
+        if (c.saDetails && c.saDetails.agreeState === 'active') targetDate = c.saDetails.agreeDate || '';
+      } else if (phase === 'OA') {
+        if (c.oaDetails && c.oaDetails.meetState === 'confirmed') targetDate = c.oaDetails.meetDate || '';
+      } else if (phase === 'PC') {
+        if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
+      } else if (phase === 'C') {
+        if (c.cDetails && c.cDetails.meetState === 'confirmed') targetDate = c.cDetails.meetDate || '';
+      } else if (phase === 'S') {
+        if (c.sDetails && c.sDetails.meetState === 'confirmed') targetDate = c.sDetails.meetDate || '';
+      }
+      return targetDate.replace(/\//g, '-') === filterWeeklyDate ? 'filter-matched-node' : '';
     }
 
     // 點擊週看板卡片：滾動至第一個符合日期的案件列並霓虹閃爍
@@ -4070,7 +4113,7 @@
           </div>
           <div class="flow-track">
             <!-- SA (以發出日期為主亮燈) -->
-            <div class="flow-node ${getNodeStatus(c, 'SA')}" data-phase="SA" 
+            <div class="flow-node ${getNodeStatus(c, 'SA')} ${getFilterMatchedClass(c, 'SA')}" data-phase="SA" 
                  onclick="onNodeClick(event, '${c.id}', 'SA')">
               <div class="node-core-container">
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${saDateText}</div>
@@ -4083,7 +4126,7 @@
               </div>
             </div>
             <!-- OA (以會面日期為主亮燈) -->
-            <div class="flow-node ${getNodeStatus(c, 'OA')}" data-phase="OA" onclick="onNodeClick(event, '${c.id}', 'OA')">
+            <div class="flow-node ${getNodeStatus(c, 'OA')} ${getFilterMatchedClass(c, 'OA')}" data-phase="OA" onclick="onNodeClick(event, '${c.id}', 'OA')">
               <div class="node-core-container">
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${oaDateText}</div>
                 <div class="node-dot">OA</div>
@@ -4095,7 +4138,7 @@
               </div>
             </div>
             <!-- PC (以遞送日期為主亮燈) -->
-            <div class="flow-node ${getNodeStatus(c, 'PC')}" data-phase="PC" onclick="onNodeClick(event, '${c.id}', 'PC')">
+            <div class="flow-node ${getNodeStatus(c, 'PC')} ${getFilterMatchedClass(c, 'PC')}" data-phase="PC" onclick="onNodeClick(event, '${c.id}', 'PC')">
               <div class="node-core-container">
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${pcDateText}</div>
                 <div class="node-dot">PC</div>
@@ -4107,7 +4150,7 @@
               </div>
             </div>
             <!-- C -->
-            <div class="flow-node ${getNodeStatus(c, 'C')}" data-phase="C" onclick="onNodeClick(event, '${c.id}', 'C')" style="width: 260px;">
+            <div class="flow-node ${getNodeStatus(c, 'C')} ${getFilterMatchedClass(c, 'C')}" data-phase="C" onclick="onNodeClick(event, '${c.id}', 'C')" style="width: 260px;">
               <div class="node-core-container">
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${cDateText}</div>
                 <div class="node-dot">C</div>
@@ -4122,7 +4165,7 @@
               </div>
             </div>
             <!-- S -->
-            <div class="flow-node ${getNodeStatus(c, 'S')}" data-phase="S" onclick="onNodeClick(event, '${c.id}', 'S')">
+            <div class="flow-node ${getNodeStatus(c, 'S')} ${getFilterMatchedClass(c, 'S')}" data-phase="S" onclick="onNodeClick(event, '${c.id}', 'S')">
               <div class="node-core-container">
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${sDateText}</div>
                 <div class="node-dot">S</div>
