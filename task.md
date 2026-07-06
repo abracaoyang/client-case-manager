@@ -11,6 +11,10 @@
 - [x] **2.1 各階段小流程定義**：一步一步對齊 SA、OA、PC、C、S 的子任務與欄位。
 - [x] **2.2 主畫面與 RWD 佈局**：設計深色霓虹主看板與流程線。
 - [x] **2.3 行動抽屜與視覺錨定**：實作點擊亮燈、正下方彈出抽屜的互動。
+- [x] Fix active style check for "喬時間中" button in SA drawer (`index.html`)
+- [x] Implement toggle-off logic for `meetState` in `updateOAField`, `updatePCField`, `updateCField`, and `updateSField` (`index.html`)
+- [x] Update date-clearing logic to set `meetState` to `""` instead of `'pending'` when date is cleared (`index.html`)
+- [x] Add active drawer refresh logic to `updateOAField` on `isStateOrSlot` changes (`index.html`)
 
 ## 📌 第三階段：資料與儲存基礎 (網頁完成後進行)
 - [x] **3.1 本機資料 CRUD**：設計 LocalStorage 資料儲存與 mock 測試。

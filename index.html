@@ -832,7 +832,9 @@
     }
 
     /* C 子標籤亮燈樣式 */
-    .sub-tag-btn.active.c-plan {
+    .sub-tag-btn.active.c-plan,
+    .sub-tag-btn.active.c-sign,
+    .sub-tag-btn.active.c-remedy {
       background: rgba(34, 197, 94, 0.12);
       color: var(--color-c);
       border-color: var(--color-c);
@@ -2437,6 +2439,10 @@
             planState: row["Ｃ文件準備狀態"] || row["Ｃ照會防範狀態"] || 'dim',
             planDate: row["Ｃ"] || '',
             planNotes: row["Ｃ文件準備備忘"] || row["Ｃ照會防範備忘"] || '',
+            signState: row["Ｃ簽約狀態"] || 'dim',
+            signDate: row["Ｃ簽約日期"] || '',
+            remedyState: row["Ｃ補件狀態"] || 'dim',
+            remedyDate: row["Ｃ補件日期"] || '',
             submitState: row["Ｃ送件狀態"] || 'dim',
             submitDate: row["Ｃ送件日期"] || '',
             submitProcessed: row["Ｃ送件已處理"] || '',
@@ -2504,6 +2510,10 @@
         "Ｃ已成交": cc.meetState === 'confirmed' ? '已成交' : '未成交',
         "Ｃ文件準備狀態": cc.planState || 'dim',
         "Ｃ文件準備備忘": cc.planNotes || '',
+        "Ｃ簽約狀態": cc.signState || 'dim',
+        "Ｃ簽約日期": cc.signDate || '',
+        "Ｃ補件狀態": cc.remedyState || 'dim',
+        "Ｃ補件日期": cc.remedyDate || '',
         "Ｃ送件狀態": cc.submitState || 'dim',
         "Ｃ送件日期": cc.submitDate || '',
         "Ｃ送件已處理": cc.submitProcessed || '',
@@ -2818,6 +2828,14 @@
       } else {
         modal.classList.remove('active');
       }
+      
+      // 自動聚焦優化：彈窗開啟時，游標自動聚焦於「客戶姓名」欄位中
+      if (show) {
+        setTimeout(() => {
+          const nameInput = document.getElementById('add-client-name');
+          if (nameInput) nameInput.focus();
+        }, 100);
+      }
     }
 
     // 輔助函數：更新設定介面中的離線佇列資訊
@@ -2999,7 +3017,52 @@
       modal.classList.add('active');
     }
 
+    // === 鍵盤快捷鍵配置 (ADHD 減法高效優化) ===
+    function initKeyboardShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        // 0. 若時程看板（通知看板）處於開啟狀態，按下 Enter 鍵則關閉
+        const reminderModal = document.getElementById('reminder-modal');
+        if (reminderModal && reminderModal.classList.contains('active') && e.key === 'Enter') {
+          e.preventDefault();
+          toggleReminderModal(false);
+          return;
+        }
+
+        // 1. Cmd + I (Mac) 或 Ctrl + I (Win) -> 快速開啟建案彈窗 (避開 Raycast 衝突)
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
+          e.preventDefault();
+          toggleAddCaseModal(true);
+        }
+
+        // 2. Cmd + Enter (Mac) 或 Ctrl + Enter (Win) -> 快速送出建案或儲存關閉抽屜
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          const addCaseModal = document.getElementById('add-case-modal');
+          
+          // 情境 A：若「新增客戶與議題」對話框處於開啟狀態
+          if (addCaseModal && addCaseModal.classList.contains('active')) {
+            e.preventDefault();
+            const form = document.getElementById('add-case-form');
+            if (form) {
+              // 觸發 submit，同時保留並觸發 HTML5 原生必填驗證，安全防呆
+              form.requestSubmit();
+            }
+          } 
+          // 情境 B：若有開啟中的側邊抽屜
+          else {
+            // 尋找當前有顯示 display 為 block 的 drawer-row 元素
+            const openDrawerEl = Array.from(document.querySelectorAll('.drawer-row')).find(el => el.style.display === 'block');
+            if (openDrawerEl) {
+              e.preventDefault();
+              closeAllDrawers();
+              showToast("抽屜修改已安全儲存 💾", "success");
+            }
+          }
+        }
+      });
+    }
+
     async function init() {
+      initKeyboardShortcuts();
       debugLog("init() 流程啟動");
       try {
         updateConnectionStatus();
@@ -3568,7 +3631,7 @@
         c.saDetails = Object.assign({ sendState: "dim", sendDate: "", replyState: "dim", replyDate: "", intentState: "intent-pending", agreeState: "dim", agreeDate: "", meetTimeSlot: "" }, c.saDetails || {});
         c.oaDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.oaDetails || {});
         c.pcDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", discussNotes: "", rescheduleHistory: [] }, c.pcDetails || {});
-        c.cDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", submitState: "dim", submitDate: "", submitProcessed: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.cDetails || {});
+        c.cDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", signState: "dim", signDate: "", remedyState: "dim", remedyDate: "", submitState: "dim", submitDate: "", submitProcessed: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.cDetails || {});
         c.sDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "" }, c.sDetails || {});
 
         // 建立卡片列
@@ -3726,9 +3789,11 @@
                 <div class="node-dot">C</div>
                 <div class="sub-tag-group c-grid" onclick="event.stopPropagation()">
                   <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : ''}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('文件準備', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
-                  <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : ''}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${fmtSubLabel('簽約', c.cDetails.signState === 'active' ? c.cDetails.signDate : '')}</span>
                   <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : ''}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">要保簽署</span>
+                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : ''}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${fmtSubLabel('補件', c.cDetails.remedyState === 'active' ? c.cDetails.remedyDate : '')}</span>
                   <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : ''}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
+                  <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 3;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
                 </div>
               </div>
             </div>
@@ -4493,7 +4558,7 @@
             </div>
           </div>
           <div style="flex: 1.1; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border-color); padding-right: 20px; min-width: 0; justify-content: center;">
-            <button class="status-badge-btn" onclick="updateOAField('${c.id}', 'meetState', 'pending')" style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid ${c.oaDetails.meetState !== 'confirmed' ? '#f38ba8' : '#313244'}; background: ${c.oaDetails.meetState !== 'confirmed' ? 'rgba(243, 139, 168, 0.15)' : '#313244'}; color: ${c.oaDetails.meetState !== 'confirmed' ? '#f38ba8' : '#a6adc8'};">喬時間中</button>
+            <button class="status-badge-btn" onclick="updateOAField('${c.id}', 'meetState', 'pending')" style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid ${c.oaDetails.meetState === 'pending' ? '#f38ba8' : '#313244'}; background: ${c.oaDetails.meetState === 'pending' ? 'rgba(243, 139, 168, 0.15)' : '#313244'}; color: ${c.oaDetails.meetState === 'pending' ? '#f38ba8' : '#a6adc8'};">喬時間中</button>
             <button class="status-badge-btn" onclick="updateOAField('${c.id}', 'meetState', 'confirmed')" ondblclick="triggerOAPhaseDirect('${c.id}')" style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; font-weight: 700; border-radius: 6px; cursor: pointer; transition: all 0.2s; border: 1px solid ${c.oaDetails.meetState === 'confirmed' ? '#a6e3a1' : '#313244'}; background: ${c.oaDetails.meetState === 'confirmed' ? 'rgba(166, 227, 161, 0.15)' : '#313244'}; color: ${c.oaDetails.meetState === 'confirmed' ? '#a6e3a1' : '#a6adc8'};" title="雙擊此按鈕以直接切換進度至 OA 階段">時間已確定 🚀</button>
             <div class="form-group" style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px; width: 100%;">
               <label style="font-size: 0.75rem; color: #a6adc8; width: 100%;">預計會面日期</label>
@@ -4619,6 +4684,12 @@
     function toggleCPlanDirect(caseId, event) {
       handleSubTagToggle(caseId, 'c', 'planState', 'planDate', 'planDate', event);
     }
+    function toggleCSignDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'c', 'signState', 'signDate', 'signDate', event);
+    }
+    function toggleCRemedyDirect(caseId, event) {
+      handleSubTagToggle(caseId, 'c', 'remedyState', 'remedyDate', 'remedyDate', event);
+    }
     function toggleCSubmitDirect(caseId, event) {
       handleSubTagToggle(caseId, 'c', 'submitState', 'submitDate', 'submitDate', event);
     }
@@ -4644,9 +4715,17 @@
       const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
       updateCase(caseId, c => {
         if (!c.cDetails) c.cDetails = {};
-        c.cDetails[field] = value;
+        if (field === 'meetState') {
+          const targetValue = (c.cDetails.meetState === value) ? '' : value;
+          c.cDetails.meetState = targetValue;
+          if (targetValue === '') {
+            c.cDetails.meetDate = '';
+          }
+        } else {
+          c.cDetails[field] = value;
+        }
         if (field === 'meetDate') {
-          c.cDetails.meetState = value ? 'confirmed' : 'pending';
+          c.cDetails.meetState = value ? 'confirmed' : '';
         }
         // 照會後重新送件機制：修改送件日期後，自動重設 processed 為未處理
         if (field === 'submitDate') {
@@ -4694,9 +4773,10 @@
       } else if (isStateOrSlot) {
         saveCasesToStorage();
         const drawerRow = document.getElementById(`drawer-row-${caseId}`);
-        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'C') {
+        if (drawerRow && drawerRow.style.display === 'block') {
+          const activeSection = drawerRow.dataset.activeSection || 'C';
           const c = cases.find(item => item.id === caseId);
-          refreshDrawerContent(caseId, 'C', c);
+          refreshDrawerContent(caseId, activeSection, c);
         }
       }
     }
@@ -4706,9 +4786,17 @@
       const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
       updateCase(caseId, c => {
         if (!c.sDetails) c.sDetails = {};
-        c.sDetails[field] = value;
+        if (field === 'meetState') {
+          const targetValue = (c.sDetails.meetState === value) ? '' : value;
+          c.sDetails.meetState = targetValue;
+          if (targetValue === '') {
+            c.sDetails.meetDate = '';
+          }
+        } else {
+          c.sDetails[field] = value;
+        }
         if (field === 'meetDate') {
-          c.sDetails.meetState = value ? 'confirmed' : 'pending';
+          c.sDetails.meetState = value ? 'confirmed' : '';
         }
       }, isNote);
       if (!isNote && !isStateOrSlot) {
@@ -4716,9 +4804,10 @@
       } else if (isStateOrSlot) {
         saveCasesToStorage();
         const drawerRow = document.getElementById(`drawer-row-${caseId}`);
-        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'S') {
+        if (drawerRow && drawerRow.style.display === 'block') {
+          const activeSection = drawerRow.dataset.activeSection || 'S';
           const c = cases.find(item => item.id === caseId);
-          refreshDrawerContent(caseId, 'S', c);
+          refreshDrawerContent(caseId, activeSection, c);
         }
       }
     }
@@ -4727,9 +4816,18 @@
       const isNote = field.endsWith('Notes') || field.endsWith('Note');
       const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
       updateCase(caseId, c => {
-        c.pcDetails[field] = value;
+        if (!c.pcDetails) c.pcDetails = {};
+        if (field === 'meetState') {
+          const targetValue = (c.pcDetails.meetState === value) ? '' : value;
+          c.pcDetails.meetState = targetValue;
+          if (targetValue === '') {
+            c.pcDetails.meetDate = '';
+          }
+        } else {
+          c.pcDetails[field] = value;
+        }
         if (field === 'meetDate') {
-          c.pcDetails.meetState = value ? 'confirmed' : 'pending';
+          c.pcDetails.meetState = value ? 'confirmed' : '';
         }
       }, isNote);
       if (!isNote && !isStateOrSlot) {
@@ -4737,9 +4835,10 @@
       } else if (isStateOrSlot) {
         saveCasesToStorage();
         const drawerRow = document.getElementById(`drawer-row-${caseId}`);
-        if (drawerRow && drawerRow.style.display === 'block' && drawerRow.dataset.activeSection === 'PC') {
+        if (drawerRow && drawerRow.style.display === 'block') {
+          const activeSection = drawerRow.dataset.activeSection || 'PC';
           const c = cases.find(item => item.id === caseId);
-          refreshDrawerContent(caseId, 'PC', c);
+          refreshDrawerContent(caseId, activeSection, c);
         }
       }
     }
@@ -4956,6 +5055,8 @@
       }
 
       const isPlanDone = cc.planState === 'active';
+      const isSignDone = cc.signState === 'active';
+      const isRemedyDone = cc.remedyState === 'active';
       const isSubmitDone = cc.submitState === 'active';
       const isPracticeDone = cc.practiceState === 'active';
       const isDiscussDone = cc.discussState === 'active';
@@ -4990,7 +5091,7 @@
           <div style="flex: 1.7; min-width: 0; display:flex; flex-direction:column; justify-content:space-between;">
             <div>
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 成交及核保追蹤</div>
-              <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
+              <div style="display:flex; flex-direction:column; gap:6px; max-height: 240px; overflow-y: auto; padding-right: 2px;">
                 <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 文件準備</span>
@@ -4999,12 +5100,12 @@
                   <input type="text" readonly value="${cc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'c')" placeholder="預估文件準備完成日" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="體檢或財務說明備忘..." onchange="updateCField('${c.id}', 'planNotes', this.value)">${cc.planNotes || ''}</textarea>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isSubmitDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isSignDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <span style="font-size:0.72rem; color:#e879f9; font-weight:700;">📤 送件</span>
-                    <button class="status-badge-btn ${isSubmitDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'submitState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isSubmitDone ? '✓ 已完成' : '標記完成'}</button>
+                    <span style="font-size:0.72rem; color:#fb923c; font-weight:700;">🤝 簽約</span>
+                    <button class="status-badge-btn ${isSignDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'signState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isSignDone ? '✓ 已完成' : '標記完成'}</button>
                   </div>
-                  <input type="text" readonly value="${cc.submitDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'submitDate', 'c')" placeholder="送件日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly value="${cc.signDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'signDate', 'c')" placeholder="簽約日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                 </div>
                 <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -5012,6 +5113,20 @@
                     <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
                   </div>
                   <input type="text" readonly value="${cc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'c')" placeholder="親簽或行動投保日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isRemedyDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#f43f5e; font-weight:700;">🔧 補件</span>
+                    <button class="status-badge-btn ${isRemedyDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'remedyState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isRemedyDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${cc.remedyDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'remedyDate', 'c')" placeholder="補件日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                </div>
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isSubmitDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:0.72rem; color:#e879f9; font-weight:700;">📤 送件</span>
+                    <button class="status-badge-btn ${isSubmitDone ? 'active agree' : ''}" data-type="agree" onclick="toggleCPrepState('${c.id}', 'submitState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isSubmitDone ? '✓ 已完成' : '標記完成'}</button>
+                  </div>
+                  <input type="text" readonly value="${cc.submitDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'submitDate', 'c')" placeholder="送件日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                 </div>
                 <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
@@ -6064,9 +6179,21 @@
       const isStateOrSlot = field === 'meetState' || field === 'meetTimeSlot';
       updateCase(caseId, c => {
         if (!c.oaDetails) c.oaDetails = {};
-        c.oaDetails[field] = value;
+        if (field === 'meetState') {
+          const targetValue = (c.oaDetails.meetState === value) ? '' : value;
+          c.oaDetails.meetState = targetValue;
+          if (targetValue === '') {
+            c.oaDetails.meetDate = '';
+            if (c.saDetails) {
+              c.saDetails.agreeState = 'dim';
+              c.saDetails.agreeDate = '';
+            }
+          }
+        } else {
+          c.oaDetails[field] = value;
+        }
         if (field === 'meetDate') {
-          c.oaDetails.meetState = value ? 'confirmed' : 'pending';
+          c.oaDetails.meetState = value ? 'confirmed' : '';
         }
       }, isNote);
       if (!isNote && !isStateOrSlot) {
@@ -6074,6 +6201,14 @@
         const drawerContent = document.getElementById(`drawer-content-${caseId}`);
         if (drawerContent) {
           renderOADrawer(c, drawerContent);
+        }
+      } else if (isStateOrSlot) {
+        saveCasesToStorage();
+        const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+        if (drawerRow && drawerRow.style.display === 'block') {
+          const activeSection = drawerRow.dataset.activeSection || 'OA';
+          const c = cases.find(item => item.id === caseId);
+          refreshDrawerContent(caseId, activeSection, c);
         }
       }
     }
@@ -6140,7 +6275,8 @@
       if (!dropdown) return;
       
       const valLower = val.trim().toLowerCase();
-      const matches = valLower === '' ? globalTopics : globalTopics.filter(t => t.toLowerCase().includes(valLower));
+      const customIssues = getCustomIssues().map(i => i.name);
+      const matches = valLower === '' ? customIssues : customIssues.filter(t => t.toLowerCase().includes(valLower));
       
       if (matches.length === 0) {
         dropdown.style.display = 'none';
