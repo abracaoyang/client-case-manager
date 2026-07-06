@@ -367,26 +367,25 @@
 
     /* 篩選條件吻合之階段紅色亮線呼吸框與發光樣式 */
     .flow-node.filter-matched-node .node-core-container {
-      border: 2px solid #ef4444 !important;
-      border-radius: 8px;
-      padding: 6px 10px;
-      background: rgba(239, 68, 68, 0.15) !important;
+      border: 1px solid rgba(239, 68, 68, 0.45) !important;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.02) 100%) !important;
       animation: red-neon-pulse 1.8s infinite ease-in-out !important;
-      box-shadow: 0 0 14px rgba(239, 68, 68, 0.7);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.25), inset 0 0 6px rgba(239, 68, 68, 0.05);
     }
 
     @keyframes red-neon-pulse {
       0% {
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
-        border-color: rgba(239, 68, 68, 0.5);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.2), inset 0 0 4px rgba(239, 68, 68, 0.02);
+        border-color: rgba(239, 68, 68, 0.35);
       }
       50% {
-        box-shadow: 0 0 16px rgba(239, 68, 68, 0.9);
-        border-color: rgba(239, 68, 68, 1);
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.45), inset 0 0 8px rgba(239, 68, 68, 0.08);
+        border-color: rgba(239, 68, 68, 0.75);
       }
       100% {
-        box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
-        border-color: rgba(239, 68, 68, 0.5);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.2), inset 0 0 4px rgba(239, 68, 68, 0.02);
+        border-color: rgba(239, 68, 68, 0.35);
       }
     }
 
@@ -633,6 +632,11 @@
       gap: 8px; /* 間距從 6px 增加到 8px，拉開整體間距 */
       width: 100%;
       justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      padding: 6px 10px;
+      box-sizing: border-box;
+      transition: all 0.3s ease;
     }
 
     .node-dot {
@@ -3882,6 +3886,7 @@
     // 取得篩選匹配的階段樣式類別
     function getFilterMatchedClass(c, phase) {
       if (!filterWeeklyDate) return '';
+      if (c.currentPhase !== phase) return '';
       let targetDate = '';
       if (phase === 'SA') {
         if (c.saDetails && c.saDetails.agreeState === 'active') targetDate = c.saDetails.agreeDate || '';
