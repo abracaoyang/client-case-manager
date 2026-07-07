@@ -1654,8 +1654,406 @@
     pointer-events: none;
     z-index: 10;
   }
+
+  /* ===== 待辦事項系統 ===== */
+  #todo-page {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 800;
+    background: var(--bg-dark);
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #todo-page.active {
+    display: flex;
+  }
+  #todo-page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-card);
+    flex-shrink: 0;
+  }
+  #todo-page-header h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    flex: 1;
+    margin: 0;
+  }
+  #todo-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .todo-card {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: all 0.2s;
+    cursor: default;
+    text-align: left;
+  }
+  .todo-card:hover {
+    border-color: rgba(245, 158, 11, 0.3);
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .todo-card.done {
+    opacity: 0.45;
+    border-color: rgba(255,255,255,0.05);
+  }
+  .todo-card.done .todo-title {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+  }
+  .todo-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    margin-top: 2px;
+  }
+  .todo-check:hover {
+    border-color: var(--accent-amber);
+  }
+  .todo-card.done .todo-check {
+    background: var(--accent-amber);
+    border-color: var(--accent-amber);
+    color: #000;
+  }
+  .todo-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    text-align: left;
+  }
+  .todo-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .todo-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+  .todo-meta-tag {
+    font-size: 0.68rem;
+    padding: 1px 7px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-weight: 600;
+  }
+  .todo-meta-tag.case-tag {
+    background: rgba(99,102,241,0.12);
+    border-color: rgba(99,102,241,0.3);
+    color: #a5b4fc;
+  }
+  .todo-meta-tag.stage-tag {
+    background: rgba(245,158,11,0.1);
+    border-color: rgba(245,158,11,0.3);
+    color: var(--accent-amber);
+  }
+  .todo-meta-tag.subtag-tag {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.25);
+    color: #4ade80;
+  }
+  .todo-due {
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: var(--text-secondary);
+  }
+  .todo-due.overdue { color: #f87171; font-weight: 700; }
+  .todo-due.today   { color: #f59e0b; font-weight: 700; }
+  .todo-note {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    padding-top: 2px;
+  }
+  .todo-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: flex-start;
+  }
+  .todo-action-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+  }
+  .todo-action-btn:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+  }
+  .todo-action-btn.del:hover {
+    background: rgba(239,68,68,0.12);
+    border-color: rgba(239,68,68,0.3);
+    color: #f87171;
+  }
+  .todo-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+  .todo-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-top: 6px;
+  }
+
+  /* 新增待辦 Modal */
+  #add-todo-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(5px);
+    align-items: center;
+    justify-content: center;
+  }
+  #add-todo-modal.active { display: flex; }
+  #add-todo-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1.5rem;
+    width: 720px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #add-todo-box h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .todo-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .todo-form-row label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+  }
+  .todo-form-row .form-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: #fff;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .todo-form-row .form-input:focus {
+    border-color: var(--accent);
+  }
+  /* 確保 HTML5 Date 欄位顯示出日曆點擊圖示，並在暗黑模式下為白色高對比 */
+  .todo-form-row input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .todo-form-row input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+  .todo-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  /* 待辦提醒 Toast */
+  #todo-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1200;
+    background: #1e1e2e;
+    border: 1px solid rgba(245,158,11,0.4);
+    border-radius: 12px;
+    padding: 14px 16px;
+    width: 300px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    transform: translateY(120%);
+    opacity: 0;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+  }
+  #todo-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: all;
+  }
+  #todo-toast-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent-amber);
+    margin-bottom: 8px;
+  }
+  #todo-toast-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+  .todo-toast-item {
+    font-size: 0.72rem;
+    color: var(--text-primary);
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  #todo-toast-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  /* === 艾森豪矩陣優先度選擇器 === */
+  .priority-matrix {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .priority-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 9px 6px;
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: rgba(255,255,255,0.02);
+    user-select: none;
+    text-align: center;
+  }
+  .priority-cell:hover {
+    border-color: rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.06);
+    transform: scale(1.03);
+  }
+  .priority-cell.active {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 2px currentColor;
+  }
+  .priority-cell[data-q="1"].active  { border-color:#ef4444; color:#ef4444; background: rgba(239,68,68,0.12); }
+  .priority-cell[data-q="2"].active  { border-color:#f97316; color:#f97316; background: rgba(249,115,22,0.12); }
+  .priority-cell[data-q="3"].active  { border-color:#eab308; color:#eab308; background: rgba(234,179,8,0.12); }
+  .priority-cell[data-q="4"].active  { border-color:#6b7280; color:#9ca3af; background: rgba(107,114,128,0.12); }
+  .priority-cell-icon { font-size: 1.1rem; line-height: 1; }
+  .priority-cell-label { font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); line-height: 1.2; }
+  .priority-cell.active .priority-cell-label { color: currentColor; }
+
+  /* === 優先度 Badge === */
+  .priority-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+  .priority-badge.q1 { background: rgba(239,68,68,0.18); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .priority-badge.q2 { background: rgba(249,115,22,0.18); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+  .priority-badge.q3 { background: rgba(234,179,8,0.18); color: #eab308; border: 1px solid rgba(234,179,8,0.3); }
+  .priority-badge.q4 { background: rgba(107,114,128,0.12); color: #9ca3af; border: 1px solid rgba(107,114,128,0.2); }
+
+  /* === 通知看板 Tab 切換 === */
+  .todo-notify-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.25);
+    padding: 3px;
+    border-radius: 8px;
+  }
+  .todo-notify-tab {
+    flex: 1;
+    padding: 5px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all 0.18s ease;
+  }
+  .todo-notify-tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.35);
+  }
+  .todo-notify-panel { display: none; }
+  .todo-notify-panel.active { display: block; }
+
+  /* === 優先度分組標題 === */
+  .priority-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 5px;
+    margin-bottom: 6px;
+    margin-top: 4px;
+  }
   </style>
 </head>
+
 <body>
 
   <!-- 自訂確認彈窗 (custom confirm dialog) -->
@@ -1671,7 +2069,7 @@
   </div>
 
   <header>
-    <h1>客戶案件管理系統</h1>
+    <h1 ondblclick="toggleTodoPage()" style="cursor:default; user-select:none;">客戶案件管理系統</h1>
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- 搜尋欄位 -->
       <div class="search-container" id="search-container">
@@ -1706,10 +2104,126 @@
       <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
         ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
+      <button class="btn" id="btn-open-todos" onclick="toggleTodoPage()" title="待辦事項管理" style="font-size: 1.1rem; padding: 6px 10px; transition: all 0.3s; position: relative; margin-right: 4px;">
+        📋 <span id="todo-global-badge" style="position: absolute; top: -4px; right: -4px; background: #f59e0b; color: #000; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1;">0</span>
+      </button>
       <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
+      <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋ 新增待辦事項</button>
       <button class="btn btn-primary" id="btn-add-case">＋ 新增議題案件</button>
     </div>
   </header>
+
+  <!-- ===== 待辦事項管理頁面 ===== -->
+  <div id="todo-page">
+    <div id="todo-page-header">
+      <button class="btn" onclick="toggleTodoPage()" style="padding: 5px 12px; font-size: 0.82rem;">← 返回</button>
+      <h2>📋 待辦事項管理</h2>
+      <button class="btn btn-primary" onclick="openTodoModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增待辦</button>
+    </div>
+    <div id="todo-body"></div>
+  </div>
+
+  <!-- 新增/編輯待辦 Modal -->
+  <div id="add-todo-modal">
+    <div id="add-todo-box">
+      <h3 id="todo-modal-title">新增待辦事項</h3>
+      <input type="hidden" id="todo-edit-id" value="">
+      
+      <!-- 左右橫式雙欄佈局 -->
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; text-align: left; margin-top: 5px;">
+        
+        <!-- 左欄：待辦任務自身設定 -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="todo-form-row">
+            <label>任務標題 *</label>
+            <input type="text" class="form-input" id="todo-input-title" placeholder="例如：打電話約訪、補交要保書..." autocomplete="off">
+          </div>
+          
+          <div class="todo-form-row">
+            <label>到期日（可選）</label>
+            <input type="date" class="form-input" id="todo-input-due" onclick="this.showPicker()" style="cursor: pointer;">
+          </div>
+
+          <div class="todo-form-row">
+            <label style="margin-bottom:6px;">優先度分類（可選）</label>
+            <input type="hidden" id="todo-input-urgent" value="">
+            <input type="hidden" id="todo-input-important" value="">
+            <div class="priority-matrix">
+              <div class="priority-cell" data-q="1" onclick="selectPriorityCell(this, true, true)">
+                <span class="priority-cell-icon">🔴</span>
+                <span class="priority-cell-label">緊急重要</span>
+              </div>
+              <div class="priority-cell" data-q="2" onclick="selectPriorityCell(this, true, false)">
+                <span class="priority-cell-icon">🟠</span>
+                <span class="priority-cell-label">緊急不重要</span>
+              </div>
+              <div class="priority-cell" data-q="3" onclick="selectPriorityCell(this, false, true)">
+                <span class="priority-cell-icon">🟡</span>
+                <span class="priority-cell-label">重要不緊急</span>
+              </div>
+              <div class="priority-cell" data-q="4" onclick="selectPriorityCell(this, false, false)">
+                <span class="priority-cell-icon">⚪</span>
+                <span class="priority-cell-label">不緊要</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="todo-form-row">
+            <label>備忘說明</label>
+            <textarea class="form-input" id="todo-input-note" rows="3" placeholder="詳細內容或記錄..." style="resize: vertical; min-height: 80px;"></textarea>
+          </div>
+        </div>
+
+        <!-- 右欄：指定關聯對象（客戶案件、階段與次標籤） -->
+        <div style="display: flex; flex-direction: column; gap: 14px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 10px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--accent); margin-bottom: 2px;">🔗 案件與階段關聯</div>
+          
+          <div class="todo-form-row">
+            <label>指定客戶案件</label>
+            <select class="form-input" id="todo-input-case">
+              <option value="">— 不指定案件 —</option>
+            </select>
+          </div>
+
+          <div class="todo-form-row">
+            <label>指定大階段</label>
+            <select class="form-input" id="todo-input-stage" onchange="onTodoStageChange()">
+              <option value="">— 不指定階段 —</option>
+              <option value="SA">SA 約訪</option>
+              <option value="OA">OA 初訪</option>
+              <option value="PC">PC 計畫說明</option>
+              <option value="C">C 成交簽約</option>
+              <option value="S">S 服務維繫</option>
+            </select>
+          </div>
+
+          <div class="todo-form-row">
+            <label>指定次標籤</label>
+            <select class="form-input" id="todo-input-subtag">
+              <option value="">— 不指定次標籤 —</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="todo-form-actions" style="margin-top: 10px;">
+        <button class="btn" onclick="closeTodoModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveTodo()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 待辦任務 Toast 通知 -->
+  <div id="todo-toast">
+    <div id="todo-toast-title">📋 有待辦任務需注意</div>
+    <div id="todo-toast-list"></div>
+    <div id="todo-toast-actions">
+      <button class="btn" onclick="dismissTodoToast()" style="font-size: 0.72rem; padding: 3px 10px;">稍後再說</button>
+      <button class="btn btn-primary" onclick="goToTodoPage()" style="font-size: 0.72rem; padding: 3px 10px;">前往管理</button>
+    </div>
+  </div>
 
   <!-- 週約訪看板 -->
   <div id="weekly-calendar-bar"></div>
@@ -1771,6 +2285,37 @@
 
     </div>
   </div>
+
+  <!-- 待辦任務通知看板 -->
+  <div class="modal-overlay" id="todo-notify-modal">
+    <div class="modal-box" style="width: 680px; max-width: 96vw; max-height: 88vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+
+      <!-- 頂部 Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0;">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin: 0; display:flex; align-items:center; gap:8px;">📋 待辦任務提醒</h3>
+        <span style="cursor:pointer; font-size: 1.2rem; color: var(--text-secondary);" onclick="toggleTodoNotifyModal(false)">✕</span>
+      </div>
+
+      <!-- Tab 切換 -->
+      <div class="todo-notify-tabs" style="margin-bottom: 1rem; flex-shrink: 0;">
+        <button class="todo-notify-tab active" id="tab-btn-priority" onclick="switchTodoNotifyTab('priority')">🎯 優先度看板</button>
+        <button class="todo-notify-tab" id="tab-btn-timeline" onclick="switchTodoNotifyTab('timeline')">🕐 時間序看板</button>
+      </div>
+
+      <!-- Panel A：優先度看板 -->
+      <div id="todo-notify-panel-priority" class="todo-notify-panel active" style="flex:1; overflow-y:auto; min-height:240px; padding-right:2px;"></div>
+
+      <!-- Panel B：時間序看板 -->
+      <div id="todo-notify-panel-timeline" class="todo-notify-panel" style="flex:1; overflow-y:auto; min-height:240px; padding-right:2px;"></div>
+
+      <!-- 底部操作列 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 1rem;">
+        <button class="btn btn-primary" onclick="toggleTodoNotifyModal(false); goToTodoPage();" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">前往待辦管理</button>
+        <button class="btn" onclick="toggleTodoNotifyModal(false)" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">關閉</button>
+      </div>
+    </div>
+  </div>
+
 
   <!-- 新增案件對話框 -->
   <div class="modal-overlay" id="add-case-modal">
@@ -3193,6 +3738,14 @@
           return;
         }
 
+        // 0.5. 若待辦任務提醒看板處於開啟狀態，按下 Enter 鍵則關閉
+        const todoNotifyModal = document.getElementById('todo-notify-modal');
+        if (todoNotifyModal && todoNotifyModal.classList.contains('active') && e.key === 'Enter') {
+          e.preventDefault();
+          toggleTodoNotifyModal(false);
+          return;
+        }
+
         // 1. Cmd + I (Mac) 或 Ctrl + I (Win) -> 快速開啟建案彈窗 (避開 Raycast 衝突)
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
           e.preventDefault();
@@ -3509,6 +4062,8 @@
         debugLog("本機案件渲染完畢");
       }
       checkAndShowDailyReminders();
+      // 啟動時從雲端同步待辦事項（非同步，不影響主流程）
+      fetchTodosFromCloud();
       } catch (e) {
         debugLog("<span style='color:#ff4444;'>💥 init() 過程中崩潰：" + e.message + "</span>");
         console.error(e);
@@ -5922,6 +6477,8 @@
         modal.classList.add('active');
       } else {
         modal.classList.remove('active');
+        // 送件看板關閉後，接著跳出待辦任務通知
+        setTimeout(() => { checkAndShowTodoReminders(); }, 400);
       }
     }
 
@@ -6340,6 +6897,39 @@
         if (input) {
           input.required = (value === 'referral');
         }
+      }
+    }
+
+    // 從雲端讀取待辦事項，並以雲端為準覆蓋本機（啟動時呼叫一次）
+    async function fetchTodosFromCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const url = crmSettings.apiUrl + (crmSettings.apiUrl.includes('?') ? '&' : '?') + 'type=todos&nocache=true';
+        const resp = await fetch(url);
+        if (!resp.ok) return;
+        const json = await resp.json();
+        if (json.status === 'success' && Array.isArray(json.todos)) {
+          // 以雲端資料為主，覆蓋本機（空陣列也覆蓋，維持一致性）
+          todos = json.todos;
+          localStorage.setItem('crm_todos', JSON.stringify(todos));
+          debugLog('☁️ 待辦事項已從雲端更新：' + todos.length + ' 筆');
+          updateTodoBadge();
+          
+          // 重新渲染待辦清單分頁
+          renderTodoPage();
+
+          // 重新計算當日提醒參數，若通知看板正在開啟，同步更新看板內容
+          const d = new Date();
+          const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+          const tw = new Date(utc + 3600000 * 8);
+          const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+          const notifyModal = document.getElementById('todo-notify-modal');
+          if (notifyModal && notifyModal.classList.contains('active')) {
+            renderTodoNotifyModal(todos.filter(t => !t.done), todayStr);
+          }
+        }
+      } catch(err) {
+        debugLog('⚠️ 待辦事項雲端讀取失敗：' + err.message);
       }
     }
 
@@ -6839,6 +7429,648 @@
         }, delay);
       }
     }
+
+    // ===================================================
+    // ===== 待辦事項管理系統 (Todo Task Manager) =========
+    // ===================================================
+
+    // --- 次標籤選項對應表 ---
+    const TODO_SUBTAG_MAP = {
+      SA: [
+        { value: 'sa_visit',   label: '約訪準備' },
+        { value: 'sa_collect', label: '資料蒐集' },
+        { value: 'sa_contact', label: '接觸聯繫' },
+      ],
+      OA: [
+        { value: 'oa_visit',   label: '初訪拜訪' },
+        { value: 'oa_needs',   label: '需求分析' },
+        { value: 'oa_discuss', label: '訪後討論' },
+      ],
+      PC: [
+        { value: 'pc_plan',    label: '計畫說明' },
+        { value: 'pc_sign',    label: '要保簽署' },
+        { value: 'pc_discuss', label: '訪後討論' },
+      ],
+      C: [
+        { value: 'c_plan',    label: '文件準備' },
+        { value: 'c_sign',    label: '簽約' },
+        { value: 'c_remedy',  label: '補件' },
+        { value: 'c_submit',  label: '送件' },
+        { value: 'c_insure',  label: '要保簽署' },
+        { value: 'c_premium', label: '保費首扣' },
+      ],
+      S: [
+        { value: 's_service', label: '服務維繫' },
+        { value: 's_review',  label: '年度回顧' },
+        { value: 's_refer',   label: '轉介紹跟進' },
+      ],
+    };
+
+    // --- 資料存取 ---
+    let todos = [];
+
+    function loadTodos() {
+      try {
+        const raw = localStorage.getItem('crm_todos');
+        todos = raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        todos = [];
+      }
+    }
+
+    function saveTodos() {
+      localStorage.setItem('crm_todos', JSON.stringify(todos));
+      // 若有雲端 API，非同步同步至 Google Sheet
+      syncTodosToCloud();
+    }
+
+
+
+    // 將整份 todos 同步覆蓋寫入 Google Sheet（非同步，不阻塞 UI）
+    async function syncTodosToCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveTodos', todos: todos }),
+        });
+        debugLog('☁️ 待辦事項已同步至雲端：' + todos.length + ' 筆');
+      } catch(err) {
+        debugLog('⚠️ 待辦事項雲端同步失敗：' + err.message);
+      }
+    }
+
+    function genTodoId() {
+      return 'todo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    }
+
+    // --- 頁面切換 ---
+    function toggleTodoPage() {
+      const page = document.getElementById('todo-page');
+      if (!page) return;
+      const isActive = page.classList.contains('active');
+      if (isActive) {
+        page.classList.remove('active');
+      } else {
+        loadTodos();
+        renderTodoPage();
+        page.classList.add('active');
+        // 關閉送件提醒 Modal（若開著）
+        const reminderModal = document.getElementById('reminder-modal');
+        if (reminderModal && reminderModal.classList.contains('active')) {
+          reminderModal.classList.remove('active');
+        }
+      }
+    }
+
+    // --- 渲染待辦頁面 ---
+    function renderTodoPage() {
+      const body = document.getElementById('todo-body');
+      if (!body) return;
+
+      // 取得今日字串
+      const d = new Date();
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const tw = new Date(utc + 3600000 * 8);
+      const todayStr = tw.getFullYear() + '-' +
+        String(tw.getMonth() + 1).padStart(2, '0') + '-' +
+        String(tw.getDate()).padStart(2, '0');
+
+      if (todos.length === 0) {
+        body.innerHTML = `<div class="todo-empty-state">🎉 目前沒有任何待辦事項！<br><span style="font-size:0.75rem; margin-top:8px; display:block;">點擊「＋ 新增待辦」建立第一筆任務</span></div>`;
+        return;
+      }
+
+      const pending = todos.filter(t => !t.done);
+      const done    = todos.filter(t =>  t.done);
+
+      // 優先度排序輔助：Q1(1) -> Q2(2) -> Q3(3) -> Q4(4) -> 未分類(5)
+      const getTodoWeight = (t) => {
+        const meta = getPriorityMeta(t.urgent, t.important);
+        if (!meta) return 5;
+        return meta.q;
+      };
+
+      // 排序未完成待辦：優先度優先，再依到期日排序（無日期排同級最後）
+      pending.sort((a, b) => {
+        const wA = getTodoWeight(a);
+        const wB = getTodoWeight(b);
+        if (wA !== wB) return wA - wB;
+        if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return 0;
+      });
+
+      // 已完成待辦依最後更新或建立時間排序即可
+      done.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+      // 分組顯示未完成待辦
+      const overdue = pending.filter(t => t.dueDate && t.dueDate < todayStr);
+      const activeTodos = pending.filter(t => !t.dueDate || t.dueDate >= todayStr);
+
+      let html = '';
+
+      if (overdue.length > 0) {
+        html += `<div class="todo-section-label" style="color:#f87171; border-color: rgba(239,68,68,0.3);">⚠ 已逾期 (${overdue.length})</div>`;
+        html += overdue.map(t => renderTodoCard(t, todayStr)).join('');
+      }
+      if (activeTodos.length > 0) {
+        html += `<div class="todo-section-label">📋 進行中 (${activeTodos.length})</div>`;
+        html += activeTodos.map(t => renderTodoCard(t, todayStr)).join('');
+      }
+      if (done.length > 0) {
+        html += `<div class="todo-section-label" style="margin-top: 16px;">✓ 已完成 (${done.length})</div>`;
+        html += done.map(t => renderTodoCard(t, todayStr)).join('');
+      }
+
+      body.innerHTML = html;
+    }
+
+    function renderTodoCard(t, todayStr) {
+      // 找案件名稱
+      let caseName = '';
+      if (t.caseId && window.cases) {
+        const c = window.cases.find(x => x.id === t.caseId);
+        caseName = c ? c.clientName : '';
+      }
+
+      // 次標籤顯示
+      let subTagLabel = '';
+      if (t.stage && t.subTag && TODO_SUBTAG_MAP[t.stage]) {
+        const sub = TODO_SUBTAG_MAP[t.stage].find(x => x.value === t.subTag);
+        subTagLabel = sub ? sub.label : t.subTag;
+      }
+
+      // 到期日顯示
+      let dueHtml = '';
+      if (t.dueDate) {
+        let cls = 'todo-due';
+        let label = '到期：' + t.dueDate;
+        if (!t.done) {
+          if (t.dueDate < todayStr)       { cls += ' overdue'; label = '⚠ 逾期：' + t.dueDate; }
+          else if (t.dueDate === todayStr) { cls += ' today';   label = '🔔 今日：' + t.dueDate; }
+        }
+        dueHtml = `<span class="${cls}">${label}</span>`;
+      }
+
+      // 優先度標籤
+      let priorityHtml = '';
+      const pMeta = getPriorityMeta(t.urgent, t.important);
+      if (pMeta) {
+        priorityHtml = `<span class="priority-badge ${pMeta.class}" title="${pMeta.title}">${pMeta.label}</span>`;
+      }
+
+      const stageLabel = t.stage ? `<span class="todo-meta-tag stage-tag">${t.stage}</span>` : '';
+      const caseTag    = caseName ? `<span class="todo-meta-tag case-tag">${caseName}</span>` : '';
+      const subTagHtml = subTagLabel ? `<span class="todo-meta-tag subtag-tag">${subTagLabel}</span>` : '';
+      const noteHtml   = t.note ? `<div class="todo-note">${t.note}</div>` : '';
+      const checkIcon  = t.done ? '✓' : '';
+      const doneClass  = t.done ? ' done' : '';
+
+      return `<div class="todo-card${doneClass}" id="todo-card-${t.id}" ondblclick="openTodoModal('${t.id}')" style="cursor:pointer; display:flex; align-items:center; justify-content:flex-start; text-align:left;" title="雙擊編輯此待辦">
+        <div class="todo-check" ondblclick="event.stopPropagation(); toggleTodoDone('${t.id}')" title="雙擊切換完成狀態">${checkIcon}</div>
+        <div class="todo-info" style="display:flex; align-items:center; justify-content:flex-start; text-align:left; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden;">
+          <div class="todo-title" style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; margin:0; flex-shrink:0; text-align:left;">${t.title}</div>
+          ${priorityHtml ? `<div style="flex-shrink:0; display:flex; justify-content:flex-start; align-items:center;">${priorityHtml}</div>` : ''}
+          <div class="todo-meta" style="margin:0; display:flex; align-items:center; justify-content:flex-start; gap:6px; flex-wrap:nowrap; white-space:nowrap; flex-shrink:0;">${caseTag}${stageLabel}${subTagHtml}${dueHtml}</div>
+          ${t.note ? `<span style="font-size:0.72rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; margin-left:4px; flex-shrink:1; text-align:left;" title="${t.note}">(${t.note})</span>` : ''}
+        </div>
+        <div class="todo-actions" style="margin-left:auto; flex-shrink:0; display:flex; align-items:center; gap:6px;">
+          <button class="todo-action-btn" onclick="openTodoModal('${t.id}')" title="編輯">✏</button>
+          <button class="todo-action-btn del" ondblclick="deleteTodo('${t.id}')" title="雙擊刪除">🗑</button>
+        </div>
+      </div>`;
+    }
+
+    // --- CRUD ---
+    function toggleTodoDone(id) {
+      const t = todos.find(x => x.id === id);
+      if (!t) return;
+      t.done = !t.done;
+      saveTodos();
+      // 微動畫
+      const card = document.getElementById('todo-card-' + id);
+      if (card) {
+        card.style.transition = 'all 0.2s';
+        card.style.transform = 'scale(0.97)';
+        setTimeout(() => {
+          card.style.transform = '';
+          renderTodoPage();
+          updateTodoBadge();
+        }, 200);
+      } else {
+        renderTodoPage();
+        updateTodoBadge();
+      }
+    }
+
+    function deleteTodo(id) {
+      const idx = todos.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      const card = document.getElementById('todo-card-' + id);
+      if (card) {
+        card.style.transition = 'all 0.25s';
+        card.style.transform = 'translateX(30px)';
+        card.style.opacity = '0';
+        setTimeout(() => {
+          todos.splice(idx, 1);
+          saveTodos();
+          renderTodoPage();
+          updateTodoBadge();
+        }, 250);
+      } else {
+        todos.splice(idx, 1);
+        saveTodos();
+        renderTodoPage();
+        updateTodoBadge();
+      }
+    }
+
+    // 優先級選擇輔助
+    function selectPriorityCell(cell, urgent, important) {
+      // 清除同層選取狀態
+      const cells = document.querySelectorAll('.priority-cell');
+      cells.forEach(c => c.classList.remove('active'));
+
+      const inputUrgent = document.getElementById('todo-input-urgent');
+      const inputImportant = document.getElementById('todo-input-important');
+
+      // 若點擊的是已經選取的，則取消選取 (留白分類)
+      if (cell.dataset.active === 'true') {
+        cells.forEach(c => c.dataset.active = 'false');
+        inputUrgent.value = '';
+        inputImportant.value = '';
+      } else {
+        cells.forEach(c => c.dataset.active = 'false');
+        cell.classList.add('active');
+        cell.dataset.active = 'true';
+        inputUrgent.value = urgent ? 'true' : 'false';
+        inputImportant.value = important ? 'true' : 'false';
+      }
+    }
+
+    function getPriorityMeta(urgent, important) {
+      if (urgent === true && important === true) return { q: 1, label: '🔴 緊急重要', color: '#ef4444', class: 'q1', title: '緊急且重要' };
+      if (urgent === true && important === false) return { q: 2, label: '🟠 緊急', color: '#f97316', class: 'q2', title: '緊急但重要性低' };
+      if (urgent === false && important === true) return { q: 3, label: '🟡 重要', color: '#eab308', class: 'q3', title: '重要但不緊急' };
+      if (urgent === false && important === false) return { q: 4, label: '⚪ 一般', color: '#9ca3af', class: 'q4', title: '不緊急且不重要' };
+      return null; // 未分類
+    }
+
+    // --- Modal ---
+    function openTodoModal(editId) {
+      const modal = document.getElementById('add-todo-modal');
+      const titleEl = document.getElementById('todo-modal-title');
+      if (!modal) return;
+
+      // 清除優先度選取狀態
+      const cells = document.querySelectorAll('.priority-cell');
+      cells.forEach(c => {
+        c.classList.remove('active');
+        c.dataset.active = 'false';
+      });
+      document.getElementById('todo-input-urgent').value = '';
+      document.getElementById('todo-input-important').value = '';
+
+      // 填充案件下拉
+      const caseSelect = document.getElementById('todo-input-case');
+      if (caseSelect && typeof cases !== 'undefined') {
+        // 過濾未封存案件 (isArchived 為 true 代表已封存，因此用 !c.isArchived)
+        const activeCases = cases.filter(c => !c.isArchived);
+        
+        // 主要排序：客戶姓名，次要排序：議題名稱
+        activeCases.sort((a, b) => {
+          const nameA = a.clientName || '';
+          const nameB = b.clientName || '';
+          const cmp = nameA.localeCompare(nameB, 'zh-Hant');
+          if (cmp !== 0) return cmp;
+          const issueA = a.issueName || '';
+          const issueB = b.issueName || '';
+          return issueA.localeCompare(issueB, 'zh-Hant');
+        });
+
+        caseSelect.innerHTML = '<option value="">— 不指定案件 —</option>' +
+          activeCases.map(c => {
+            const client = c.clientName || '未知客戶';
+            const issue = c.issueName ? ` ｜ 議題: ${c.issueName}` : '';
+            return `<option value="${c.id}">👤 客戶: ${client}${issue}</option>`;
+          }).join('');
+      }
+
+      if (editId) {
+        const t = todos.find(x => x.id === editId);
+        if (!t) return;
+        titleEl.textContent = '編輯待辦事項';
+        document.getElementById('todo-edit-id').value = t.id;
+        document.getElementById('todo-input-title').value = t.title || '';
+        document.getElementById('todo-input-case').value  = t.caseId || '';
+        document.getElementById('todo-input-stage').value = t.stage  || '';
+        document.getElementById('todo-input-due').value   = t.dueDate || '';
+        document.getElementById('todo-input-note').value  = t.note   || '';
+        
+        // 設定優先度 active 狀態
+        if (t.urgent !== undefined && t.important !== undefined) {
+          const uVal = t.urgent === true || t.urgent === 'true';
+          const iVal = t.important === true || t.important === 'true';
+          document.getElementById('todo-input-urgent').value = uVal ? 'true' : 'false';
+          document.getElementById('todo-input-important').value = iVal ? 'true' : 'false';
+          let qIdx = 4;
+          if (uVal && iVal) qIdx = 1;
+          else if (uVal && !iVal) qIdx = 2;
+          else if (!uVal && iVal) qIdx = 3;
+          
+          const cell = document.querySelector(`.priority-cell[data-q="${qIdx}"]`);
+          if (cell) {
+            cell.classList.add('active');
+            cell.dataset.active = 'true';
+          }
+        }
+
+        onTodoStageChange();
+        setTimeout(() => { document.getElementById('todo-input-subtag').value = t.subTag || ''; }, 0);
+      } else {
+        titleEl.textContent = '新增待辦事項';
+        document.getElementById('todo-edit-id').value = '';
+        document.getElementById('todo-input-title').value = '';
+        document.getElementById('todo-input-case').value  = '';
+        document.getElementById('todo-input-stage').value = '';
+        document.getElementById('todo-input-subtag').innerHTML = '<option value="">— 不指定次標籤 —</option>';
+        document.getElementById('todo-input-due').value   = '';
+        document.getElementById('todo-input-note').value  = '';
+      }
+
+      modal.classList.add('active');
+      setTimeout(() => { document.getElementById('todo-input-title').focus(); }, 80);
+    }
+
+    function closeTodoModal() {
+      const modal = document.getElementById('add-todo-modal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function onTodoStageChange() {
+      const stage = document.getElementById('todo-input-stage').value;
+      const subtagSelect = document.getElementById('todo-input-subtag');
+      if (!subtagSelect) return;
+      const options = TODO_SUBTAG_MAP[stage] || [];
+      subtagSelect.innerHTML = '<option value="">— 不指定次標籤 —</option>' +
+        options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    }
+
+    function saveTodo() {
+      const title = (document.getElementById('todo-input-title').value || '').trim();
+      if (!title) {
+        document.getElementById('todo-input-title').style.borderColor = '#f87171';
+        document.getElementById('todo-input-title').focus();
+        return;
+      }
+      document.getElementById('todo-input-title').style.borderColor = '';
+
+      const editId  = document.getElementById('todo-edit-id').value;
+      const caseId  = document.getElementById('todo-input-case').value;
+      const stage   = document.getElementById('todo-input-stage').value;
+      const subTag  = document.getElementById('todo-input-subtag').value;
+      const dueDate = document.getElementById('todo-input-due').value;
+      const note    = (document.getElementById('todo-input-note').value || '').trim();
+      
+      const urgentVal = document.getElementById('todo-input-urgent').value;
+      const importantVal = document.getElementById('todo-input-important').value;
+      const urgent = urgentVal === '' ? undefined : urgentVal === 'true';
+      const important = importantVal === '' ? undefined : importantVal === 'true';
+
+      if (editId) {
+        const t = todos.find(x => x.id === editId);
+        if (t) { 
+          t.title = title; 
+          t.caseId = caseId; 
+          t.stage = stage; 
+          t.subTag = subTag; 
+          t.dueDate = dueDate; 
+          t.note = note;
+          t.urgent = urgent;
+          t.important = important;
+        }
+      } else {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const tw = new Date(utc + 3600000 * 8);
+        const createdAt = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+        todos.unshift({ id: genTodoId(), title, caseId, stage, subTag, dueDate, note, done: false, createdAt, urgent, important });
+      }
+
+      saveTodos();
+      closeTodoModal();
+      renderTodoPage();
+      updateTodoBadge();
+    }
+
+    // --- 頂部角標更新 ---
+    function updateTodoBadge() {
+      const badge = document.getElementById('todo-global-badge');
+      if (!badge) return;
+      const d = new Date();
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const tw = new Date(utc + 3600000 * 8);
+      const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+      const urgentCount = todos.filter(t => !t.done && t.dueDate && t.dueDate <= todayStr).length;
+      if (urgentCount > 0) {
+        badge.textContent = urgentCount;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    // --- 待辦通知雙 Tab 看板 ---
+    let currentTodoNotifyTab = 'priority';
+
+    function toggleTodoNotifyModal(show) {
+      const modal = document.getElementById('todo-notify-modal');
+      if (!modal) return;
+      if (show) {
+        modal.classList.add('active');
+      } else {
+        modal.classList.remove('active');
+      }
+    }
+
+    function switchTodoNotifyTab(tabName) {
+      currentTodoNotifyTab = tabName;
+      const btnPriority = document.getElementById('tab-btn-priority');
+      const btnTimeline = document.getElementById('tab-btn-timeline');
+      const panelPriority = document.getElementById('todo-notify-panel-priority');
+      const panelTimeline = document.getElementById('todo-notify-panel-timeline');
+
+      if (tabName === 'priority') {
+        if (btnPriority) btnPriority.classList.add('active');
+        if (btnTimeline) btnTimeline.classList.remove('active');
+        if (panelPriority) panelPriority.classList.add('active');
+        if (panelTimeline) panelTimeline.classList.remove('active');
+      } else {
+        if (btnPriority) btnPriority.classList.remove('active');
+        if (btnTimeline) btnTimeline.classList.add('active');
+        if (panelPriority) panelPriority.classList.remove('active');
+        if (panelTimeline) panelTimeline.classList.add('active');
+      }
+    }
+
+    // 在通知看板中雙擊結案完成
+    function toggleTodoDoneInNotify(id) {
+      toggleTodoDone(id);
+      // toggleTodoDone 內部會 saveTodos 並更新 badge。我們在延遲 200ms 動畫後刷新 Modal 本身
+      setTimeout(() => {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const tw = new Date(utc + 3600000 * 8);
+        const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+        renderTodoNotifyModal(todos.filter(t => !t.done), todayStr);
+      }, 250);
+    }
+
+    function renderTodoNotifyModal(allPending, todayStr) {
+      const panelPriority = document.getElementById('todo-notify-panel-priority');
+      const panelTimeline = document.getElementById('todo-notify-panel-timeline');
+      if (!panelPriority || !panelTimeline) return;
+
+      const renderItemHtml = (t) => {
+        let caseName = '';
+        if (t.caseId && typeof cases !== 'undefined') {
+          const c = cases.find(x => x.id === t.caseId);
+          caseName = c ? c.clientName : '';
+        }
+        
+        // 解析次標籤 Label
+        let subTagLabel = '';
+        if (t.stage && t.subTag && TODO_SUBTAG_MAP[t.stage]) {
+          const sub = TODO_SUBTAG_MAP[t.stage].find(x => x.value === t.subTag);
+          subTagLabel = sub ? sub.label : t.subTag;
+        }
+
+        const stageText = t.stage ? ` ／ ${t.stage}` : '';
+        const subTagText = subTagLabel ? ` (次標籤: ${subTagLabel})` : '';
+        
+        let dueLabel = '';
+        if (t.dueDate) {
+          if (t.dueDate < todayStr) dueLabel = `<span style="color:#ef4444; font-size:0.68rem; font-family:monospace; margin-left:auto;">⚠ 逾期 ${t.dueDate}</span>`;
+          else if (t.dueDate === todayStr) dueLabel = `<span style="color:#f59e0b; font-size:0.68rem; font-family:monospace; margin-left:auto;">🔔 今日 ${t.dueDate}</span>`;
+          else dueLabel = `<span style="color:var(--text-secondary); font-size:0.68rem; font-family:monospace; margin-left:auto;">🕐 到期 ${t.dueDate}</span>`;
+        } else {
+          dueLabel = `<span style="color:var(--text-secondary); font-size:0.65rem; margin-left:auto;">(未設時間)</span>`;
+        }
+
+        const uVal = t.urgent === true || t.urgent === 'true';
+        const iVal = t.important === true || t.important === 'true';
+        const pMeta = getPriorityMeta(uVal, iVal);
+        const pBadge = pMeta ? `<span class="priority-badge ${pMeta.class}" style="font-size:0.6rem; padding:1px 4px; border-radius:3px;">${pMeta.label}</span>` : '';
+
+        return `<div ondblclick="toggleTodoDoneInNotify('${t.id}')" style="display:flex; align-items:center; justify-content:flex-start; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); padding:8px 10px; border-radius:8px; margin-bottom:8px; gap:10px; cursor:pointer;" title="雙擊此項即可結案完成">
+          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; pointer-events:none; text-align:left;">
+            <div style="font-weight:bold; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; margin:0; flex-shrink:0;">${t.title}</div>
+            ${pBadge ? `<div style="flex-shrink:0; display:flex;">${pBadge}</div>` : ''}
+            ${(caseName || stageText || subTagText) ? `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; flex-shrink:1;">[${caseName}${stageText}${subTagText}]</span>` : ''}
+          </div>
+          <div style="margin-left:auto; flex-shrink:0; display:flex; align-items:center;">
+            ${dueLabel}
+          </div>
+        </div>`;
+      };
+
+      // Tab A: 優先度分組 (相容字串與布林過濾)
+      const q1 = allPending.filter(t => (t.urgent === true || t.urgent === 'true') && (t.important === true || t.important === 'true'));
+      const q2 = allPending.filter(t => (t.urgent === true || t.urgent === 'true') && (t.important === false || t.important === 'false'));
+      const q3 = allPending.filter(t => (t.urgent === false || t.urgent === 'false') && (t.important === true || t.important === 'true'));
+      const q4 = allPending.filter(t => (t.urgent === false || t.urgent === 'false') && (t.important === false || t.important === 'false'));
+      const unclassified = allPending.filter(t => t.urgent === undefined || t.urgent === '' || t.important === undefined || t.important === '');
+
+      let pGroupsHtml = '';
+      const appendGroup = (title, items, borderStyle, headerBg) => {
+        if (items.length === 0) return;
+        pGroupsHtml += `
+          <div style="margin-bottom:12px; border:1px solid ${borderStyle}; border-radius:8px; overflow:hidden;">
+            <div class="priority-group-header" style="background:${headerBg}; margin:0; border-radius:0; color:#fff; padding:6px 10px;">${title} (${items.length})</div>
+            <div style="padding:8px 8px 1px 8px; background:rgba(0,0,0,0.1);">
+              ${items.map(renderItemHtml).join('')}
+            </div>
+          </div>
+        `;
+      };
+
+      appendGroup('🔴 緊急且重要 (Q1)', q1, 'rgba(239,68,68,0.2)', 'rgba(239,68,68,0.18)');
+      appendGroup('🟠 緊急但重要性低 (Q2)', q2, 'rgba(249,115,22,0.2)', 'rgba(249,115,22,0.18)');
+      appendGroup('🟡 重要但不緊急 (Q3)', q3, 'rgba(234,179,8,0.2)', 'rgba(234,179,8,0.18)');
+      appendGroup('⚪ 不緊急且不重要 (Q4)', q4, 'rgba(107,114,128,0.2)', 'rgba(107,114,128,0.18)');
+      appendGroup('📋 未分類任務', unclassified, 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)');
+
+      if (pGroupsHtml === '') {
+        pGroupsHtml = `<div style="color:var(--text-secondary); text-align:center; padding:40px 10px; font-size:0.75rem;">🎉 暫無任何待辦任務</div>`;
+      }
+      panelPriority.innerHTML = pGroupsHtml;
+
+      // Tab B: 時間序分組
+      const timedTodos = allPending.filter(t => t.dueDate);
+      timedTodos.sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+
+      if (timedTodos.length === 0) {
+        panelTimeline.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:40px 10px; font-size:0.75rem;">🎉 暫無設定到期日的待辦任務</div>`;
+      } else {
+        panelTimeline.innerHTML = `<div style="padding:8px 0; max-height: 380px; overflow-y: auto;">${timedTodos.map(renderItemHtml).join('')}</div>`;
+      }
+    }
+
+    function checkAndShowTodoReminders() {
+      loadTodos();
+      const d = new Date();
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const tw = new Date(utc + 3600000 * 8);
+      const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+
+      const pending = todos.filter(t => !t.done);
+      updateTodoBadge();
+
+      renderTodoNotifyModal(pending, todayStr);
+      switchTodoNotifyTab('priority');
+      toggleTodoNotifyModal(true);
+    }
+
+    function dismissTodoToast() {
+      const toast = document.getElementById('todo-toast');
+      if (toast) toast.classList.remove('show');
+    }
+
+    function goToTodoPage() {
+      dismissTodoToast();
+      toggleTodoNotifyModal(false);
+      const page = document.getElementById('todo-page');
+      if (page && !page.classList.contains('active')) {
+        loadTodos();
+        renderTodoPage();
+        page.classList.add('active');
+      }
+    }
+
+
+    // --- Toast 提醒 ---
+
+
+    // --- ESC 關閉所有 Modal ---
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const todoModal = document.getElementById('add-todo-modal');
+        if (todoModal && todoModal.classList.contains('active')) {
+          closeTodoModal();
+          return;
+        }
+        const notifyModal = document.getElementById('todo-notify-modal');
+        if (notifyModal && notifyModal.classList.contains('active')) {
+          toggleTodoNotifyModal(false);
+        }
+      }
+    });
+
+    // ===================================================
 
     // 頁面載入初始化
     if (document.readyState === 'loading') {

@@ -2,6 +2,7 @@
 // 用途：部署為 Web App 後，作為本機前端管理系統與 Google Sheet 試算表之間的同步橋樑。
 
 const SHEET_NAME = 'Sheet1';
+const TODOS_SHEET_NAME = 'Todos';
 
 // 取得或初始化試算表與表頭
 function getOrCreateSheet() {
@@ -61,9 +62,60 @@ function getOrCreateSheet() {
   return sheet;
 }
 
-// 處理 GET 請求：讀取所有客戶案件資料並以 JSON 回傳
+// 取得或建立「待辦事項」Sheet
+function getOrCreateTodosSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(TODOS_SHEET_NAME);
+  const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important"];
+  if (!sheet) {
+    sheet = ss.insertSheet(TODOS_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    // 強制用最新表頭覆蓋第一行，自動把欄位擴展至 11 欄，保證 urgent 和 important 存在且順序正確
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 處理 GET 請求：讀取資料並以 JSON 回傳
 function doGet(e) {
   try {
+    // === 待辦事項讀取 ===
+    if (e && e.parameter && e.parameter.type === 'todos') {
+      const todosSheet = getOrCreateTodosSheet();
+      const tValues = todosSheet.getDataRange().getValues();
+      if (tValues.length <= 1) {
+        return jsonResponse({ status: 'success', todos: [] });
+      }
+      const tHeaders = tValues[0];
+      const todosList = [];
+      for (let i = 1; i < tValues.length; i++) {
+        const row = tValues[i];
+        const item = {};
+        tHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          item[h] = v;
+        });
+        // 類型轉回布林
+        if (typeof item.done === 'string') item.done = item.done === 'true';
+        if (item.urgent !== undefined && item.urgent !== '') {
+          item.urgent = (item.urgent === true || item.urgent === 'true');
+        } else {
+          item.urgent = undefined;
+        }
+        if (item.important !== undefined && item.important !== '') {
+          item.important = (item.important === true || item.important === 'true');
+        } else {
+          item.important = undefined;
+        }
+        todosList.push(item);
+      }
+      return jsonResponse({ status: 'success', todos: todosList });
+    }
+
+    // === 案件資料讀取（原有邏輯）===
     const isNoCache = e && e.parameter && e.parameter.nocache === 'true';
     if (isNoCache) {
       clearCachedData();
@@ -119,9 +171,40 @@ function doGet(e) {
 // 處理 POST 請求：寫入、更新與刪除資料
 function doPost(e) {
   try {
-    const sheet = getOrCreateSheet();
     const payload = JSON.parse(e.postData.contents);
-    const action = payload.action; // 'create', 'update', 'delete'
+    const action = payload.action;
+
+    // === 待辦事項覆蓋式同步 ===
+    if (action === 'saveTodos') {
+      const todosSheet = getOrCreateTodosSheet();
+      const todosList = payload.todos || [];
+      const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important"];
+      
+      // 清除舊資料（保留第一列表頭）
+      const lastRow = todosSheet.getLastRow();
+      if (lastRow > 1) {
+        todosSheet.deleteRows(2, lastRow - 1);
+      }
+      
+      // 整批寫入新資料
+      if (todosList.length > 0) {
+        const rows = todosList.map(t => headers.map(h => {
+          const v = t[h];
+          // done, urgent, important 布林轉為字串儲存
+          if (h === 'done' || h === 'urgent' || h === 'important') {
+            if (v === true || v === 'true') return 'true';
+            if (v === false || v === 'false') return 'false';
+            return '';
+          }
+          return v !== undefined && v !== null ? v : '';
+        }));
+        todosSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '待辦事項已同步 (' + todosList.length + ' 筆)' });
+    }
+
+    // === 案件資料原有邏輯 ===
+    const sheet = getOrCreateSheet();
     const customerName = payload.customerName;
     const data = payload.data;
     
