@@ -2051,6 +2051,119 @@
     margin-bottom: 6px;
     margin-top: 4px;
   }
+
+  /* === 漏斗排序切換按鈕 === */
+  .sort-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+  .sort-toggle-btn:hover {
+    border-color: var(--accent);
+    background: rgba(99, 102, 241, 0.08);
+  }
+  .sort-toggle-btn.mode-manual { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
+  .sort-toggle-btn.mode-status { color: #a78bfa; border-color: rgba(167, 139, 250, 0.3); }
+  .sort-toggle-btn.mode-time   { color: #fb7185; border-color: rgba(251, 113, 133, 0.3); }
+
+  /* === 自訂規則設定介面 === */
+  .rules-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .rules-section-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
+  }
+  .priority-sort-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.2);
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+  .priority-sort-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+  }
+  .priority-weight-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .priority-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .priority-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+  .priority-weight-display {
+    font-family: monospace;
+    font-size: 0.78rem;
+    width: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+  }
+  .template-badge {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .template-badge:hover {
+    background: var(--accent);
+    color: #fff;
+  }
   </style>
 </head>
 
@@ -2090,6 +2203,10 @@
           </div>
         </div>
       </div>
+      <!-- 案件排序三態按鈕 -->
+      <button class="sort-toggle-btn mode-manual" id="btn-sort-toggle" onclick="cycleSortMode()" title="點擊切換排序：🖐️手動 ➔ ⚡狀態 ➔ ⏳時間">
+        <span>🖐️ 手動排序</span>
+      </button>
       <!-- 連線狀態指示燈 -->
       <div id="connection-status-bar" style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; background: var(--bg-card); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color);">
         <span id="connection-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></span>
@@ -2445,11 +2562,11 @@
       <div style="display: flex; flex: 1; min-height: 380px; overflow: hidden;">
         
         <!-- 左側：項目垂直選單 -->
-        <div style="width: 170px; border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.1); padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
           <button class="btn btn-tab active" id="settings-tab-sync" onclick="switchSettingsTab('sync')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🌐 雲端串接設定</button>
           <button class="btn btn-tab" id="settings-tab-reminder" onclick="switchSettingsTab('reminder')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📅 時程提醒設定</button>
           <button class="btn btn-tab" id="settings-tab-issues" onclick="switchSettingsTab('issues')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">💬 常規議題維護</button>
           <button class="btn btn-tab" id="settings-tab-groups" onclick="switchSettingsTab('groups')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📂 分群管理維護</button>
+          <button class="btn btn-tab" id="settings-tab-rules" onclick="switchSettingsTab('rules')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🔧 推進規則自訂</button>
         </div>
 
         <!-- 右側：設定內容區 -->
@@ -2535,6 +2652,39 @@
                 <p style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px;">刪除分群時，該分群下的所有議題也會一併移除。</p>
               </div>
               <div id="group-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- 推進規則自訂 Tab -->
+            <div id="settings-pane-rules" style="display:none;">
+              <div class="rules-container">
+                <div>
+                  <div class="rules-section-title">🧭 狀態排序優先順序自訂 (次標籤順序)</div>
+                  <p style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px;">設定切換為「⚡狀態排序」時，哪一種類型的案件最應該被排在最上面。數值越大越優先。</p>
+                  
+                  <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button type="button" class="template-badge" onclick="applyRulesTemplate('close')">🎯 臨門一腳優先 (收單/補件優先)</button>
+                    <button type="button" class="template-badge" onclick="applyRulesTemplate('dev')">✨ 新客開發優先 (約訪/說明優先)</button>
+                  </div>
+
+                  <div class="priority-sort-list" id="rules-priority-list">
+                    <!-- JS 自動填充次標籤順序 -->
+                  </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                  <div class="rules-section-title">🔔 智能事件訂閱通知</div>
+                  <p style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px;">自訂要在登入時，讓提醒面板額外跳出哪些重要的卡關或狀態通知。</p>
+                  
+                  <div style="display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; cursor:pointer;">
+                      <input type="checkbox" id="rules-notify-due" checked> 🔔 訂閱「時程/送件提醒」到期通知
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; cursor:pointer;">
+                      <input type="checkbox" id="rules-notify-stuck" checked> ⚠️ 訂閱「卡關提醒」：前置規劃/討論超過 5 天未更新時警示
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -2731,8 +2881,27 @@
       if (!crmSettings || typeof crmSettings !== 'object') throw new Error('invalid');
     } catch(e) {
       console.warn('crm_settings 快取損毀，已重置', e);
-      localStorage.removeItem('crm_settings');
       crmSettings = { apiUrl: '', isOffline: true };
+    }
+
+    // 補齊自訂規則與排序模式之預設值
+    if (!crmSettings.currentSortMode) {
+      crmSettings.currentSortMode = 'manual';
+    }
+    if (!crmSettings.customSubTagPriority) {
+      crmSettings.customSubTagPriority = {
+        "sa_visit": 5, "sa_collect": 4, "sa_contact": 3,
+        "oa_visit": 8, "oa_needs": 7, "oa_discuss": 10,
+        "pc_plan": 7, "pc_sign": 6, "pc_discuss": 8,
+        "c_plan": 9, "c_sign": 7, "c_remedy": 10, "c_submit": 8, "c_insure": 6, "c_premium": 5,
+        "s_deliver": 4, "s_cooldown": 3, "s_service": 3
+      };
+    }
+    if (!crmSettings.activeNotificationRules) {
+      crmSettings.activeNotificationRules = {
+        "rules-notify-due": true,
+        "rules-notify-stuck": true
+      };
     }
 
     // 預設常規議題維護清單 (存於 LocalStorage)
@@ -3028,6 +3197,10 @@
       const originalName = c.clientName;
       updateFn(c);
       
+      // 更新最後更新時間
+      const tw = new Date(new Date().getTime() + 3600000 * 8); // 台灣時間
+      c.lastUpdated = tw.toISOString().slice(0,10) + ' ' + tw.toISOString().slice(11,19);
+      
       saveCasesToStorage();
       if (!skipRender) {
         renderCases();
@@ -3041,6 +3214,8 @@
     }
 
     async function addCase(newCase) {
+      const tw = new Date(new Date().getTime() + 3600000 * 8); // 台灣時間
+      newCase.lastUpdated = tw.toISOString().slice(0,10) + ' ' + tw.toISOString().slice(11,19);
       cases.push(newCase);
       saveCasesToStorage();
       renderCases();
@@ -3094,6 +3269,7 @@
           issueDate: row["ＳＡ"] || '',
           currentPhase: row["當前階段"] || 'SA',
           archived: row["是否封存"] === '已封存',
+          lastUpdated: row["最後更新時間"] || '',
           contactMethods: (() => {
             try {
               return row["聯絡資訊"] ? (JSON.parse(row["聯絡資訊"]).methods || []) : ["LINE"];
@@ -3249,7 +3425,8 @@
         "備註": c.note || '',
         "議題發想備忘": c.issueNote || '',
         "Ｃ時段": (c.cDetails ? c.cDetails.meetTimeSlot : '') || '',
-        "Ｓ時段": (c.sDetails ? c.sDetails.meetTimeSlot : '') || ''
+        "Ｓ時段": (c.sDetails ? c.sDetails.meetTimeSlot : '') || '',
+        "最後更新時間": c.lastUpdated || ''
       };
     }
 
@@ -3499,19 +3676,22 @@
       document.getElementById('settings-pane-reminder').style.display = tab === 'reminder' ? 'block' : 'none';
       document.getElementById('settings-pane-issues').style.display = tab === 'issues' ? 'block' : 'none';
       document.getElementById('settings-pane-groups').style.display = tab === 'groups' ? 'block' : 'none';
+      document.getElementById('settings-pane-rules').style.display = tab === 'rules' ? 'block' : 'none';
       
       document.getElementById('settings-tab-sync').classList.toggle('active', tab === 'sync');
       document.getElementById('settings-tab-reminder').classList.toggle('active', tab === 'reminder');
       document.getElementById('settings-tab-issues').classList.toggle('active', tab === 'issues');
       document.getElementById('settings-tab-groups').classList.toggle('active', tab === 'groups');
+      document.getElementById('settings-tab-rules').classList.toggle('active', tab === 'rules');
       
       const actionBox = document.getElementById('settings-global-actions');
       if (actionBox) {
-        actionBox.style.display = (tab === 'sync' || tab === 'reminder') ? 'flex' : 'none';
+        actionBox.style.display = (tab === 'sync' || tab === 'reminder' || tab === 'rules') ? 'flex' : 'none';
       }
       
       if (tab === 'issues') renderIssueList();
       if (tab === 'groups') renderGroupList();
+      if (tab === 'rules') renderRulesPriorityList();
     }
 
     function toggleSettingsModal(show) {
@@ -3522,6 +3702,12 @@
         document.getElementById('settings-api-url').value = crmSettings.apiUrl || '';
         document.getElementById('settings-mode-offline').checked = crmSettings.isOffline;
         document.getElementById('settings-mode-cloud').checked = !crmSettings.isOffline;
+        
+        // 綁定自訂通知勾選狀態
+        const notifyRules = crmSettings.activeNotificationRules || {};
+        document.getElementById('rules-notify-due').checked = notifyRules['rules-notify-due'] !== false;
+        document.getElementById('rules-notify-stuck').checked = notifyRules['rules-notify-stuck'] !== false;
+
         switchSettingsTab('sync');
         modal.classList.add('active');
         rebuildGroupSelect();
@@ -3629,6 +3815,13 @@
 
       crmSettings.apiUrl = apiUrl;
       crmSettings.isOffline = isOffline;
+      
+      // 儲存訂閱通知設定
+      crmSettings.activeNotificationRules = {
+        "rules-notify-due": document.getElementById('rules-notify-due').checked,
+        "rules-notify-stuck": document.getElementById('rules-notify-stuck').checked
+      };
+
       localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
       
       toggleSettingsModal(false);
@@ -4515,6 +4708,18 @@
       // 每次重繪時同步刷新週約訪看板
       renderWeeklyCalendar();
 
+      // 根據 currentSortMode 對案件進行排序
+      const sortMode = crmSettings.currentSortMode || 'manual';
+      
+      // 更新搜尋欄右側按鈕的 UI 狀態與文字
+      const toggleBtn = document.getElementById('btn-sort-toggle');
+      if (toggleBtn) {
+        toggleBtn.className = `sort-toggle-btn mode-${sortMode}`;
+        if (sortMode === 'manual') toggleBtn.innerHTML = '<span>🖐️ 手動排序</span>';
+        else if (sortMode === 'status') toggleBtn.innerHTML = '<span>⚡ 智能狀態</span>';
+        else if (sortMode === 'time') toggleBtn.innerHTML = '<span>⏳ 冷案追蹤</span>';
+      }
+
       // 根據封存狀態過濾案件
       let visibleCases = cases.filter(c => showingArchived ? c.archived === true : !c.archived);
 
@@ -4553,6 +4758,33 @@
         body.appendChild(filterBar);
       }
 
+      // 執行排序
+      if (sortMode === 'status') {
+        const priorityMap = crmSettings.customSubTagPriority || {};
+        visibleCases.sort((a, b) => {
+          const aTodos = todos.filter(t => t.caseId === a.id && !t.done);
+          const bTodos = todos.filter(t => t.caseId === b.id && !t.done);
+          const getWeight = (todoList) => {
+            if (todoList.length === 0) return 0;
+            let maxW = 0;
+            todoList.forEach(t => {
+              const w = priorityMap[t.subTag] || 0;
+              if (w > maxW) maxW = w;
+            });
+            return maxW;
+          };
+          return getWeight(bTodos) - getWeight(aTodos);
+        });
+      } else if (sortMode === 'time') {
+        visibleCases.sort((a, b) => {
+          const tA = a.lastUpdated || '9999-99-99 99:99:99';
+          const tB = b.lastUpdated || '9999-99-99 99:99:99';
+          return tA.localeCompare(tB);
+        });
+      } else {
+        sortCasesBySavedOrder(visibleCases);
+      }
+
       visibleCases.forEach((c) => {
         // 確保所有案件子屬性結構完整，相容舊有本機快取資料，防止 TypeError 崩潰
         c.saDetails = Object.assign({ sendState: "dim", sendDate: "", replyState: "dim", replyDate: "", intentState: "intent-pending", agreeState: "dim", agreeDate: "", meetTimeSlot: "" }, c.saDetails || {});
@@ -4565,7 +4797,14 @@
         const row = document.createElement('div');
         row.className = 'case-row';
         row.dataset.id = c.id;
-        row.setAttribute('draggable', 'true');
+        row.setAttribute('draggable', sortMode === 'manual' ? 'true' : 'false');
+        if (sortMode !== 'manual') {
+          row.style.cursor = 'default';
+          row.title = '請切換至手動排序模式即可進行拖曳排序';
+        } else {
+          row.style.cursor = 'grab';
+          row.title = '拖曳即可調整案件先後順序';
+        }
 
         // 1. 險種 (壽/產)
         const typeText = c.type === 'life' ? '壽' : '產';
@@ -8069,6 +8308,111 @@
         }
       }
     });
+
+    // === 案件排序三態切換與自訂優先級引擎 ===
+    window.cycleSortMode = function() {
+      const modes = ['manual', 'status', 'time'];
+      let idx = modes.indexOf(crmSettings.currentSortMode || 'manual');
+      idx = (idx + 1) % modes.length;
+      crmSettings.currentSortMode = modes[idx];
+      
+      // 儲存設定
+      localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
+      showToast(`已切換排序模式為：${
+        crmSettings.currentSortMode === 'manual' ? '🖐️ 手動排序' :
+        crmSettings.currentSortMode === 'status' ? '⚡ 智能狀態' : '⏳ 冷案追蹤'
+      }`, 'success');
+      
+      renderCases();
+    };
+
+    window.renderRulesPriorityList = function() {
+      const listContainer = document.getElementById('rules-priority-list');
+      if (!listContainer) return;
+      
+      const priorityMap = crmSettings.customSubTagPriority || {};
+      let html = '';
+      
+      // 合併所有大階段的所有次標籤來顯示
+      const allSubtags = [];
+      for (const phase in TODO_SUBTAG_MAP) {
+        TODO_SUBTAG_MAP[phase].forEach(sub => {
+          allSubtags.push({
+            phase: phase,
+            value: sub.value,
+            label: sub.label,
+            weight: priorityMap[sub.value] !== undefined ? priorityMap[sub.value] : 5
+          });
+        });
+      }
+      
+      // 依當前權重由大到小排序，讓使用者一眼看出哪個最重要
+      allSubtags.sort((a, b) => b.weight - a.weight);
+      
+      if (allSubtags.length === 0) {
+        listContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); text-align:center; padding:10px;">目前尚無設定次標籤</div>';
+        return;
+      }
+      
+      html = allSubtags.map(item => {
+        return `<div class="priority-sort-item">
+          <span style="font-weight:600;"><span style="color:${getPhaseColor(item.phase)}; font-size:0.7rem; font-family:monospace; margin-right:4px;">${item.phase}</span> ${item.label}</span>
+          <div class="priority-weight-control">
+            <button type="button" class="priority-btn" onclick="changePriorityWeight('${item.value}', -1)">-</button>
+            <span class="priority-weight-display" id="weight-display-${item.value}">${item.weight}</span>
+            <button type="button" class="priority-btn" onclick="changePriorityWeight('${item.value}', 1)">+</button>
+          </div>
+        </div>`;
+      }).join('');
+      
+      listContainer.innerHTML = html;
+    };
+
+    window.changePriorityWeight = function(subTag, delta) {
+      if (!crmSettings.customSubTagPriority) crmSettings.customSubTagPriority = {};
+      let current = crmSettings.customSubTagPriority[subTag] !== undefined ? crmSettings.customSubTagPriority[subTag] : 5;
+      current += delta;
+      if (current < 1) current = 1;
+      if (current > 10) current = 10;
+      
+      crmSettings.customSubTagPriority[subTag] = current;
+      localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
+      
+      const display = document.getElementById(`weight-display-${subTag}`);
+      if (display) display.textContent = current;
+      
+      // 自動即時重新排序列表
+      renderRulesPriorityList();
+      renderCases();
+    };
+
+    window.applyRulesTemplate = function(type) {
+      if (type === 'close') {
+        // 臨門一腳優先 (收單/補件優先)
+        crmSettings.customSubTagPriority = {
+          "sa_visit": 5, "sa_collect": 4, "sa_contact": 3,
+          "oa_visit": 6, "oa_needs": 5, "oa_discuss": 10,
+          "pc_plan": 7, "pc_sign": 6, "pc_discuss": 8,
+          "c_plan": 9, "c_sign": 9, "c_remedy": 10, "c_submit": 8, "c_insure": 7, "c_premium": 6,
+          "s_deliver": 4, "s_cooldown": 3, "s_service": 3
+        };
+        showToast('已套用：🎯 臨門一腳收單優先模版', 'success');
+      } else if (type === 'dev') {
+        // 新客開發優先 (約訪/說明優先)
+        crmSettings.customSubTagPriority = {
+          "sa_visit": 9, "sa_collect": 8, "sa_contact": 10,
+          "oa_visit": 8, "oa_needs": 7, "oa_discuss": 6,
+          "pc_plan": 7, "pc_sign": 5, "pc_discuss": 5,
+          "c_plan": 6, "c_sign": 5, "c_remedy": 5, "c_submit": 5, "c_insure": 4, "c_premium": 4,
+          "s_deliver": 3, "s_cooldown": 2, "s_service": 2
+        };
+        showToast('已套用：✨ 新客開發維繫優先模版', 'success');
+      }
+      
+      localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
+      renderRulesPriorityList();
+      renderCases();
+    };
 
     // ===================================================
 
