@@ -2172,6 +2172,7 @@
     100% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
   }
   .status-badge-btn.ongoing-purple {
+    transition: none !important;
     animation: ongoing-purple-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -2183,6 +2184,7 @@
     100% { background: rgba(249, 146, 60, 0.08); border-color: rgba(249, 146, 60, 0.3); box-shadow: 0 0 3px rgba(249, 146, 60, 0.2); }
   }
   .status-badge-btn.ongoing-orange {
+    transition: none !important;
     animation: ongoing-orange-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -2194,6 +2196,7 @@
     100% { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 3px rgba(96, 165, 250, 0.2); }
   }
   .status-badge-btn.ongoing-blue {
+    transition: none !important;
     animation: ongoing-blue-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -2205,6 +2208,7 @@
     100% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
   }
   .status-badge-btn.ongoing-red {
+    transition: none !important;
     animation: ongoing-red-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -2216,6 +2220,7 @@
     100% { background: rgba(232, 121, 249, 0.08); border-color: rgba(232, 121, 249, 0.3); box-shadow: 0 0 3px rgba(232, 121, 249, 0.2); }
   }
   .status-badge-btn.ongoing-magenta {
+    transition: none !important;
     animation: ongoing-magenta-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -2227,6 +2232,7 @@
     100% { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.3); box-shadow: 0 0 3px rgba(52, 211, 153, 0.2); }
   }
   .status-badge-btn.ongoing-green {
+    transition: none !important;
     animation: ongoing-green-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
@@ -7622,19 +7628,23 @@
         }
       });
 
-      // 如果成功轉為進行中，自動觸發日期欄位彈出
+      // 如果成功轉為進行中，等待全域 renderCases 完成後再渲染 Drawer
       if (changedToOngoing) {
-        const c = cases.find(item => item.id === caseId);
-        const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-        if (drawerContent) renderCDrawer(c, drawerContent);
-
-        // 使用 setTimeout 確保 DOM 渲染完畢後再開啟日曆
         setTimeout(() => {
-          const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-          if (dateInput) {
-            dateInput.click();
+          const c = cases.find(item => item.id === caseId);
+          const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+          if (drawerContent) {
+            renderCDrawer(c, drawerContent);
+            
+            // 緊接著開啟日曆選擇器
+            setTimeout(() => {
+              const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
+              if (dateInput) {
+                dateInput.click();
+              }
+            }, 100);
           }
-        }, 150);
+        }, 100);
       }
     }
 
