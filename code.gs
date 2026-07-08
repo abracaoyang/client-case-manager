@@ -78,8 +78,18 @@ function getOrCreateTodosSheet() {
   return sheet;
 }
 
-// 處理 GET 請求：讀取資料並以 JSON 回傳
+// 處理 GET 請求：讀取資料並以 JSON 回傳 (iPad 渲染 & API 相容)
 function doGet(e) {
+  // 檢查是否為 iPad 專用網頁請求（即沒有任何 API 參數）
+  const hasParams = e && e.parameter && (Object.keys(e.parameter).length > 0);
+  if (!hasParams) {
+    // 沒有參數，代表直接用瀏覽器開啟 Web App，此時渲染網頁介面 (ADHD UX)
+    return HtmlService.createHtmlOutputFromFile('index')
+        .setTitle('客戶案件管理系統')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+  }
+
   try {
     // === 待辦事項讀取 ===
     if (e && e.parameter && e.parameter.type === 'todos') {
@@ -336,32 +346,4 @@ function clearCachedData() {
   } catch (e) {
     // 忽略潛在的系統層清除異常
   }
-}
-
-// 方案二：支援直接在 iPad 渲染管理系統網頁介面 (ADHD UX & PWA 友善)
-function doGet(e) {
-  // 如果請求帶有 action=getData 參數，則走 API 回傳 JSON 資料，維持原本的 API 調用相容性
-  if (e.parameter.action === 'getData' || e.parameter.action === 'update' || e.parameter.action === 'delete') {
-    // 呼叫原本的 API 入口處理
-    return handleLegacyApiRequest(e);
-  }
-
-  // 否則，直接渲染 index.html
-  return HtmlService.createHtmlOutputFromFile('index')
-      .setTitle('客戶案件管理系統')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
-}
-
-// 相容處理舊 API 的進入點
-function handleLegacyApiRequest(e) {
-  // 由於舊的進入點是靠部署後的 doPost/doGet 來執行，我們保留對應處理
-  // 這裡回傳與原本 code.gs 相同的 API 結果即可
-  if (e.parameter.action === 'getData') {
-    const data = getCompleteData();
-    return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: data }))
-        .setMimeType(ContentService.MimeType.JSON);
-  }
-  return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Invalid Action' }))
-      .setMimeType(ContentService.MimeType.JSON);
 }
