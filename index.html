@@ -759,7 +759,7 @@
       border-color: #ef4444;
       box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
     }
-    .sub-tag-btn.active.intent-hold {
+    .sub-tag-btn.active.agree-hold {
       background: #000000;
       color: #ffffff;
       border-color: #ffffff;
@@ -4880,9 +4880,6 @@
           if (c.saDetails.intentState === 'intent-pending') {
             replyText = '互動中';
             replyClass = 'active intent-pending';
-          } else if (c.saDetails.intentState === 'intent-hold') {
-            replyText = '擱置中';
-            replyClass = 'active intent-hold';
           } else if (c.saDetails.intentState === 'intent-no') {
             replyText = '無意願';
             replyClass = 'active intent-no';
@@ -4892,12 +4889,15 @@
           }
         }
 
-        // 算出 SA 第三個按鈕「約定」的三種狀態 (未約定、喬時間、已約定) - 不顯示日期
+        // 算出 SA 第三個按鈕「約定」的四種狀態 (未約定、喬時間、擱置中、已約定) - 不顯示日期
         let agreeText = '未約定';
         let agreeClass = '';
         if (c.saDetails.agreeState === 'active') {
           agreeText = '已約定';
           agreeClass = 'active agree';
+        } else if (c.saDetails.agreeState === 'hold') {
+          agreeText = '擱置中';
+          agreeClass = 'active agree-hold';
         } else if (c.oaDetails.meetState === 'pending') {
           agreeText = '喬時間';
           agreeClass = 'active pending';
@@ -7849,16 +7849,13 @@
           }
         });
       } else {
-        // 已亮燈 (互動中 或 擱置中 或 無意願)：雙擊防呆才切換下個狀態或還原
+        // 已亮燈 (互動中 或 無意願)：雙擊防呆才切換下個狀態或還原
         if (event && event.detail >= 2) {
           updateCase(caseId, item => {
             if (!item.saDetails) item.saDetails = {};
             const currentIntent = item.saDetails.intentState || '';
             if (currentIntent === 'intent-pending') {
-              // 互動中 -> 擱置中
-              item.saDetails.intentState = 'intent-hold';
-            } else if (currentIntent === 'intent-hold') {
-              // 擱置中 -> 無意願
+              // 互動中 -> 無意願
               item.saDetails.intentState = 'intent-no';
             } else {
               // 無意願 -> 未回覆 (還原)
@@ -7877,10 +7874,11 @@
       if (!c) return;
 
       const isAgreeActive = (c.saDetails && c.saDetails.agreeState === 'active');
+      const isAgreeHold = (c.saDetails && c.saDetails.agreeState === 'hold');
       const isMeetPending = (c.oaDetails && c.oaDetails.meetState === 'pending');
       let openSADrawer = false;
 
-      if (!isAgreeActive && !isMeetPending) {
+      if (!isAgreeActive && !isAgreeHold && !isMeetPending) {
         // 未亮燈 (未約定) -> 亮燈第一個狀態 (喬時間)：單擊即可推進，並自動拉出抽屜
         updateCase(caseId, item => {
           if (!item.saDetails) item.saDetails = {};
@@ -7891,17 +7889,24 @@
         });
         openSADrawer = true;
       } else {
-        // 已亮燈 (喬時間 或 已約定)：雙擊防呆才切換下個狀態或還原
+        // 已亮燈 (喬時間 或 擱置中 或 已約定)：雙擊防呆才切換下個狀態或還原
         if (event && event.detail >= 2) {
           updateCase(caseId, item => {
             if (!item.saDetails) item.saDetails = {};
             if (!item.oaDetails) item.oaDetails = {};
             
             const currentMeetPending = item.oaDetails.meetState === 'pending';
+            const currentAgreeHold = item.saDetails.agreeState === 'hold';
             const currentAgreeActive = item.saDetails.agreeState === 'active';
 
-            if (currentMeetPending && !currentAgreeActive) {
-              // 喬時間 -> 已約定
+            if (currentMeetPending && !currentAgreeHold && !currentAgreeActive) {
+              // 1. 喬時間 -> 擱置中
+              item.saDetails.agreeState = 'hold';
+              item.saDetails.agreeDate = '';
+              item.oaDetails.meetState = ''; // 移出喬時間狀態
+              item.oaDetails.meetDate = '';
+            } else if (currentAgreeHold) {
+              // 2. 擱置中 -> 已約定
               item.saDetails.agreeState = 'active';
               item.saDetails.agreeDate = new Date().toISOString().split('T')[0];
               item.oaDetails.meetState = 'confirmed';
@@ -7909,7 +7914,7 @@
                 item.oaDetails.meetDate = new Date().toISOString().split('T')[0];
               }
             } else {
-              // 已約定 -> 未約定 (還原)
+              // 3. 已約定 -> 未約定 (還原)
               item.saDetails.agreeState = 'dim';
               item.saDetails.agreeDate = '';
               item.oaDetails.meetState = '';
