@@ -7623,44 +7623,59 @@
       if (drawerContent) renderCDrawer(c, drawerContent);
     }
 
+    let cBtnClickTimeout = null;
+
     // C 抽屜按鈕單擊事件：標記為「進行中」並自動開啟日曆
     function handleCBtnClick(caseId, stateKey) {
-      let isOngoingOrTargetChanged = false;
-      updateCase(caseId, c => {
-        if (!c.cDetails) c.cDetails = {};
-        const cur = c.cDetails[stateKey] || 'dim';
-        
-        if (cur === 'dim') {
-          c.cDetails[stateKey] = 'ongoing';
-          isOngoingOrTargetChanged = true;
-        } else if (cur === 'ongoing') {
-          // 本來就是 ongoing，單擊只負責叫出日曆修改預計日期，狀態維持 ongoing
-          isOngoingOrTargetChanged = true;
-        }
-      });
-
-      // 只要觸發了進行中或要調整預計日期，等待全域 renderCases 完成後再彈出日曆
-      if (isOngoingOrTargetChanged) {
-        setTimeout(() => {
-          const c = cases.find(item => item.id === caseId);
-          const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-          if (drawerContent) {
-            renderCDrawer(c, drawerContent);
-            
-            // 緊接著開啟日曆選擇器
-            setTimeout(() => {
-              const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-              if (dateInput) {
-                dateInput.click();
-              }
-            }, 100);
-          }
-        }, 100);
+      if (cBtnClickTimeout) {
+        clearTimeout(cBtnClickTimeout);
+        cBtnClickTimeout = null;
       }
+      
+      cBtnClickTimeout = setTimeout(() => {
+        let isOngoingOrTargetChanged = false;
+        updateCase(caseId, c => {
+          if (!c.cDetails) c.cDetails = {};
+          const cur = c.cDetails[stateKey] || 'dim';
+          
+          if (cur === 'dim') {
+            c.cDetails[stateKey] = 'ongoing';
+            isOngoingOrTargetChanged = true;
+          } else if (cur === 'ongoing') {
+            // 本來就是 ongoing，單擊只負責叫出日曆修改預計日期，狀態維持 ongoing
+            isOngoingOrTargetChanged = true;
+          }
+        });
+
+        // 只要觸發了進行中或要調整預計日期，等待全域 renderCases 完成後再彈出日曆
+        if (isOngoingOrTargetChanged) {
+          setTimeout(() => {
+            const c = cases.find(item => item.id === caseId);
+            const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+            if (drawerContent) {
+              renderCDrawer(c, drawerContent);
+              
+              // 緊接著開啟日曆選擇器
+              setTimeout(() => {
+                const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
+                if (dateInput) {
+                  dateInput.click();
+                }
+              }, 100);
+            }
+          }, 100);
+        }
+        cBtnClickTimeout = null;
+      }, 250);
     }
 
     // C 抽屜按鈕雙擊事件：標記為「已完成」或重置為「未開始」
     function handleCBtnDblClick(caseId, stateKey) {
+      if (cBtnClickTimeout) {
+        clearTimeout(cBtnClickTimeout);
+        cBtnClickTimeout = null;
+      }
+      
       updateCase(caseId, c => {
         if (!c.cDetails) c.cDetails = {};
         const cur = c.cDetails[stateKey] || 'dim';
