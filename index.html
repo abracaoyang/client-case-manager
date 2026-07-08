@@ -2171,69 +2171,54 @@
     50% { background: rgba(192, 132, 252, 0.35); border-color: rgba(192, 132, 252, 0.95); box-shadow: 0 0 10px rgba(192, 132, 252, 0.6); }
     100% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
   }
-  .status-badge-btn.ongoing-purple, .sub-tag-btn.ongoing-purple {
+  /* OA 階段次標籤呼吸發光 (紫色) */
+  @keyframes ongoing-oa-pulse {
+    0% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
+    50% { background: rgba(192, 132, 252, 0.35); border-color: rgba(192, 132, 252, 0.95); box-shadow: 0 0 10px rgba(192, 132, 252, 0.6); }
+    100% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
+  }
+  .status-badge-btn.ongoing-oa, .sub-tag-btn.ongoing-oa {
     transition: none !important;
-    animation: ongoing-purple-pulse 1.8s infinite ease-in-out !important;
+    animation: ongoing-oa-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
   }
 
-  @keyframes ongoing-orange-pulse {
-    0% { background: rgba(249, 146, 60, 0.08); border-color: rgba(249, 146, 60, 0.3); box-shadow: 0 0 3px rgba(249, 146, 60, 0.2); }
-    50% { background: rgba(249, 146, 60, 0.35); border-color: rgba(249, 146, 60, 0.95); box-shadow: 0 0 10px rgba(249, 146, 60, 0.6); }
-    100% { background: rgba(249, 146, 60, 0.08); border-color: rgba(249, 146, 60, 0.3); box-shadow: 0 0 3px rgba(249, 146, 60, 0.2); }
-  }
-  .status-badge-btn.ongoing-orange, .sub-tag-btn.ongoing-orange {
-    transition: none !important;
-    animation: ongoing-orange-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
-    border-style: solid !important;
-  }
-
-  @keyframes ongoing-blue-pulse {
+  /* PC 階段次標籤呼吸發光 (藍色) */
+  @keyframes ongoing-pc-pulse {
     0% { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 3px rgba(96, 165, 250, 0.2); }
     50% { background: rgba(96, 165, 250, 0.35); border-color: rgba(96, 165, 250, 0.95); box-shadow: 0 0 10px rgba(96, 165, 250, 0.6); }
     100% { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 3px rgba(96, 165, 250, 0.2); }
   }
-  .status-badge-btn.ongoing-blue, .sub-tag-btn.ongoing-blue {
+  .status-badge-btn.ongoing-pc, .sub-tag-btn.ongoing-pc {
     transition: none !important;
-    animation: ongoing-blue-pulse 1.8s infinite ease-in-out !important;
+    animation: ongoing-pc-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
   }
 
-  @keyframes ongoing-red-pulse {
-    0% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
-    50% { background: rgba(244, 63, 94, 0.35); border-color: rgba(244, 63, 94, 0.95); box-shadow: 0 0 10px rgba(244, 63, 94, 0.6); }
-    100% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
-  }
-  .status-badge-btn.ongoing-red, .sub-tag-btn.ongoing-red {
-    transition: none !important;
-    animation: ongoing-red-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
-    border-style: solid !important;
-  }
-
-  @keyframes ongoing-magenta-pulse {
-    0% { background: rgba(232, 121, 249, 0.08); border-color: rgba(232, 121, 249, 0.3); box-shadow: 0 0 3px rgba(232, 121, 249, 0.2); }
-    50% { background: rgba(232, 121, 249, 0.35); border-color: rgba(232, 121, 249, 0.95); box-shadow: 0 0 10px rgba(232, 121, 249, 0.6); }
-    100% { background: rgba(232, 121, 249, 0.08); border-color: rgba(232, 121, 249, 0.3); box-shadow: 0 0 3px rgba(232, 121, 249, 0.2); }
-  }
-  .status-badge-btn.ongoing-magenta, .sub-tag-btn.ongoing-magenta {
-    transition: none !important;
-    animation: ongoing-magenta-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
-    border-style: solid !important;
-  }
-
-  @keyframes ongoing-green-pulse {
+  /* C 階段次標籤呼吸發光 (綠色) */
+  @keyframes ongoing-c-pulse {
     0% { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.3); box-shadow: 0 0 3px rgba(52, 211, 153, 0.2); }
     50% { background: rgba(52, 211, 153, 0.35); border-color: rgba(52, 211, 153, 0.95); box-shadow: 0 0 10px rgba(52, 211, 153, 0.6); }
     100% { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.3); box-shadow: 0 0 3px rgba(52, 211, 153, 0.2); }
   }
-  .status-badge-btn.ongoing-green, .sub-tag-btn.ongoing-green {
+  .status-badge-btn.ongoing-c, .sub-tag-btn.ongoing-c {
     transition: none !important;
-    animation: ongoing-green-pulse 1.8s infinite ease-in-out !important;
+    animation: ongoing-c-pulse 1.8s infinite ease-in-out !important;
+    color: #fff !important;
+    border-style: solid !important;
+  }
+
+  /* S 階段次標籤呼吸發光 (紅色) */
+  @keyframes ongoing-s-pulse {
+    0% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
+    50% { background: rgba(244, 63, 94, 0.35); border-color: rgba(244, 63, 94, 0.95); box-shadow: 0 0 10px rgba(244, 63, 94, 0.6); }
+    100% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
+  }
+  .status-badge-btn.ongoing-s, .sub-tag-btn.ongoing-s {
+    transition: none !important;
+    animation: ongoing-s-pulse 1.8s infinite ease-in-out !important;
     color: #fff !important;
     border-style: solid !important;
   }
@@ -5022,9 +5007,9 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${oaDateText}</div>
                 <div class="node-dot">OA</div>
                 <div class="sub-tag-group" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.oaDetails.planState === 'active' ? 'active plan' : ''}" onclick="toggleOAPlanDirect('${c.id}', event)">${fmtSubLabel('訪前規劃', c.oaDetails.planState === 'active' ? c.oaDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.oaDetails.practiceState === 'active' ? 'active practice' : ''}" onclick="toggleOAPracticeDirect('${c.id}', event)">${fmtSubLabel('訪前演練', c.oaDetails.practiceState === 'active' ? c.oaDetails.practiceDate : '')}</span>
-                  <span class="sub-tag-btn ${c.oaDetails.discussState === 'active' ? 'active discuss' : ''}" onclick="toggleOADiscussDirect('${c.id}', event)">${fmtSubLabel('訪後討論', c.oaDetails.discussState === 'active' ? c.oaDetails.discussDate : '')}</span>
+                  <span class="sub-tag-btn ${c.oaDetails.planState === 'active' ? 'active plan' : (c.oaDetails.planState === 'ongoing' ? 'ongoing-oa' : '')}" onclick="toggleOAPlanDirect('${c.id}', event)">${c.oaDetails.planState === 'active' ? fmtSubLabel('訪前規劃', c.oaDetails.planDate) : (c.oaDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('訪前規劃', c.oaDetails.planDate)}` : '訪前規劃')}</span>
+                  <span class="sub-tag-btn ${c.oaDetails.practiceState === 'active' ? 'active practice' : (c.oaDetails.practiceState === 'ongoing' ? 'ongoing-oa' : '')}" onclick="toggleOAPracticeDirect('${c.id}', event)">${c.oaDetails.practiceState === 'active' ? fmtSubLabel('訪前演練', c.oaDetails.practiceDate) : (c.oaDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('訪前演練', c.oaDetails.practiceDate)}` : '訪前演練')}</span>
+                  <span class="sub-tag-btn ${c.oaDetails.discussState === 'active' ? 'active discuss' : (c.oaDetails.discussState === 'ongoing' ? 'ongoing-oa' : '')}" onclick="toggleOADiscussDirect('${c.id}', event)">${c.oaDetails.discussState === 'active' ? fmtSubLabel('訪後討論', c.oaDetails.discussDate) : (c.oaDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('訪後討論', c.oaDetails.discussDate)}` : '訪後討論')}</span>
                 </div>
               </div>
             </div>
@@ -5034,9 +5019,9 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${pcDateText}</div>
                 <div class="node-dot">PC</div>
                 <div class="sub-tag-group" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.pcDetails.planState === 'active' ? 'active pc-plan' : ''}" onclick="togglePCPlanDirect('${c.id}', event)">${fmtSubLabel('規劃建議', c.pcDetails.planState === 'active' ? c.pcDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.pcDetails.discussState === 'active' ? 'active pc-discuss' : ''}" onclick="togglePCDiscussDirect('${c.id}', event)">${fmtSubLabel('已傳建議', c.pcDetails.discussState === 'active' ? c.pcDetails.discussDate : '')}</span>
-                  <span class="sub-tag-btn ${c.pcDetails.practiceState === 'active' ? 'active pc-practice' : ''}" onclick="togglePCPracticeDirect('${c.id}', event)">${fmtSubLabel('講解演練', c.pcDetails.practiceState === 'active' ? c.pcDetails.practiceDate : '')}</span>
+                  <span class="sub-tag-btn ${c.pcDetails.planState === 'active' ? 'active pc-plan' : (c.pcDetails.planState === 'ongoing' ? 'ongoing-pc' : '')}" onclick="togglePCPlanDirect('${c.id}', event)">${c.pcDetails.planState === 'active' ? fmtSubLabel('規劃建議', c.pcDetails.planDate) : (c.pcDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('規劃建議', c.pcDetails.planDate)}` : '規劃建議')}</span>
+                  <span class="sub-tag-btn ${c.pcDetails.discussState === 'active' ? 'active pc-discuss' : (c.pcDetails.discussState === 'ongoing' ? 'ongoing-pc' : '')}" onclick="togglePCDiscussDirect('${c.id}', event)">${c.pcDetails.discussState === 'active' ? fmtSubLabel('已傳建議', c.pcDetails.discussDate) : (c.pcDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('已傳建議', c.pcDetails.discussDate)}` : '已傳建議')}</span>
+                  <span class="sub-tag-btn ${c.pcDetails.practiceState === 'active' ? 'active pc-practice' : (c.pcDetails.practiceState === 'ongoing' ? 'ongoing-pc' : '')}" onclick="togglePCPracticeDirect('${c.id}', event)">${c.pcDetails.practiceState === 'active' ? fmtSubLabel('講解演練', c.pcDetails.practiceDate) : (c.pcDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('講解演練', c.pcDetails.practiceDate)}` : '講解演練')}</span>
                 </div>
               </div>
             </div>
@@ -5046,11 +5031,11 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${cDateText}</div>
                 <div class="node-dot">C</div>
                 <div class="sub-tag-group c-grid" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : (c.cDetails.planState === 'ongoing' ? 'ongoing-purple' : '')}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${c.cDetails.planState === 'active' ? fmtSubLabel('文件準備', c.cDetails.planDate) : (c.cDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('文件準備', c.cDetails.planDate)}` : '文件準備')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : (c.cDetails.signState === 'ongoing' ? 'ongoing-orange' : '')}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${c.cDetails.signState === 'active' ? fmtSubLabel('簽約', c.cDetails.signDate) : (c.cDetails.signState === 'ongoing' ? `⚡ ${fmtSubLabel('簽約', c.cDetails.signDate)}` : '簽約')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : (c.cDetails.practiceState === 'ongoing' ? 'ongoing-blue' : '')}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">${c.cDetails.practiceState === 'active' ? fmtSubLabel('要保簽署', c.cDetails.practiceDate) : (c.cDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('要保簽署', c.cDetails.practiceDate)}` : '要保簽署')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : (c.cDetails.remedyState === 'ongoing' ? 'ongoing-red' : '')}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${c.cDetails.remedyState === 'active' ? fmtSubLabel('補件', c.cDetails.remedyDate) : (c.cDetails.remedyState === 'ongoing' ? `⚡ ${fmtSubLabel('補件', c.cDetails.remedyDate)}` : '補件')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : (c.cDetails.discussState === 'ongoing' ? 'ongoing-green' : '')}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${c.cDetails.discussState === 'active' ? fmtSubLabel('保費首扣', c.cDetails.discussDate) : (c.cDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('保費首扣', c.cDetails.discussDate)}` : '保費首扣')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : (c.cDetails.planState === 'ongoing' ? 'ongoing-c' : '')}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${c.cDetails.planState === 'active' ? fmtSubLabel('文件準備', c.cDetails.planDate) : (c.cDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('文件準備', c.cDetails.planDate)}` : '文件準備')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : (c.cDetails.signState === 'ongoing' ? 'ongoing-c' : '')}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${c.cDetails.signState === 'active' ? fmtSubLabel('簽約', c.cDetails.signDate) : (c.cDetails.signState === 'ongoing' ? `⚡ ${fmtSubLabel('簽約', c.cDetails.signDate)}` : '簽約')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : (c.cDetails.practiceState === 'ongoing' ? 'ongoing-c' : '')}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">${c.cDetails.practiceState === 'active' ? fmtSubLabel('要保簽署', c.cDetails.practiceDate) : (c.cDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('要保簽署', c.cDetails.practiceDate)}` : '要保簽署')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : (c.cDetails.remedyState === 'ongoing' ? 'ongoing-c' : '')}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${c.cDetails.remedyState === 'active' ? fmtSubLabel('補件', c.cDetails.remedyDate) : (c.cDetails.remedyState === 'ongoing' ? `⚡ ${fmtSubLabel('補件', c.cDetails.remedyDate)}` : '補件')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : (c.cDetails.discussState === 'ongoing' ? 'ongoing-c' : '')}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${c.cDetails.discussState === 'active' ? fmtSubLabel('保費首扣', c.cDetails.discussDate) : (c.cDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('保費首扣', c.cDetails.discussDate)}` : '保費首扣')}</span>
                   <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 3;" onclick="toggleCSubmitDirect('${c.id}', event)">${c.cDetails.submitState === 'active' ? fmtSubLabel('送件', c.cDetails.submitDate) : (c.cDetails.submitState === 'ongoing' ? `⚡ ${fmtSubLabel('送件', c.cDetails.submitDate)}` : '送件')}</span>
                 </div>
               </div>
@@ -5061,9 +5046,9 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${sDateText}</div>
                 <div class="node-dot">S</div>
                 <div class="sub-tag-group" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.sDetails.planState === 'active' ? 'active s-plan' : ''}" onclick="toggleSPlanDirect('${c.id}', event)">${fmtSubLabel('保單送達', c.sDetails.planState === 'active' ? c.sDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.sDetails.practiceState === 'active' ? 'active s-practice' : ''}" onclick="toggleSPracticeDirect('${c.id}', event)">${fmtSubLabel('契撤追蹤', c.sDetails.practiceState === 'active' ? c.sDetails.practiceDate : '')}</span>
-                  <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : ''}" onclick="toggleSDiscussDirect('${c.id}', event)">${fmtSubLabel('週年服務', c.sDetails.discussState === 'active' ? c.sDetails.discussDate : '')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.planState === 'active' ? 'active s-plan' : (c.sDetails.planState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPlanDirect('${c.id}', event)">${c.sDetails.planState === 'active' ? fmtSubLabel('保單送達', c.sDetails.planDate) : (c.sDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('保單送達', c.sDetails.planDate)}` : '保單送達')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.practiceState === 'active' ? 'active s-practice' : (c.sDetails.practiceState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPracticeDirect('${c.id}', event)">${c.sDetails.practiceState === 'active' ? fmtSubLabel('契撤追蹤', c.sDetails.practiceDate) : (c.sDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('契撤追蹤', c.sDetails.practiceDate)}` : '契撤追蹤')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : (c.sDetails.discussState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSDiscussDirect('${c.id}', event)">${c.sDetails.discussState === 'active' ? fmtSubLabel('週年服務', c.sDetails.discussDate) : (c.sDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('週年服務', c.sDetails.discussDate)}` : '週年服務')}</span>
                 </div>
               </div>
             </div>
@@ -5920,34 +5905,29 @@
 
       subTagClickTimeout = setTimeout(() => {
         if (curState === 'dim') {
-          // C 階段次標籤單擊轉為 ongoing 呼吸燈，先在前端局部渲染
-          if (phase === 'c') {
-            details[stateKey] = 'ongoing';
-            renderCases(); // 僅渲染主畫面呈現 ⚡
+          // 不分大階段，單擊轉為 ongoing 進行中，先在前端局部重繪
+          details[stateKey] = 'ongoing';
+          renderCases(); // 僅渲染主畫面呈現 ⚡
+          
+          // 自動呼叫開啟對應階段的抽屜並彈出行事曆
+          openDrawer(caseId, phase.toUpperCase());
+          setTimeout(() => {
+            // 局部繪製對應階段的 Drawer 後模擬開啟日曆
+            const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+            if (drawerContent) {
+              if (phase === 'oa') renderOADrawer(c, drawerContent);
+              else if (phase === 'pc') renderPCDrawer(c, drawerContent);
+              else if (phase === 'c') renderCDrawer(c, drawerContent);
+              else if (phase === 's') renderSDrawer(c, drawerContent);
+            }
             
-            // 自動呼叫開啟對應階段的抽屜並彈出行事曆
-            openDrawer(caseId, phase.toUpperCase());
             setTimeout(() => {
-              // 局部繪製 Drawer 後模擬開啟日曆
-              const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-              if (drawerContent) renderCDrawer(c, drawerContent);
-              
-              setTimeout(() => {
-                const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-                if (dateInput) {
-                  dateInput.click();
-                }
-              }, 100);
+              const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
+              if (dateInput) {
+                dateInput.click();
+              }
             }, 100);
-          } else {
-            // 其他大階段非 C 則維持原先一鍵完成亮燈
-            updateCase(caseId, item => {
-              const itemDetails = phase === 'oa' ? item.oaDetails :
-                                  phase === 'pc' ? item.pcDetails : item.sDetails;
-              itemDetails[stateKey] = 'active';
-              itemDetails[dateKey] = new Date().toISOString().split('T')[0];
-            });
-          }
+          }, 100);
         } else if (curState === 'ongoing') {
           // 已經是進行中，單擊直接開啟抽屜並彈出日曆
           openDrawer(caseId, phase.toUpperCase());
@@ -6107,6 +6087,18 @@
           }
         } else {
           c.sDetails[field] = value;
+          
+          const subTagFields = ['planDate', 'practiceDate', 'discussDate'];
+          if (subTagFields.includes(field)) {
+            const stateKey = field.replace('Date', 'State');
+            if (value === '') {
+              c.sDetails[stateKey] = 'dim';
+            } else {
+              if (c.sDetails[stateKey] !== 'active') {
+                c.sDetails[stateKey] = 'ongoing';
+              }
+            }
+          }
         }
         if (field === 'meetDate') {
           c.sDetails.meetState = value ? 'confirmed' : '';
@@ -6138,6 +6130,18 @@
           }
         } else {
           c.pcDetails[field] = value;
+          
+          const subTagFields = ['planDate', 'practiceDate', 'discussDate'];
+          if (subTagFields.includes(field)) {
+            const stateKey = field.replace('Date', 'State');
+            if (value === '') {
+              c.pcDetails[stateKey] = 'dim';
+            } else {
+              if (c.pcDetails[stateKey] !== 'active') {
+                c.pcDetails[stateKey] = 'ongoing';
+              }
+            }
+          }
         }
         if (field === 'meetDate') {
           c.pcDetails.meetState = value ? 'confirmed' : '';
@@ -6176,8 +6180,11 @@
       }
 
       const isPlanDone = oa.planState === 'active';
+      const isPlanOngoing = oa.planState === 'ongoing';
       const isPracticeDone = oa.practiceState === 'active';
+      const isPracticeOngoing = oa.practiceState === 'ongoing';
       const isDiscussDone = oa.discussState === 'active';
+      const isDiscussOngoing = oa.discussState === 'ongoing';
 
       container.innerHTML = `
         <div class="drawer-grid-horizontal">
@@ -6221,27 +6228,42 @@
             <div>
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 訪前訪後準備工作</div>
               <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.18' : (isPlanOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 訪前規劃</span>
-                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : (isPlanOngoing ? 'ongoing-oa' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'planState', 'oa')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'planState', 'oa')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPlanDone ? `✓ 已完成 (${formatShortDate(oa.planDate)})` : (isPlanOngoing ? `⚡ 進行中 (預計: ${formatShortDate(oa.planDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${oa.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'oa')" placeholder="規劃確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-planState" value="${oa.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'oa')" placeholder="規劃確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="備忘或討論要點..." onchange="updateOAField('${c.id}', 'planNotes', this.value)">${oa.planNotes || ''}</textarea>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.18' : (isPracticeOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">⚔️ 訪前演練</span>
-                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : (isPracticeOngoing ? 'ongoing-oa' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'practiceState', 'oa')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'practiceState', 'oa')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPracticeDone ? `✓ 已完成 (${formatShortDate(oa.practiceDate)})` : (isPracticeOngoing ? `⚡ 進行中 (預計: ${formatShortDate(oa.practiceDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${oa.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'oa')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-practiceState" value="${oa.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'oa')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.18' : (isDiscussOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#34d399; font-weight:700;">💬 訪後討論</span>
-                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="toggleOAPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : (isDiscussOngoing ? 'ongoing-oa' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'discussState', 'oa')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'discussState', 'oa')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isDiscussDone ? `✓ 已完成 (${formatShortDate(oa.discussDate)})` : (isDiscussOngoing ? `⚡ 進行中 (預計: ${formatShortDate(oa.discussDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${oa.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'oa')" placeholder="討論確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-discussState" value="${oa.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'oa')" placeholder="討論確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="討論心得或邀約方向..." onchange="updateOAField('${c.id}', 'discussNotes', this.value)">${oa.discussNotes || ''}</textarea>
                 </div>
               </div>
@@ -6272,8 +6294,11 @@
       }
 
       const isPlanDone = pc.planState === 'active';
+      const isPlanOngoing = pc.planState === 'ongoing';
       const isDiscussDone = pc.discussState === 'active';
+      const isDiscussOngoing = pc.discussState === 'ongoing';
       const isPracticeDone = pc.practiceState === 'active';
+      const isPracticeOngoing = pc.practiceState === 'ongoing';
 
       container.innerHTML = `
         <div class="drawer-grid-horizontal">
@@ -6317,28 +6342,43 @@
             <div>
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 建議草案規劃與演練</div>
               <div style="display:flex; flex-direction:column; gap:6px; max-height: 200px; overflow-y: auto; padding-right: 2px;">
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.18' : (isPlanOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 規劃建議</span>
-                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : (isPlanOngoing ? 'ongoing-pc' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'planState', 'pc')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'planState', 'pc')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPlanDone ? `✓ 已完成 (${formatShortDate(pc.planDate)})` : (isPlanOngoing ? `⚡ 進行中 (預計: ${formatShortDate(pc.planDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${pc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'pc')" placeholder="建議書發想製作日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-planState" value="${pc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'pc')" placeholder="建議書發想製作日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="規劃要點與搭配險種..." onchange="updatePCField('${c.id}', 'planNotes', this.value)">${pc.planNotes || ''}</textarea>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.18' : (isDiscussOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">✉️ 已傳建議</span>
-                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : (isDiscussOngoing ? 'ongoing-pc' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'discussState', 'pc')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'discussState', 'pc')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isDiscussDone ? `✓ 已完成 (${formatShortDate(pc.discussDate)})` : (isDiscussOngoing ? `⚡ 進行中 (預計: ${formatShortDate(pc.discussDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${pc.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'pc')" placeholder="建議書遞交日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-discussState" value="${pc.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'pc')" placeholder="建議書遞交日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px; width:100%; box-sizing:border-box;" placeholder="遞交回饋與討論備忘..." onchange="updatePCField('${c.id}', 'discussNotes', this.value)">${pc.discussNotes || ''}</textarea>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.18' : (isPracticeOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#f59e0b; font-weight:700;">⚔️ 說明演練</span>
-                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="togglePCPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : (isPracticeOngoing ? 'ongoing-pc' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'practiceState', 'pc')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'practiceState', 'pc')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPracticeDone ? `✓ 已完成 (${formatShortDate(pc.practiceDate)})` : (isPracticeOngoing ? `⚡ 進行中 (預計: ${formatShortDate(pc.practiceDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${pc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'pc')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-practiceState" value="${pc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'pc')" placeholder="演練確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                 </div>
               </div>
             </div>
@@ -6504,8 +6544,11 @@
       const s = c.sDetails;
       
       const isPlanDone = s.planState === 'active';
+      const isPlanOngoing = s.planState === 'ongoing';
       const isPracticeDone = s.practiceState === 'active';
+      const isPracticeOngoing = s.practiceState === 'ongoing';
       const isDiscussDone = s.discussState === 'active';
+      const isDiscussOngoing = s.discussState === 'ongoing';
 
       container.innerHTML = `
         <div class="drawer-grid-horizontal">
@@ -6521,27 +6564,42 @@
             <div>
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 售後服務工作項目</div>
               <div style="display:flex; flex-direction:column; gap:6px; max-height: 220px; overflow-y: auto; padding-right: 2px;">
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPlanDone ? '0.18' : (isPlanOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#c084fc; font-weight:700;">🎯 保單送達</span>
-                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'planState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPlanDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPlanDone ? 'active agree' : (isPlanOngoing ? 'ongoing-s' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'planState', 's')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'planState', 's')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPlanDone ? `✓ 已完成 (${formatShortDate(s.planDate)})` : (isPlanOngoing ? `⚡ 進行中 (預計: ${formatShortDate(s.planDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${s.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 's')" placeholder="親交保單與簽收回條日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-planState" value="${s.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 's')" placeholder="親交保單與簽收回條日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="保單回條簽收狀態或備忘..." onchange="updateSField('${c.id}', 'planNotes', this.value)">${s.planNotes || ''}</textarea>
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isPracticeDone ? '0.18' : (isPracticeOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#60a5fa; font-weight:700;">⏱️ 契撤追蹤</span>
-                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'practiceState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isPracticeDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isPracticeDone ? 'active agree' : (isPracticeOngoing ? 'ongoing-s' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'practiceState', 's')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'practiceState', 's')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPracticeDone ? `✓ 已完成 (${formatShortDate(s.practiceDate)})` : (isPracticeOngoing ? `⚡ 進行中 (預計: ${formatShortDate(s.practiceDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${s.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 's')" placeholder="契撤期提醒與確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-practiceState" value="${s.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 's')" placeholder="契撤期提醒與確認日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                 </div>
-                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.12' : '0.04'}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
+                <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.18' : (isDiscussOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                   <div style="display:flex; align-items:center; justify-content:space-between;">
                     <span style="font-size:0.72rem; color:#34d399; font-weight:700;">💬 週年服務</span>
-                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : ''}" data-type="agree" onclick="toggleSPrepState('${c.id}', 'discussState')" style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px;">${isDiscussDone ? '✓ 已完成' : '標記完成'}</button>
+                    <button class="status-badge-btn ${isDiscussDone ? 'active agree' : (isDiscussOngoing ? 'ongoing-s' : '')}" 
+                            onclick="handleCBtnClick('${c.id}', 'discussState', 's')" 
+                            ondblclick="handleCBtnDblClick('${c.id}', 'discussState', 's')"
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isDiscussDone ? `✓ 已完成 (${formatShortDate(s.discussDate)})` : (isDiscussOngoing ? `⚡ 進行中 (預計: ${formatShortDate(s.discussDate) || '未排'})` : '標記進行中')}
+                    </button>
                   </div>
-                  <input type="text" readonly value="${s.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 's')" placeholder="定期維繫與二次開發日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                  <input type="text" readonly id="date-input-${c.id}-discussState" value="${s.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 's')" placeholder="定期維繫與二次開發日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
                   <textarea style="height:26px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:2px;" placeholder="週年聯絡記錄 or 轉介紹發掘備忘..." onchange="updateSField('${c.id}', 'discussNotes', this.value)">${s.discussNotes || ''}</textarea>
                 </div>
               </div>
@@ -7596,6 +7654,18 @@
           }
         } else {
           c.oaDetails[field] = value;
+          
+          const subTagFields = ['planDate', 'practiceDate', 'discussDate'];
+          if (subTagFields.includes(field)) {
+            const stateKey = field.replace('Date', 'State');
+            if (value === '') {
+              c.oaDetails[stateKey] = 'dim';
+            } else {
+              if (c.oaDetails[stateKey] !== 'active') {
+                c.oaDetails[stateKey] = 'ongoing';
+              }
+            }
+          }
         }
         if (field === 'meetDate') {
           // 直接在 OA 抽屜設定會面日期時，自動推進狀態並同步 SA
@@ -7643,38 +7713,10 @@
       if (drawerContent) renderOADrawer(c, drawerContent);
     }
 
-    // 連動 PC 抽屜子狀態
-    function togglePCPrepState(caseId, stateKey) {
-      updateCase(caseId, c => {
-        if (!c.pcDetails) c.pcDetails = {};
-        const isCurrentlyActive = c.pcDetails[stateKey] === 'active';
-        c.pcDetails[stateKey] = isCurrentlyActive ? 'dim' : 'active';
-        const dateKey = stateKey.replace('State', 'Date');
-        c.pcDetails[dateKey] = isCurrentlyActive ? '' : new Date().toISOString().split('T')[0];
-      });
-      const c = cases.find(item => item.id === caseId);
-      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-      if (drawerContent) renderPCDrawer(c, drawerContent);
-    }
-
-    // 連動 C 抽屜子狀態
-    function toggleCPrepState(caseId, stateKey) {
-      updateCase(caseId, c => {
-        if (!c.cDetails) c.cDetails = {};
-        const isCurrentlyActive = c.cDetails[stateKey] === 'active';
-        c.cDetails[stateKey] = isCurrentlyActive ? 'dim' : 'active';
-        const dateKey = stateKey.replace('State', 'Date');
-        c.cDetails[dateKey] = isCurrentlyActive ? '' : new Date().toISOString().split('T')[0];
-      });
-      const c = cases.find(item => item.id === caseId);
-      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-      if (drawerContent) renderCDrawer(c, drawerContent);
-    }
-
     let cBtnClickTimeout = null;
 
-    // C 抽屜按鈕單擊事件：標記為「進行中」並自動開啟日曆
-    function handleCBtnClick(caseId, stateKey) {
+    // 抽屜按鈕單擊事件：標記為「進行中」並自動開啟日曆
+    function handleCBtnClick(caseId, stateKey, phase) {
       if (cBtnClickTimeout) {
         clearTimeout(cBtnClickTimeout);
         cBtnClickTimeout = null;
@@ -7683,17 +7725,24 @@
       cBtnClickTimeout = setTimeout(() => {
         const c = cases.find(item => item.id === caseId);
         if (!c) return;
-        if (!c.cDetails) c.cDetails = {};
-        const cur = c.cDetails[stateKey] || 'dim';
         
+        const details = phase === 'oa' ? c.oaDetails :
+                        phase === 'pc' ? c.pcDetails :
+                        phase === 'c' ? c.cDetails : c.sDetails;
+        if (!details) return;
+        
+        const cur = details[stateKey] || 'dim';
         if (cur === 'dim') {
-          c.cDetails[stateKey] = 'ongoing';
+          details[stateKey] = 'ongoing';
         }
         
         // 局部刷新抽屜 UI，讓呼吸燈立刻亮起，不發送全域重繪與 API
         const drawerContent = document.getElementById(`drawer-content-${caseId}`);
         if (drawerContent) {
-          renderCDrawer(c, drawerContent);
+          if (phase === 'oa') renderOADrawer(c, drawerContent);
+          else if (phase === 'pc') renderPCDrawer(c, drawerContent);
+          else if (phase === 'c') renderCDrawer(c, drawerContent);
+          else if (phase === 's') renderSDrawer(c, drawerContent);
         }
         
         // 緊接著開啟日曆選擇器
@@ -7708,46 +7757,39 @@
       }, 250);
     }
 
-    // C 抽屜按鈕雙擊事件：標記為「已完成」或重置為「未開始」
-    function handleCBtnDblClick(caseId, stateKey) {
+    // 抽屜按鈕雙擊事件：標記為「已完成」或重置為「未開始」
+    function handleCBtnDblClick(caseId, stateKey, phase) {
       if (cBtnClickTimeout) {
         clearTimeout(cBtnClickTimeout);
         cBtnClickTimeout = null;
       }
       
       updateCase(caseId, c => {
-        if (!c.cDetails) c.cDetails = {};
-        const cur = c.cDetails[stateKey] || 'dim';
+        const details = phase === 'oa' ? c.oaDetails :
+                        phase === 'pc' ? c.pcDetails :
+                        phase === 'c' ? c.cDetails : c.sDetails;
+        if (!details) return;
+        
+        const cur = details[stateKey] || 'dim';
         const dateKey = stateKey.replace('State', 'Date');
         
         if (cur === 'active') {
-          // 已完成 ➔ 雙擊還原為未開始，清空日期
-          c.cDetails[stateKey] = 'dim';
-          c.cDetails[dateKey] = '';
+          details[stateKey] = 'dim';
+          details[dateKey] = '';
         } else {
-          // 未開始或進行中 ➔ 雙擊標記為已完成，自動更新日期為今日實際完成日
-          c.cDetails[stateKey] = 'active';
-          c.cDetails[dateKey] = new Date().toISOString().split('T')[0];
+          details[stateKey] = 'active';
+          details[dateKey] = new Date().toISOString().split('T')[0];
         }
       });
       
       const c = cases.find(item => item.id === caseId);
       const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-      if (drawerContent) renderCDrawer(c, drawerContent);
-    }
-
-    // 連動 S 抽屜子狀態
-    function toggleSPrepState(caseId, stateKey) {
-      updateCase(caseId, c => {
-        if (!c.sDetails) c.sDetails = {};
-        const isCurrentlyActive = c.sDetails[stateKey] === 'active';
-        c.sDetails[stateKey] = isCurrentlyActive ? 'dim' : 'active';
-        const dateKey = stateKey.replace('State', 'Date');
-        c.sDetails[dateKey] = isCurrentlyActive ? '' : new Date().toISOString().split('T')[0];
-      });
-      const c = cases.find(item => item.id === caseId);
-      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-      if (drawerContent) renderSDrawer(c, drawerContent);
+      if (drawerContent) {
+        if (phase === 'oa') renderOADrawer(c, drawerContent);
+        else if (phase === 'pc') renderPCDrawer(c, drawerContent);
+        else if (phase === 'c') renderCDrawer(c, drawerContent);
+        else if (phase === 's') renderSDrawer(c, drawerContent);
+      }
     }
 
     // === 實作議題自動完成下拉選單 ===
