@@ -448,6 +448,7 @@
       border-bottom: 1px solid var(--border-color);
       position: relative;
       gap: 0;
+      scroll-margin-top: 100px;
     }
     .case-row > div:first-child {
       flex: 0 0 310px; /* 左側資訊欄：固定 310px，確保所有案件的流程亮燈絕對垂直對齊 */
@@ -2275,7 +2276,7 @@
         <button class="btn" id="btn-font-dec" style="padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border: none; background: transparent; min-width: 28px; height: 28px;">A-</button>
         <button class="btn" id="btn-font-inc" style="padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border: none; background: transparent; min-width: 28px; height: 28px;">A+</button>
       </div>
-      <button class="btn" id="btn-show-archived" onclick="toggleArchivedView()" style="opacity: 0.65;">📦 已封存</button>
+      <button class="btn" id="btn-show-archived" onclick="toggleArchivedView()" style="opacity: 0.65;" title="已封存">📦</button>
       <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
         ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
@@ -2283,8 +2284,8 @@
         📋 <span id="todo-global-badge" style="position: absolute; top: -4px; right: -4px; background: #f59e0b; color: #000; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
       <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
-      <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋ 新增待辦事項</button>
-      <button class="btn btn-primary" id="btn-add-case">＋ 新增議題案件</button>
+      <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋待辦</button>
+      <button class="btn btn-primary" id="btn-add-case">＋案件</button>
     </div>
   </header>
 
@@ -5231,6 +5232,14 @@
           input.setSelectionRange(len, len);
         }
       }
+      
+      // 當開啟抽屜時，平滑滾動到最上方 (ADHD UX)
+      setTimeout(() => {
+        const rowEl = document.getElementById(`case-row-${caseId}`);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 80);
     }
     function closeCaseDrawer(caseId) {
       const drawerRow = document.getElementById(`drawer-row-${caseId}`);
