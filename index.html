@@ -4833,6 +4833,7 @@
         // 建立卡片列
         const row = document.createElement('div');
         row.className = 'case-row';
+        row.id = `case-row-${c.id}`;
         row.dataset.id = c.id;
         row.ondblclick = (event) => handleRowDblClick(event, c.id);
         row.setAttribute('draggable', sortMode === 'manual' ? 'true' : 'false');
