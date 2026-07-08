@@ -4429,6 +4429,10 @@
       if (!container) return;
 
       container.addEventListener('dragstart', (e) => {
+        if (crmSettings.currentSortMode && crmSettings.currentSortMode !== 'manual') {
+          e.preventDefault();
+          return;
+        }
         const row = e.target.closest('.case-row');
         if (!row) return;
         row.classList.add('dragging');
@@ -4439,6 +4443,10 @@
       });
 
       container.addEventListener('dragend', (e) => {
+        if (crmSettings.currentSortMode && crmSettings.currentSortMode !== 'manual') {
+          e.preventDefault();
+          return;
+        }
         const row = e.target.closest('.case-row');
         if (!row) return;
         row.classList.remove('dragging');
@@ -4451,6 +4459,9 @@
       });
 
       container.addEventListener('dragover', (e) => {
+        if (crmSettings.currentSortMode && crmSettings.currentSortMode !== 'manual') {
+          return;
+        }
         e.preventDefault();
         const draggingRow = document.querySelector('.case-row.dragging');
         if (!draggingRow) return;
