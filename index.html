@@ -2759,47 +2759,6 @@
     </div>
   </div>
 
-  <!-- NBS 險種防呆對話框 (鎖) -->
-  <div class="modal-overlay" id="risk-lock-modal" style="z-index: 2000;">
-    <div class="modal-box" style="width: 420px; border-color: var(--color-sa); box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);">
-      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--color-sa); display: flex; align-items: center; gap: 8px;">🔒 NBS 險種進度鎖定</h3>
-        <span style="cursor:pointer;" onclick="closeRiskLockModal()">✕</span>
-      </div>
-      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
-        前進到下一階段前，請與客戶確認本次討論的 **NBS 核心保障焦點**。選擇後將自動解鎖並切換：
-      </p>
-      <form id="risk-lock-form" onsubmit="submitRiskLock(event)">
-        <div class="form-group" style="margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 8px;">
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: var(--bg-input); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <input type="radio" name="nbs-risk-focus" value="🏥 實支實付醫療 (缺口規劃)" required style="accent-color:#f59e0b;">
-            <span style="color:var(--text-primary);">🏥 實支實付醫療 (缺口規劃)</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: var(--bg-input); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <input type="radio" name="nbs-risk-focus" value="🎗️ 重大傷病與癌症 (一次金防護)" style="accent-color:#f97316;">
-            <span style="color:var(--text-primary);">🎗️ 重大傷病與癌症 (一次金防護)</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: var(--bg-input); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <input type="radio" name="nbs-risk-focus" value="👴 長照與失能扶助 (安養保障)" style="accent-color:#a855f7;">
-            <span style="color:var(--text-primary);">👴 長照與失能扶助 (安養保障)</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: var(--bg-input); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <input type="radio" name="nbs-risk-focus" value="📈 退休金儲蓄與分紅保單" style="accent-color:#3b82f6;">
-            <span style="color:var(--text-primary);">📈 退休金儲蓄與分紅保單</span>
-          </label>
-          <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; background: var(--bg-input); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-            <input type="radio" name="nbs-risk-focus" value="🚗 車險與第三人責任險 (產險續保)" style="accent-color:#0ea5e9;">
-            <span style="color:var(--text-primary);">🚗 車險與第三人責任險 (產險續保)</span>
-          </label>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-          <button class="btn" type="button" onclick="closeRiskLockModal()">取消</button>
-          <button class="btn btn-primary" type="submit" style="background:var(--color-sa); color:#000;">解鎖階段並前進 🔓</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <!-- 議題維護對話框 -->
   <div class="modal-overlay" id="topic-modal">
     <div class="modal-box">
@@ -5388,40 +5347,6 @@
 
 
     // === NBS Risk Lock & Confetti ===
-    let pendingPhaseTransition = null;
-
-    function closeRiskLockModal() {
-      document.getElementById('risk-lock-modal').classList.remove('active');
-      document.getElementById('risk-lock-form').reset();
-      pendingPhaseTransition = null;
-    }
-
-    function submitRiskLock(event) {
-      event.preventDefault();
-      if (!pendingPhaseTransition) return;
-      
-      const { caseId, newPhase } = pendingPhaseTransition;
-      const radio = document.querySelector('input[name="nbs-risk-focus"]:checked');
-      if (!radio) return;
-      
-      const selectedFocus = radio.value;
-      
-      updateCase(caseId, c => {
-        if (!c.preparedIssues) {
-          c.preparedIssues = [];
-        }
-        if (!c.preparedIssues.includes(selectedFocus)) {
-          c.preparedIssues.push(selectedFocus);
-        }
-        c.currentPhase = newPhase;
-      });
-      
-      showToast(`已解鎖！案件進度推移至 [${newPhase}] 階段`, 'success');
-      triggerConfetti();
-      closeRiskLockModal();
-      openDrawer(caseId, newPhase, true);
-    }
-
     // === Canvas Confetti 粒子紙花動畫 ===
     function triggerConfetti() {
       let canvas = document.getElementById('confetti-canvas');
@@ -5502,18 +5427,17 @@
         const currentIdx = stageOrder.indexOf(c.currentPhase);
         const newIdx = stageOrder.indexOf(phase);
         
+        updateCase(caseId, c => {
+          c.currentPhase = phase;
+        });
+        
         if (newIdx > currentIdx) {
-          // 前進階段：觸發 NBS 防呆鎖
-          pendingPhaseTransition = { caseId, newPhase: phase };
-          document.getElementById('risk-lock-modal').classList.add('active');
+          showToast(`已推移至 [${phase}] 階段！`, 'success');
+          triggerConfetti();
         } else {
-          // 後退或相同階段：直接變更
-          updateCase(caseId, c => {
-            c.currentPhase = phase;
-          });
-          showToast(`已雙擊！案件進度回退至 [${phase}] 階段`, 'success');
-          openDrawer(caseId, phase, true);
+          showToast(`已變更！案件進度調整至 [${phase}] 階段`, 'success');
         }
+        openDrawer(caseId, phase, true);
       }
     }
 
