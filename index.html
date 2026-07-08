@@ -3982,6 +3982,9 @@
 
         rebuildIssueSelects();
         debugLog("議題選單初始化完畢");
+        
+        loadTodos();
+        debugLog("待辦事項本機快取載入完畢");
 
       // 點擊 modal-overlay 遮罩外部區域自動關閉彈窗
       const modalCloseMap = {
@@ -7168,6 +7171,7 @@
           
           // 重新渲染待辦清單分頁
           renderTodoPage();
+          renderCases();
 
           // 重新計算當日提醒參數，若通知看板正在開啟，同步更新看板內容
           const d = new Date();
