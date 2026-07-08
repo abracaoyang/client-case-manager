@@ -4834,6 +4834,7 @@
         const row = document.createElement('div');
         row.className = 'case-row';
         row.dataset.id = c.id;
+        row.ondblclick = (event) => handleRowDblClick(event, c.id);
         row.setAttribute('draggable', sortMode === 'manual' ? 'true' : 'false');
         if (sortMode !== 'manual') {
           row.style.cursor = 'default';
@@ -5248,6 +5249,28 @@
         }
       }, 150);
     }
+
+    // 雙擊主幹道空白區域 - 快速為該案建立待辦任務 (ADHD UX)
+    function handleRowDblClick(event, caseId) {
+      // 如果雙擊事件的目標是互動按鈕、次標籤、大階段點點、客戶姓名、議題標題等，則直接略過
+      if (
+        event.target.closest('.sub-tag-btn') || 
+        event.target.closest('.node-dot') || 
+        event.target.closest('.client-name') || 
+        event.target.closest('.issue-start') ||
+        event.target.closest('button') ||
+        event.target.closest('input') ||
+        event.target.closest('textarea') ||
+        event.target.closest('.source-badge') ||
+        event.target.closest('.type-badge')
+      ) {
+        return;
+      }
+      
+      // 否則，這代表使用者雙擊了案件行的空白區域，自動調用待辦 Modal 並預填案件 ID
+      openTodoModal(null, caseId);
+    }
+
     function closeCaseDrawer(caseId) {
       const drawerRow = document.getElementById(`drawer-row-${caseId}`);
       if (drawerRow) {
@@ -8201,7 +8224,7 @@
     }
 
     // --- Modal ---
-    function openTodoModal(editId) {
+    function openTodoModal(editId, prefillCaseId) {
       const modal = document.getElementById('add-todo-modal');
       const titleEl = document.getElementById('todo-modal-title');
       if (!modal) return;
@@ -8275,7 +8298,7 @@
         titleEl.textContent = '新增待辦事項';
         document.getElementById('todo-edit-id').value = '';
         document.getElementById('todo-input-title').value = '';
-        document.getElementById('todo-input-case').value  = '';
+        document.getElementById('todo-input-case').value  = prefillCaseId || '';
         document.getElementById('todo-input-stage').value = '';
         document.getElementById('todo-input-subtag').innerHTML = '<option value="">— 不指定次標籤 —</option>';
         document.getElementById('todo-input-due').value   = '';
