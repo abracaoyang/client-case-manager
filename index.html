@@ -5232,14 +5232,21 @@
           input.setSelectionRange(len, len);
         }
       }
-      
       // 當開啟抽屜時，平滑滾動到最上方 (ADHD UX)
       setTimeout(() => {
         const rowEl = document.getElementById(`case-row-${caseId}`);
         if (rowEl) {
-          rowEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // 計算案件行距離網頁頂端的絕對高度，並扣除 header 高度（約 75px），以防被 Navbar 遮擋
+          const rect = rowEl.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const targetY = rect.top + scrollTop - 75;
+          
+          window.scrollTo({
+            top: targetY,
+            behavior: 'smooth'
+          });
         }
-      }, 80);
+      }, 150);
     }
     function closeCaseDrawer(caseId) {
       const drawerRow = document.getElementById(`drawer-row-${caseId}`);
