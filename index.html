@@ -2841,6 +2841,8 @@
       if (!c || !c.cDetails) return baseClass;
       if (c.cDetails.submitState === 'active') {
         baseClass += ' active c-submit';
+      } else if (c.cDetails.submitState === 'ongoing') {
+        baseClass += ' ongoing-magenta';
       }
       
       // 若已送件處理，回傳預設樣式
@@ -5036,11 +5038,11 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${cDateText}</div>
                 <div class="node-dot">C</div>
                 <div class="sub-tag-group c-grid" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : ''}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('文件準備', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : ''}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${fmtSubLabel('簽約', c.cDetails.signState === 'active' ? c.cDetails.signDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : ''}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">要保簽署</span>
-                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : ''}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${fmtSubLabel('補件', c.cDetails.remedyState === 'active' ? c.cDetails.remedyDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : ''}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : (c.cDetails.planState === 'ongoing' ? 'ongoing-purple' : '')}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('文件準備', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : (c.cDetails.signState === 'ongoing' ? 'ongoing-orange' : '')}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${fmtSubLabel('簽約', c.cDetails.signState === 'active' ? c.cDetails.signDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : (c.cDetails.practiceState === 'ongoing' ? 'ongoing-blue' : '')}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">要保簽署</span>
+                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : (c.cDetails.remedyState === 'ongoing' ? 'ongoing-red' : '')}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${fmtSubLabel('補件', c.cDetails.remedyState === 'active' ? c.cDetails.remedyDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : (c.cDetails.discussState === 'ongoing' ? 'ongoing-green' : '')}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
                   <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 3;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
                 </div>
               </div>
@@ -6877,6 +6879,8 @@
       if (!c || !c.cDetails) return baseClass;
       if (c.cDetails.submitState === 'active') {
         baseClass += ' active c-submit';
+      } else if (c.cDetails.submitState === 'ongoing') {
+        baseClass += ' ongoing-magenta';
       }
       
       // 若已送件處理，回傳預設樣式
@@ -6942,6 +6946,8 @@
       if (!c || !c.cDetails) return baseClass;
       if (c.cDetails.submitState === 'active') {
         baseClass += ' active c-submit';
+      } else if (c.cDetails.submitState === 'ongoing') {
+        baseClass += ' ongoing-magenta';
       }
       
       // 若已送件處理，回傳預設樣式
