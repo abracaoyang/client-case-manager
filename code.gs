@@ -337,3 +337,31 @@ function clearCachedData() {
     // 忽略潛在的系統層清除異常
   }
 }
+
+// 方案二：支援直接在 iPad 渲染管理系統網頁介面 (ADHD UX & PWA 友善)
+function doGet(e) {
+  // 如果請求帶有 action=getData 參數，則走 API 回傳 JSON 資料，維持原本的 API 調用相容性
+  if (e.parameter.action === 'getData' || e.parameter.action === 'update' || e.parameter.action === 'delete') {
+    // 呼叫原本的 API 入口處理
+    return handleLegacyApiRequest(e);
+  }
+
+  // 否則，直接渲染 index.html
+  return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle('客戶案件管理系統')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+}
+
+// 相容處理舊 API 的進入點
+function handleLegacyApiRequest(e) {
+  // 由於舊的進入點是靠部署後的 doPost/doGet 來執行，我們保留對應處理
+  // 這裡回傳與原本 code.gs 相同的 API 結果即可
+  if (e.parameter.action === 'getData') {
+    const data = getCompleteData();
+    return ContentService.createTextOutput(JSON.stringify({ status: 'success', data: data }))
+        .setMimeType(ContentService.MimeType.JSON);
+  }
+  return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: 'Invalid Action' }))
+      .setMimeType(ContentService.MimeType.JSON);
+}
