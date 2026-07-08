@@ -5979,6 +5979,13 @@
           }
         } else {
           c.cDetails[field] = value;
+          
+          // 防呆：如果清除次標籤的日期，自動將其狀態還原為 'dim'
+          const subTagFields = ['planDate', 'signDate', 'remedyDate', 'submitDate', 'practiceDate', 'discussDate'];
+          if (subTagFields.includes(field) && value === '') {
+            const stateKey = field.replace('Date', 'State');
+            c.cDetails[stateKey] = 'dim';
+          }
         }
         if (field === 'meetDate') {
           c.cDetails.meetState = value ? 'confirmed' : '';
@@ -6361,8 +6368,8 @@
                     <button class="status-badge-btn ${isPlanDone ? 'active agree' : (isPlanOngoing ? 'ongoing-purple' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'planState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'planState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isPlanDone ? '✓ 已完成' : (isPlanOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPlanDone ? `✓ 已完成 (${formatShortDate(cc.planDate)})` : (isPlanOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.planDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-planState" value="${cc.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'c')" placeholder="預估文件準備完成日" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -6375,8 +6382,8 @@
                     <button class="status-badge-btn ${isSignDone ? 'active agree' : (isSignOngoing ? 'ongoing-orange' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'signState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'signState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isSignDone ? '✓ 已完成' : (isSignOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isSignDone ? `✓ 已完成 (${formatShortDate(cc.signDate)})` : (isSignOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.signDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-signState" value="${cc.signDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'signDate', 'c')" placeholder="簽約日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -6388,8 +6395,8 @@
                     <button class="status-badge-btn ${isPracticeDone ? 'active agree' : (isPracticeOngoing ? 'ongoing-blue' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'practiceState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'practiceState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isPracticeDone ? '✓ 已完成' : (isPracticeOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isPracticeDone ? `✓ 已完成 (${formatShortDate(cc.practiceDate)})` : (isPracticeOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.practiceDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-practiceState" value="${cc.practiceDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'practiceDate', 'c')" placeholder="親簽或行動投保日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -6401,8 +6408,8 @@
                     <button class="status-badge-btn ${isRemedyDone ? 'active agree' : (isRemedyOngoing ? 'ongoing-red' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'remedyState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'remedyState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isRemedyDone ? '✓ 已完成' : (isRemedyOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isRemedyDone ? `✓ 已完成 (${formatShortDate(cc.remedyDate)})` : (isRemedyOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.remedyDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-remedyState" value="${cc.remedyDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'remedyDate', 'c')" placeholder="補件日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -6414,8 +6421,8 @@
                     <button class="status-badge-btn ${isSubmitDone ? 'active agree' : (isSubmitOngoing ? 'ongoing-magenta' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'submitState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'submitState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isSubmitDone ? '✓ 已完成' : (isSubmitOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isSubmitDone ? `✓ 已完成 (${formatShortDate(cc.submitDate)})` : (isSubmitOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.submitDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-submitState" value="${cc.submitDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'submitDate', 'c')" placeholder="送件日期設定" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -6427,8 +6434,8 @@
                     <button class="status-badge-btn ${isDiscussDone ? 'active agree' : (isDiscussOngoing ? 'ongoing-green' : '')}" 
                             onclick="handleCBtnClick('${c.id}', 'discussState')" 
                             ondblclick="handleCBtnDblClick('${c.id}', 'discussState')"
-                            style="font-size:0.64rem; padding:1px 4px; border-radius:4px; height:18px; user-select:none;">
-                      ${isDiscussDone ? '✓ 已完成' : (isDiscussOngoing ? '⚡ 進行中' : '標記進行中')}
+                            style="font-size:0.62rem; padding:1px 6px; border-radius:4px; height:18px; width:135px; justify-content:center; user-select:none; white-space:nowrap;">
+                      ${isDiscussDone ? `✓ 已完成 (${formatShortDate(cc.discussDate)})` : (isDiscussOngoing ? `⚡ 進行中 (預計: ${formatShortDate(cc.discussDate) || '未排'})` : '標記進行中')}
                     </button>
                   </div>
                   <input type="text" readonly id="date-input-${c.id}-discussState" value="${cc.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 'c')" placeholder="第一次保費扣款日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
@@ -7616,20 +7623,22 @@
 
     // C 抽屜按鈕單擊事件：標記為「進行中」並自動開啟日曆
     function handleCBtnClick(caseId, stateKey) {
-      let changedToOngoing = false;
+      let isOngoingOrTargetChanged = false;
       updateCase(caseId, c => {
         if (!c.cDetails) c.cDetails = {};
         const cur = c.cDetails[stateKey] || 'dim';
         
-        // 只有在未開始狀態下，單擊才轉換為「進行中」
         if (cur === 'dim') {
           c.cDetails[stateKey] = 'ongoing';
-          changedToOngoing = true;
+          isOngoingOrTargetChanged = true;
+        } else if (cur === 'ongoing') {
+          // 本來就是 ongoing，單擊只負責叫出日曆修改預計日期，狀態維持 ongoing
+          isOngoingOrTargetChanged = true;
         }
       });
 
-      // 如果成功轉為進行中，等待全域 renderCases 完成後再渲染 Drawer
-      if (changedToOngoing) {
+      // 只要觸發了進行中或要調整預計日期，等待全域 renderCases 完成後再彈出日曆
+      if (isOngoingOrTargetChanged) {
         setTimeout(() => {
           const c = cases.find(item => item.id === caseId);
           const drawerContent = document.getElementById(`drawer-content-${caseId}`);
@@ -7656,16 +7665,13 @@
         const dateKey = stateKey.replace('State', 'Date');
         
         if (cur === 'active') {
-          // 已完成 ➔ 雙擊還原為未開始
+          // 已完成 ➔ 雙擊還原為未開始，清空日期
           c.cDetails[stateKey] = 'dim';
           c.cDetails[dateKey] = '';
         } else {
-          // 未開始或進行中 ➔ 雙擊標記為已完成
+          // 未開始或進行中 ➔ 雙擊標記為已完成，自動更新日期為今日實際完成日
           c.cDetails[stateKey] = 'active';
-          // 若日期尚未填寫，自動填寫當日
-          if (!c.cDetails[dateKey]) {
-            c.cDetails[dateKey] = new Date().toISOString().split('T')[0];
-          }
+          c.cDetails[dateKey] = new Date().toISOString().split('T')[0];
         }
       });
       
