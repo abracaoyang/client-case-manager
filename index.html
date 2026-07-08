@@ -759,6 +759,12 @@
       border-color: #ef4444;
       box-shadow: 0 0 6px rgba(239, 68, 68, 0.2);
     }
+    .sub-tag-btn.active.intent-hold {
+      background: #000000;
+      color: #ffffff;
+      border-color: #ffffff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+    }
     .sub-tag-btn.active.agree {
       background: rgba(16, 185, 129, 0.12);
       color: #34d399;
@@ -4874,6 +4880,9 @@
           if (c.saDetails.intentState === 'intent-pending') {
             replyText = '互動中';
             replyClass = 'active intent-pending';
+          } else if (c.saDetails.intentState === 'intent-hold') {
+            replyText = '擱置中';
+            replyClass = 'active intent-hold';
           } else if (c.saDetails.intentState === 'intent-no') {
             replyText = '無意願';
             replyClass = 'active intent-no';
@@ -7840,13 +7849,16 @@
           }
         });
       } else {
-        // 已亮燈 (互動中 或 無意願)：雙擊防呆才切換下個狀態或還原
+        // 已亮燈 (互動中 或 擱置中 或 無意願)：雙擊防呆才切換下個狀態或還原
         if (event && event.detail >= 2) {
           updateCase(caseId, item => {
             if (!item.saDetails) item.saDetails = {};
             const currentIntent = item.saDetails.intentState || '';
             if (currentIntent === 'intent-pending') {
-              // 互動中 -> 無意願
+              // 互動中 -> 擱置中
+              item.saDetails.intentState = 'intent-hold';
+            } else if (currentIntent === 'intent-hold') {
+              // 擱置中 -> 無意願
               item.saDetails.intentState = 'intent-no';
             } else {
               // 無意願 -> 未回覆 (還原)
