@@ -5046,12 +5046,12 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${cDateText}</div>
                 <div class="node-dot">C</div>
                 <div class="sub-tag-group c-grid" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : (c.cDetails.planState === 'ongoing' ? 'ongoing-purple' : '')}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${fmtSubLabel('文件準備', c.cDetails.planState === 'active' ? c.cDetails.planDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : (c.cDetails.signState === 'ongoing' ? 'ongoing-orange' : '')}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${fmtSubLabel('簽約', c.cDetails.signState === 'active' ? c.cDetails.signDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : (c.cDetails.practiceState === 'ongoing' ? 'ongoing-blue' : '')}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">要保簽署</span>
-                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : (c.cDetails.remedyState === 'ongoing' ? 'ongoing-red' : '')}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${fmtSubLabel('補件', c.cDetails.remedyState === 'active' ? c.cDetails.remedyDate : '')}</span>
-                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : (c.cDetails.discussState === 'ongoing' ? 'ongoing-green' : '')}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${fmtSubLabel('保費首扣', c.cDetails.discussState === 'active' ? c.cDetails.discussDate : '')}</span>
-                  <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 3;" onclick="toggleCSubmitDirect('${c.id}', event)">${fmtSubLabel('送件', c.cDetails.submitState === 'active' ? c.cDetails.submitDate : '')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.planState === 'active' ? 'active c-plan' : (c.cDetails.planState === 'ongoing' ? 'ongoing-purple' : '')}" style="grid-column: 1; grid-row: 1;" onclick="toggleCPlanDirect('${c.id}', event)">${c.cDetails.planState === 'active' ? fmtSubLabel('文件準備', c.cDetails.planDate) : (c.cDetails.planState === 'ongoing' ? `⚡ ${fmtSubLabel('文件準備', c.cDetails.planDate)}` : '文件準備')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.signState === 'active' ? 'active c-sign' : (c.cDetails.signState === 'ongoing' ? 'ongoing-orange' : '')}" style="grid-column: 2; grid-row: 1;" onclick="toggleCSignDirect('${c.id}', event)">${c.cDetails.signState === 'active' ? fmtSubLabel('簽約', c.cDetails.signDate) : (c.cDetails.signState === 'ongoing' ? `⚡ ${fmtSubLabel('簽約', c.cDetails.signDate)}` : '簽約')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.practiceState === 'active' ? 'active c-practice' : (c.cDetails.practiceState === 'ongoing' ? 'ongoing-blue' : '')}" style="grid-column: 1; grid-row: 2;" onclick="toggleCPracticeDirect('${c.id}', event)">${c.cDetails.practiceState === 'active' ? fmtSubLabel('要保簽署', c.cDetails.practiceDate) : (c.cDetails.practiceState === 'ongoing' ? `⚡ ${fmtSubLabel('要保簽署', c.cDetails.practiceDate)}` : '要保簽署')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.remedyState === 'active' ? 'active c-remedy' : (c.cDetails.remedyState === 'ongoing' ? 'ongoing-red' : '')}" style="grid-column: 2; grid-row: 2;" onclick="toggleCRemedyDirect('${c.id}', event)">${c.cDetails.remedyState === 'active' ? fmtSubLabel('補件', c.cDetails.remedyDate) : (c.cDetails.remedyState === 'ongoing' ? `⚡ ${fmtSubLabel('補件', c.cDetails.remedyDate)}` : '補件')}</span>
+                  <span class="sub-tag-btn ${c.cDetails.discussState === 'active' ? 'active c-discuss' : (c.cDetails.discussState === 'ongoing' ? 'ongoing-green' : '')}" style="grid-column: 1; grid-row: 3;" onclick="toggleCDiscussDirect('${c.id}', event)">${c.cDetails.discussState === 'active' ? fmtSubLabel('保費首扣', c.cDetails.discussDate) : (c.cDetails.discussState === 'ongoing' ? `⚡ ${fmtSubLabel('保費首扣', c.cDetails.discussDate)}` : '保費首扣')}</span>
+                  <span class="${getSubmitBtnClass(c)}" style="grid-column: 2; grid-row: 3;" onclick="toggleCSubmitDirect('${c.id}', event)">${c.cDetails.submitState === 'active' ? fmtSubLabel('送件', c.cDetails.submitDate) : (c.cDetails.submitState === 'ongoing' ? `⚡ ${fmtSubLabel('送件', c.cDetails.submitDate)}` : '送件')}</span>
                 </div>
               </div>
             </div>
@@ -5982,11 +5982,18 @@
         } else {
           c.cDetails[field] = value;
           
-          // 防呆：如果清除次標籤的日期，自動將其狀態還原為 'dim'
           const subTagFields = ['planDate', 'signDate', 'remedyDate', 'submitDate', 'practiceDate', 'discussDate'];
-          if (subTagFields.includes(field) && value === '') {
+          if (subTagFields.includes(field)) {
             const stateKey = field.replace('Date', 'State');
-            c.cDetails[stateKey] = 'dim';
+            if (value === '') {
+              // 防呆：如果清除次標籤的日期，自動將其狀態還原為 'dim'
+              c.cDetails[stateKey] = 'dim';
+            } else {
+              // 防呆：如果填入日期且原本非 'active'，自動強制為 'ongoing' 進行中
+              if (c.cDetails[stateKey] !== 'active') {
+                c.cDetails[stateKey] = 'ongoing';
+              }
+            }
           }
         }
         if (field === 'meetDate') {
@@ -7633,38 +7640,29 @@
       }
       
       cBtnClickTimeout = setTimeout(() => {
-        let isOngoingOrTargetChanged = false;
-        updateCase(caseId, c => {
-          if (!c.cDetails) c.cDetails = {};
-          const cur = c.cDetails[stateKey] || 'dim';
-          
-          if (cur === 'dim') {
-            c.cDetails[stateKey] = 'ongoing';
-            isOngoingOrTargetChanged = true;
-          } else if (cur === 'ongoing') {
-            // 本來就是 ongoing，單擊只負責叫出日曆修改預計日期，狀態維持 ongoing
-            isOngoingOrTargetChanged = true;
-          }
-        });
-
-        // 只要觸發了進行中或要調整預計日期，等待全域 renderCases 完成後再彈出日曆
-        if (isOngoingOrTargetChanged) {
-          setTimeout(() => {
-            const c = cases.find(item => item.id === caseId);
-            const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-            if (drawerContent) {
-              renderCDrawer(c, drawerContent);
-              
-              // 緊接著開啟日曆選擇器
-              setTimeout(() => {
-                const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-                if (dateInput) {
-                  dateInput.click();
-                }
-              }, 100);
-            }
-          }, 100);
+        const c = cases.find(item => item.id === caseId);
+        if (!c) return;
+        if (!c.cDetails) c.cDetails = {};
+        const cur = c.cDetails[stateKey] || 'dim';
+        
+        if (cur === 'dim') {
+          c.cDetails[stateKey] = 'ongoing';
         }
+        
+        // 局部刷新抽屜 UI，讓呼吸燈立刻亮起，不發送全域重繪與 API
+        const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+        if (drawerContent) {
+          renderCDrawer(c, drawerContent);
+        }
+        
+        // 緊接著開啟日曆選擇器
+        setTimeout(() => {
+          const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
+          if (dateInput) {
+            dateInput.click();
+          }
+        }, 80);
+
         cBtnClickTimeout = null;
       }, 250);
     }
