@@ -78,18 +78,8 @@ function getOrCreateTodosSheet() {
   return sheet;
 }
 
-// 處理 GET 請求：讀取資料並以 JSON 回傳 (iPad 渲染 & API 相容)
+// 處理 GET 請求：讀取資料並以 JSON 回傳
 function doGet(e) {
-  // 檢查是否為 iPad 專用網頁請求（即沒有任何 API 參數）
-  const hasParams = e && e.parameter && (Object.keys(e.parameter).length > 0);
-  if (!hasParams) {
-    // 沒有參數，代表直接用瀏覽器開啟 Web App，此時渲染網頁介面 (ADHD UX)
-    return HtmlService.createHtmlOutputFromFile('index')
-        .setTitle('客戶案件管理系統')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
-  }
-
   try {
     // === 待辦事項讀取 ===
     if (e && e.parameter && e.parameter.type === 'todos') {
