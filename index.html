@@ -7868,70 +7868,80 @@
       }
     }
 
+    let agreeClickTimer = null;
+
     function toggleSAAgreeDirect(caseId, event) {
       if (event) event.stopPropagation();
-      const c = cases.find(item => item.id === caseId);
-      if (!c) return;
-
-      const isAgreeActive = (c.saDetails && c.saDetails.agreeState === 'active');
-      const isAgreeHold = (c.saDetails && c.saDetails.intentState === 'intent-hold');
-      const isMeetPending = (c.oaDetails && c.oaDetails.meetState === 'pending') || (c.saDetails && c.saDetails.intentState === 'intent-pending');
-      let openSADrawer = false;
-
-      if (!isAgreeActive && !isAgreeHold && !isMeetPending) {
-        // 未亮燈 (未約定) -> 亮燈第一個狀態 (喬時間)：單擊即可推進，並自動拉出抽屜
+      
+      // 如果已經有定時器，代表這是雙擊事件！
+      if (agreeClickTimer) {
+        clearTimeout(agreeClickTimer);
+        agreeClickTimer = null;
+        
         updateCase(caseId, item => {
           if (!item.saDetails) item.saDetails = {};
           if (!item.oaDetails) item.oaDetails = {};
-          item.saDetails.agreeState = 'dim';
-          item.saDetails.intentState = 'intent-pending';
-          item.oaDetails.meetState = 'pending';
-          item.saDetails.agreeDate = '';
+          
+          const currentMeetPending = item.oaDetails.meetState === 'pending' || item.saDetails.intentState === 'intent-pending';
+          const currentAgreeHold = item.saDetails.intentState === 'intent-hold';
+          const currentAgreeActive = item.saDetails.agreeState === 'active';
+
+          if (currentMeetPending && !currentAgreeHold && !currentAgreeActive) {
+            // 1. 喬時間 -> 擱置中
+            item.saDetails.agreeState = 'dim';
+            item.saDetails.intentState = 'intent-hold';
+            item.saDetails.agreeDate = '';
+            item.oaDetails.meetState = ''; // 移出喬時間狀態
+            item.oaDetails.meetDate = '';
+          } else if (currentAgreeHold) {
+            // 2. 擱置中 -> 已約定
+            item.saDetails.agreeState = 'active';
+            item.saDetails.intentState = 'intent-yes';
+            item.saDetails.agreeDate = new Date().toISOString().split('T')[0];
+            item.oaDetails.meetState = 'confirmed';
+            if (!item.oaDetails.meetDate) {
+              item.oaDetails.meetDate = new Date().toISOString().split('T')[0];
+            }
+          } else {
+            // 3. 已約定 -> 未約定 (還原)
+            item.saDetails.agreeState = 'dim';
+            item.saDetails.intentState = 'dim';
+            item.saDetails.agreeDate = '';
+            item.oaDetails.meetState = '';
+            item.oaDetails.meetDate = '';
+          }
         });
-        openSADrawer = true;
-      } else {
-        // 已亮燈 (喬時間 或 擱置中 或 已約定)：雙擊防呆才切換下個狀態或還原
-        if (event && event.detail >= 2) {
+        return;
+      }
+
+      // 否則，這是一次單擊，我們等待 250 毫秒看看是否有雙擊
+      agreeClickTimer = setTimeout(() => {
+        agreeClickTimer = null;
+        
+        const c = cases.find(item => item.id === caseId);
+        if (!c) return;
+        
+        const isAgreeActive = (c.saDetails && c.saDetails.agreeState === 'active');
+        const isAgreeHold = (c.saDetails && c.saDetails.intentState === 'intent-hold');
+        const isMeetPending = (c.oaDetails && c.oaDetails.meetState === 'pending') || (c.saDetails && c.saDetails.intentState === 'intent-pending');
+
+        if (!isAgreeActive && !isAgreeHold && !isMeetPending) {
+          // 未約定 -> 喬時間 (單擊推進)
           updateCase(caseId, item => {
             if (!item.saDetails) item.saDetails = {};
             if (!item.oaDetails) item.oaDetails = {};
-            
-            const currentMeetPending = item.oaDetails.meetState === 'pending' || item.saDetails.intentState === 'intent-pending';
-            const currentAgreeHold = item.saDetails.intentState === 'intent-hold';
-            const currentAgreeActive = item.saDetails.agreeState === 'active';
-
-            if (currentMeetPending && !currentAgreeHold && !currentAgreeActive) {
-              // 1. 喬時間 -> 擱置中
-              item.saDetails.agreeState = 'dim';
-              item.saDetails.intentState = 'intent-hold';
-              item.saDetails.agreeDate = '';
-              item.oaDetails.meetState = ''; // 移出喬時間狀態
-              item.oaDetails.meetDate = '';
-            } else if (currentAgreeHold) {
-              // 2. 擱置中 -> 已約定
-              item.saDetails.agreeState = 'active';
-              item.saDetails.intentState = 'intent-yes';
-              item.saDetails.agreeDate = new Date().toISOString().split('T')[0];
-              item.oaDetails.meetState = 'confirmed';
-              if (!item.oaDetails.meetDate) {
-                item.oaDetails.meetDate = new Date().toISOString().split('T')[0];
-              }
-            } else {
-              // 3. 已約定 -> 未約定 (還原)
-              item.saDetails.agreeState = 'dim';
-              item.saDetails.intentState = 'dim';
-              item.saDetails.agreeDate = '';
-              item.oaDetails.meetState = '';
-              item.oaDetails.meetDate = '';
-            }
+            item.saDetails.agreeState = 'dim';
+            item.saDetails.intentState = 'intent-pending';
+            item.oaDetails.meetState = 'pending';
+            item.saDetails.agreeDate = '';
           });
         }
-      }
-
-      if (openSADrawer) {
+        
+        // 彈出抽屜
         openDrawer(caseId, 'SA');
-      }
+      }, 250);
     }
+
 
     // === 單擊與雙擊防呆調度器 ===
     let clickTimer = null;
