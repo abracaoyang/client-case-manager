@@ -7874,8 +7874,8 @@
       if (!c) return;
 
       const isAgreeActive = (c.saDetails && c.saDetails.agreeState === 'active');
-      const isAgreeHold = (c.saDetails && c.saDetails.agreeState === 'hold');
-      const isMeetPending = (c.oaDetails && c.oaDetails.meetState === 'pending');
+      const isAgreeHold = (c.saDetails && c.saDetails.intentState === 'intent-hold');
+      const isMeetPending = (c.oaDetails && c.oaDetails.meetState === 'pending') || (c.saDetails && c.saDetails.intentState === 'intent-pending');
       let openSADrawer = false;
 
       if (!isAgreeActive && !isAgreeHold && !isMeetPending) {
@@ -7884,6 +7884,7 @@
           if (!item.saDetails) item.saDetails = {};
           if (!item.oaDetails) item.oaDetails = {};
           item.saDetails.agreeState = 'dim';
+          item.saDetails.intentState = 'intent-pending';
           item.oaDetails.meetState = 'pending';
           item.saDetails.agreeDate = '';
         });
@@ -7895,19 +7896,21 @@
             if (!item.saDetails) item.saDetails = {};
             if (!item.oaDetails) item.oaDetails = {};
             
-            const currentMeetPending = item.oaDetails.meetState === 'pending';
-            const currentAgreeHold = item.saDetails.agreeState === 'hold';
+            const currentMeetPending = item.oaDetails.meetState === 'pending' || item.saDetails.intentState === 'intent-pending';
+            const currentAgreeHold = item.saDetails.intentState === 'intent-hold';
             const currentAgreeActive = item.saDetails.agreeState === 'active';
 
             if (currentMeetPending && !currentAgreeHold && !currentAgreeActive) {
               // 1. 喬時間 -> 擱置中
-              item.saDetails.agreeState = 'hold';
+              item.saDetails.agreeState = 'dim';
+              item.saDetails.intentState = 'intent-hold';
               item.saDetails.agreeDate = '';
               item.oaDetails.meetState = ''; // 移出喬時間狀態
               item.oaDetails.meetDate = '';
             } else if (currentAgreeHold) {
               // 2. 擱置中 -> 已約定
               item.saDetails.agreeState = 'active';
+              item.saDetails.intentState = 'intent-yes';
               item.saDetails.agreeDate = new Date().toISOString().split('T')[0];
               item.oaDetails.meetState = 'confirmed';
               if (!item.oaDetails.meetDate) {
@@ -7916,6 +7919,7 @@
             } else {
               // 3. 已約定 -> 未約定 (還原)
               item.saDetails.agreeState = 'dim';
+              item.saDetails.intentState = 'dim';
               item.saDetails.agreeDate = '';
               item.oaDetails.meetState = '';
               item.oaDetails.meetDate = '';
