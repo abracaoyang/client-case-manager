@@ -1856,6 +1856,50 @@
     justify-content: center;
   }
   #add-todo-modal.active { display: flex; }
+
+  /* 待辦計時 Modal */
+  #todo-timer-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(5px);
+    align-items: center;
+    justify-content: center;
+  }
+  #todo-timer-modal.active { display: flex; }
+  #todo-timer-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 1.5rem;
+    width: 680px;
+    max-width: 95vw;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: modal-fade 0.25s ease-out;
+  }
+  
+  /* 碼表字體與發光 */
+  .timer-display {
+    font-family: monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--bg-dark);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+    transition: all 0.3s;
+  }
+  .timer-display.running {
+    color: #10b981;
+    border-color: #10b981;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  }
+
   #add-todo-box {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -2392,6 +2436,60 @@
       <div class="todo-form-actions" style="margin-top: 10px;">
         <button class="btn" onclick="closeTodoModal()">取消</button>
         <button class="btn btn-primary" onclick="saveTodo()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待辦事項計時控制面板 (雙擊待辦列觸發) -->
+  <div id="todo-timer-modal">
+    <div id="todo-timer-box">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
+        <div>
+          <h3 id="timer-todo-title" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--accent);">🎯 待辦事項計時</h3>
+          <p id="timer-todo-meta" style="margin: 4px 0 0 0; font-size: 0.72rem; color: var(--text-secondary);"></p>
+        </div>
+        <span style="cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);" onclick="closeTodoTimerModal()">✕</span>
+      </div>
+
+      <!-- 總花費時間展示區 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; margin-bottom: 15px;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">⏱️ 累計總時間：</span>
+        <span id="timer-total-accumulated" style="font-size: 0.95rem; font-weight: 700; color: var(--color-sa); font-family: monospace;">0 秒</span>
+      </div>
+
+      <!-- 左右雙欄版面佈局 -->
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px;">
+        
+        <!-- 左欄：計時器與控制 -->
+        <div style="display: flex; flex-direction: column;">
+          <!-- 當次計時顯示 -->
+          <div id="timer-clock-display" class="timer-display">00:00:00</div>
+          
+          <!-- 計時按鈕群組 -->
+          <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <button class="btn" id="btn-timer-start" onclick="startTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981;">開始計時</button>
+            <button class="btn" id="btn-timer-pause" onclick="pauseTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;" disabled>暫停</button>
+            <button class="btn" id="btn-timer-stop" onclick="stopTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; color: #3b82f6;" disabled>結束當次</button>
+          </div>
+
+          <!-- 當次工作備忘 -->
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">當次工作備忘 (結束時一併儲存)</label>
+            <textarea id="timer-current-note" placeholder="例如：今日完成草案，剩下精算..." style="min-height: 50px; font-size: 0.78rem; resize: none; padding: 6px; box-sizing: border-box;"></textarea>
+          </div>
+
+          <!-- 結案按鈕 -->
+          <button class="btn" id="btn-timer-complete" onclick="timerMarkAsDone()" style="width: 100%; height: 36px; font-weight: 700; background: var(--color-c); color: #000; border: none; border-radius: 8px; margin-top: auto;">✓ 完成此任務並結案</button>
+        </div>
+
+        <!-- 右欄：歷次歷史紀錄 (可滾動) -->
+        <div style="display: flex; flex-direction: column; border-left: 1px solid var(--border-color); padding-left: 20px; max-height: 290px; min-height: 290px; overflow: hidden;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">⏳ 歷次工作紀錄</div>
+          <div id="timer-history-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+            <!-- 歷史紀錄動態填充 -->
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -8158,6 +8256,12 @@
         priorityHtml = `<span class="priority-badge ${pMeta.class}" title="${pMeta.title}">${pMeta.label}</span>`;
       }
 
+      // 累計時間小標籤
+      let timeSpentHtml = '';
+      if (t.totalTimeSpent && parseInt(t.totalTimeSpent, 10) > 0) {
+        timeSpentHtml = `<span class="todo-meta-tag" style="background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); font-family: monospace;">⏱️ ${formatSecondsToShortTime(t.totalTimeSpent)}</span>`;
+      }
+
       const stageLabel = t.stage ? `<span class="todo-meta-tag stage-tag">${t.stage}</span>` : '';
       const caseTag    = caseName ? `<span class="todo-meta-tag case-tag">${caseName}</span>` : '';
       const subTagHtml = subTagLabel ? `<span class="todo-meta-tag subtag-tag">${subTagLabel}</span>` : '';
@@ -8165,12 +8269,12 @@
       const checkIcon  = t.done ? '✓' : '';
       const doneClass  = t.done ? ' done' : '';
 
-      return `<div class="todo-card${doneClass}" id="todo-card-${t.id}" ondblclick="openTodoModal('${t.id}')" style="cursor:pointer; display:flex; align-items:center; justify-content:flex-start; text-align:left;" title="雙擊編輯此待辦">
+      return `<div class="todo-card${doneClass}" id="todo-card-${t.id}" ondblclick="openTodoTimerModal('${t.id}')" style="cursor:pointer; display:flex; align-items:center; justify-content:flex-start; text-align:left;" title="雙擊開啟計時面板與歷史紀錄">
         <div class="todo-check" ondblclick="event.stopPropagation(); toggleTodoDone('${t.id}')" title="雙擊切換完成狀態">${checkIcon}</div>
         <div class="todo-info" style="display:flex; align-items:center; justify-content:flex-start; text-align:left; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden;">
           <div class="todo-title" style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; margin:0; flex-shrink:0; text-align:left;">${t.title}</div>
           ${priorityHtml ? `<div style="flex-shrink:0; display:flex; justify-content:flex-start; align-items:center;">${priorityHtml}</div>` : ''}
-          <div class="todo-meta" style="margin:0; display:flex; align-items:center; justify-content:flex-start; gap:6px; flex-wrap:nowrap; white-space:nowrap; flex-shrink:0;">${caseTag}${stageLabel}${subTagHtml}${dueHtml}</div>
+          <div class="todo-meta" style="margin:0; display:flex; align-items:center; justify-content:flex-start; gap:6px; flex-wrap:nowrap; white-space:nowrap; flex-shrink:0;">${caseTag}${stageLabel}${subTagHtml}${timeSpentHtml}${dueHtml}</div>
           ${t.note ? `<span style="font-size:0.72rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; margin-left:4px; flex-shrink:1; text-align:left;" title="${t.note}">(${t.note})</span>` : ''}
         </div>
         <div class="todo-actions" style="margin-left:auto; flex-shrink:0; display:flex; align-items:center; gap:6px;">
@@ -8418,6 +8522,270 @@
         badge.style.display = 'none';
       }
     }
+
+    // ==========================================
+    // === 待辦事項計時器模組 (Time Tracker) ===
+    // ==========================================
+    let activeTodoTimer = {
+      todoId: null,
+      seconds: 0,
+      intervalId: null,
+      isPaused: false,
+      startTime: null
+    };
+
+    // 格式化秒數為碼表格式 00:00:00
+    function formatSecondsToClock(totalSeconds) {
+      const hrs = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      const secs = totalSeconds % 60;
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    // 格式化秒數為累計易讀格式 (如：1小時20分10秒)
+    function formatSecondsToShortTime(totalSeconds) {
+      const hrs = Math.floor(totalSeconds / 3600);
+      const mins = Math.floor((totalSeconds % 3600) / 60);
+      const secs = totalSeconds % 60;
+      let result = '';
+      if (hrs > 0) result += `${hrs} 小時 `;
+      if (mins > 0 || hrs > 0) result += `${mins} 分 `;
+      result += `${secs} 秒`;
+      return result;
+    }
+
+    // 開啟待辦計時 Modal
+    function openTodoTimerModal(todoId) {
+      // 防呆：如果原本就有其他任務正在計時，警告使用者
+      if (activeTodoTimer.todoId && activeTodoTimer.todoId !== todoId && activeTodoTimer.intervalId) {
+        alert('目前已有另一個待辦事項正在計時中，請先結束該任務計時！');
+        return;
+      }
+
+      const t = todos.find(x => x.id === todoId);
+      if (!t) return;
+
+      activeTodoTimer.todoId = todoId;
+      
+      // 更新標題與關聯資訊
+      document.getElementById('timer-todo-title').textContent = `🎯 ${t.title}`;
+      let caseName = '無關聯客戶';
+      if (t.caseId && window.cases) {
+        const c = window.cases.find(x => x.id === t.caseId);
+        if (c) caseName = `👤 客戶: ${c.clientName}`;
+      }
+      const stageLabel = t.stage ? ` ｜ 階段: ${t.stage}` : '';
+      document.getElementById('timer-todo-meta').textContent = `${caseName}${stageLabel}`;
+
+      // 初始化當次計時顯示
+      if (!activeTodoTimer.intervalId) {
+        activeTodoTimer.seconds = 0;
+        activeTodoTimer.isPaused = false;
+        activeTodoTimer.startTime = null;
+        document.getElementById('timer-clock-display').textContent = '00:00:00';
+        document.getElementById('timer-clock-display').className = 'timer-display';
+        
+        // 按鈕初態
+        document.getElementById('btn-timer-start').disabled = false;
+        document.getElementById('btn-timer-pause').disabled = true;
+        document.getElementById('btn-timer-stop').disabled = true;
+      } else {
+        // 若此任務本來就在計時中，維持畫面按鈕與發光狀態
+        document.getElementById('timer-clock-display').className = 'timer-display running';
+        document.getElementById('btn-timer-start').disabled = true;
+        document.getElementById('btn-timer-pause').disabled = false;
+        document.getElementById('btn-timer-stop').disabled = false;
+      }
+
+      document.getElementById('timer-current-note').value = '';
+
+      // 渲染累計時間與歷史紀錄
+      renderTimerHistory(t);
+
+      // 開啟 Modal
+      document.getElementById('todo-timer-modal').classList.add('active');
+    }
+
+    // 關閉待辦計時 Modal
+    function closeTodoTimerModal() {
+      // 僅關閉畫面，不停止背景計時（讓計時可以在背景繼續走）
+      document.getElementById('todo-timer-modal').classList.remove('active');
+    }
+
+    // 開始計時
+    function startTodoTimer() {
+      if (activeTodoTimer.intervalId && !activeTodoTimer.isPaused) return;
+
+      activeTodoTimer.isPaused = false;
+      activeTodoTimer.startTime = activeTodoTimer.startTime || new Date();
+      
+      const displayEl = document.getElementById('timer-clock-display');
+      displayEl.className = 'timer-display running';
+
+      document.getElementById('btn-timer-start').disabled = true;
+      document.getElementById('btn-timer-pause').disabled = false;
+      document.getElementById('btn-timer-stop').disabled = false;
+
+      if (!activeTodoTimer.intervalId) {
+        activeTodoTimer.intervalId = setInterval(() => {
+          if (!activeTodoTimer.isPaused) {
+            activeTodoTimer.seconds++;
+            displayEl.textContent = formatSecondsToClock(activeTodoTimer.seconds);
+          }
+        }, 1000);
+      }
+    }
+
+    // 暫停計時
+    function pauseTodoTimer() {
+      if (!activeTodoTimer.intervalId) return;
+      
+      activeTodoTimer.isPaused = !activeTodoTimer.isPaused;
+      const pauseBtn = document.getElementById('btn-timer-pause');
+      const displayEl = document.getElementById('timer-clock-display');
+      
+      if (activeTodoTimer.isPaused) {
+        pauseBtn.textContent = '繼續計時';
+        pauseBtn.style.color = '#10b981';
+        pauseBtn.style.borderColor = '#10b981';
+        pauseBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+        displayEl.className = 'timer-display'; // 取消綠光
+      } else {
+        pauseBtn.textContent = '暫停';
+        pauseBtn.style.color = '#f59e0b';
+        pauseBtn.style.borderColor = '#f59e0b';
+        pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
+        displayEl.className = 'timer-display running'; // 恢復綠光
+      }
+    }
+
+    // 結束當次計時並儲存
+    function stopTodoTimer() {
+      if (!activeTodoTimer.intervalId) return;
+
+      // 停止定時器
+      clearInterval(activeTodoTimer.intervalId);
+      
+      const todoId = activeTodoTimer.todoId;
+      const spentSeconds = activeTodoTimer.seconds;
+      const noteText = document.getElementById('timer-current-note').value.trim();
+
+      // 重設計時器狀態
+      activeTodoTimer = {
+        todoId: null,
+        seconds: 0,
+        intervalId: null,
+        isPaused: false,
+        startTime: null
+      };
+
+      // 儲存至資料庫
+      const t = todos.find(x => x.id === todoId);
+      if (t) {
+        // 解析舊紀錄
+        let logList = [];
+        if (t.timeLog) {
+          try {
+            logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+            if (!Array.isArray(logList)) logList = [];
+          } catch (e) {
+            logList = [];
+          }
+        }
+
+        // 新增當次紀錄
+        const now = new Date();
+        const twOffset = 8 * 60 * 60 * 1000;
+        const localTimeStr = new Date(now.getTime() + twOffset).toISOString().slice(0, 19).replace('T', ' ');
+        
+        logList.push({
+          date: localTimeStr,
+          duration: spentSeconds,
+          note: noteText || '無工作備忘'
+        });
+
+        t.timeLog = JSON.stringify(logList);
+        t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) + spentSeconds;
+
+        // 同步並刷新
+        saveTodos();
+        renderTodoPage();
+        
+        // 如果 Modal 還開著，重新渲染其歷史清單
+        if (document.getElementById('todo-timer-modal').classList.contains('active')) {
+          renderTimerHistory(t);
+          
+          // 重設按鈕與顯示
+          document.getElementById('timer-clock-display').textContent = '00:00:00';
+          document.getElementById('timer-clock-display').className = 'timer-display';
+          document.getElementById('btn-timer-start').disabled = false;
+          document.getElementById('btn-timer-pause').disabled = true;
+          document.getElementById('btn-timer-stop').disabled = true;
+          document.getElementById('timer-current-note').value = '';
+        }
+      }
+    }
+
+    // 渲染 Modal 右側的歷史紀錄清單
+    function renderTimerHistory(t) {
+      // 1. 總時間
+      const totalSeconds = parseInt(t.totalTimeSpent, 10) || 0;
+      document.getElementById('timer-total-accumulated').textContent = formatSecondsToShortTime(totalSeconds);
+
+      // 2. 歷史紀錄
+      const historyListEl = document.getElementById('timer-history-list');
+      historyListEl.innerHTML = '';
+
+      let logList = [];
+      if (t.timeLog) {
+        try {
+          logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+          if (!Array.isArray(logList)) logList = [];
+        } catch (e) {
+          logList = [];
+        }
+      }
+
+      if (logList.length === 0) {
+        historyListEl.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding: 40px 0; font-size:0.75rem;">⏱️ 尚無任何計時工作紀錄！<br>點選左方「開始計時」建立您的第一次紀錄。</div>`;
+        return;
+      }
+
+      // 從新到舊排序
+      logList.slice().reverse().forEach(log => {
+        const item = document.createElement('div');
+        item.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; font-size: 0.72rem; text-align: left; display:flex; flex-direction:column; gap:4px;';
+        
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text-primary);">
+            <span style="color:var(--color-sa);">${formatSecondsToShortTime(log.duration)}</span>
+            <span style="font-size:0.65rem; color:var(--text-secondary); font-family:monospace;">${log.date}</span>
+          </div>
+          <div style="color:#fff; font-size: 0.74rem;">${log.note}</div>
+        `;
+        historyListEl.appendChild(item);
+      });
+    }
+
+    // 完成待辦任務並結案
+    function timerMarkAsDone() {
+      const todoId = activeTodoTimer.todoId;
+      if (!todoId) return;
+
+      // 如果當前仍在計時中，自動幫使用者結束並儲存
+      if (activeTodoTimer.intervalId) {
+        if (confirm('當前計時器仍在運行中，結案前將會自動結束並儲存當次計時，是否確定？')) {
+          stopTodoTimer();
+        } else {
+          return;
+        }
+      }
+
+      // 標記任務完成
+      toggleTodoDone(todoId);
+      closeTodoTimerModal();
+    }
+
 
     // --- 待辦通知雙 Tab 看板 ---
     let currentTodoNotifyTab = 'priority';
