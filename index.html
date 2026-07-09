@@ -3312,7 +3312,7 @@
             sendDate: row["ＳＡ"] || '',
             replyState: row["是否已回覆"] === '已回覆' ? 'active' : 'dim',
             replyDate: row["ＳＡ"] || '',
-            intentState: row["約定狀態"] || 'intent-pending',
+            intentState: row["約定狀態"] || '',
             agreeState: row["已約定"] ? 'active' : 'dim',
             agreeDate: row["已約定"] || '',
             meetTimeSlot: row["約定時段"] || '',
@@ -4895,10 +4895,10 @@
         if (c.saDetails.agreeState === 'active') {
           agreeText = '已約定';
           agreeClass = 'active agree';
-        } else if (c.saDetails.agreeState === 'hold') {
+        } else if (c.saDetails.intentState === 'intent-hold') {
           agreeText = '擱置中';
           agreeClass = 'active agree-hold';
-        } else if (c.oaDetails.meetState === 'pending') {
+        } else if (c.oaDetails.meetState === 'pending' || c.saDetails.intentState === 'intent-pending') {
           agreeText = '喬時間';
           agreeClass = 'active pending';
         } else {
