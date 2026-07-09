@@ -8563,10 +8563,10 @@
       // 2. 開始按鈕啟用
       document.getElementById('btn-timer-start').disabled = false;
       
-      // 3. 暫停按鈕還原為「暫停」與橘色樣式，並禁用
+      // 3. 暫停按鈕還原為「暫停計時」與黃色樣式，並禁用
       const pauseBtn = document.getElementById('btn-timer-pause');
       pauseBtn.disabled = true;
-      pauseBtn.textContent = '暫停';
+      pauseBtn.textContent = '暫停計時';
       pauseBtn.style.color = '#f59e0b';
       pauseBtn.style.borderColor = '#f59e0b';
       pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
@@ -8619,9 +8619,13 @@
       document.getElementById('todo-timer-modal').classList.add('active');
     }
 
-    // 關閉待辦計時 Modal
+    // 關閉待辦計時 Modal (防呆版)
     function closeTodoTimerModal() {
-      // 僅關閉畫面，不停止背景計時（讓計時可以在背景繼續走）
+      // 如果還在計時中（定時器還在跑），禁止關閉面板
+      if (activeTodoTimer.intervalId) {
+        alert('⚠️ 尚未結束當次！請先結束當次計時後再關閉面板。');
+        return;
+      }
       document.getElementById('todo-timer-modal').classList.remove('active');
     }
 
@@ -8659,12 +8663,12 @@
       
       if (activeTodoTimer.isPaused) {
         pauseBtn.textContent = '繼續計時';
-        pauseBtn.style.color = '#10b981';
-        pauseBtn.style.borderColor = '#10b981';
-        pauseBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+        pauseBtn.style.color = '#f59e0b';
+        pauseBtn.style.borderColor = '#f59e0b';
+        pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
         displayEl.className = 'timer-display'; // 取消綠光
       } else {
-        pauseBtn.textContent = '暫停';
+        pauseBtn.textContent = '暫停計時';
         pauseBtn.style.color = '#f59e0b';
         pauseBtn.style.borderColor = '#f59e0b';
         pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
@@ -8756,20 +8760,105 @@
         return;
       }
 
-      // 從新到舊排序
-      logList.slice().reverse().forEach(log => {
+      // 將 index 綁在 HTML 上，方便我們定位操作原本陣列中的第幾個元素
+      const reversedLogs = logList.map((log, index) => ({ log, index })).reverse();
+      
+      reversedLogs.forEach(({ log, index }) => {
         const item = document.createElement('div');
-        item.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; font-size: 0.72rem; text-align: left; display:flex; flex-direction:column; gap:4px;';
+        item.style.cssText = 'background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px; border-radius: 6px; font-size: 0.72rem; text-align: left; display:flex; flex-direction:column; gap:4px; position:relative;';
         
         item.innerHTML = `
-          <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text-primary);">
+          <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--text-primary); padding-right:85px;">
             <span style="color:var(--color-sa);">${formatSecondsToShortTime(log.duration)}</span>
             <span style="font-size:0.65rem; color:var(--text-secondary); font-family:monospace;">${log.date}</span>
           </div>
-          <div style="color:#fff; font-size: 0.74rem;">${log.note}</div>
+          <div style="color:#fff; font-size: 0.74rem; padding-right:85px;">${log.note}</div>
+          <div style="position:absolute; right:8px; top:50%; transform:translateY(-50%); display:flex; gap:6px;">
+            <button onclick="editTimerLog('${t.id}', ${index})" style="background:none; border:none; color:#f59e0b; cursor:pointer; font-size:0.68rem; font-weight:bold; padding: 2px;" title="修改工作時間與備忘">[修改]</button>
+            <button onclick="deleteTimerLog('${t.id}', ${index})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.68rem; font-weight:bold; padding: 2px;" title="刪除此計時紀錄">[刪除]</button>
+          </div>
         `;
         historyListEl.appendChild(item);
       });
+    }
+
+    // 編輯特定一次的計時紀錄 (ADHD UX)
+    function editTimerLog(todoId, logIndex) {
+      const t = todos.find(x => x.id === todoId);
+      if (!t) return;
+
+      let logList = [];
+      try {
+        logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+      } catch (e) {
+        return;
+      }
+
+      const log = logList[logIndex];
+      if (!log) return;
+
+      // 1. 詢問工作備忘
+      const newNote = prompt("請輸入修正後的工作備忘：", log.note);
+      if (newNote === null) return; // 使用者按取消
+
+      // 2. 詢問工作時間（分鐘）
+      const currentMins = Math.round(log.duration / 60);
+      const newMinsStr = prompt("請輸入修正後的工作時間（分鐘）：", currentMins);
+      if (newMinsStr === null) return;
+
+      const newMins = parseInt(newMinsStr, 10);
+      if (isNaN(newMins) || newMins < 0) {
+        alert("請輸入大於或等於 0 的整數分鐘！");
+        return;
+      }
+
+      const newDuration = newMins * 60;
+      
+      // 重新計算總時間：扣除舊的時間，加上新的時間
+      t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) - log.duration + newDuration;
+      if (t.totalTimeSpent < 0) t.totalTimeSpent = 0;
+
+      // 更新紀錄
+      log.note = newNote.trim() || '無工作備忘';
+      log.duration = newDuration;
+
+      t.timeLog = JSON.stringify(logList);
+
+      // 存檔並刷新 UI
+      saveTodos();
+      renderTodoPage();
+      renderTimerHistory(t);
+    }
+
+    // 刪除特定一次的計時紀錄
+    function deleteTimerLog(todoId, logIndex) {
+      const t = todos.find(x => x.id === todoId);
+      if (!t) return;
+
+      let logList = [];
+      try {
+        logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+      } catch (e) {
+        return;
+      }
+
+      const log = logList[logIndex];
+      if (!log) return;
+
+      if (confirm(`確定要刪除此筆計時工作紀錄（花費時間：${formatSecondsToShortTime(log.duration)}）嗎？\n總累計時間將會扣除此數值。`)) {
+        // 從總時間扣除
+        t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) - log.duration;
+        if (t.totalTimeSpent < 0) t.totalTimeSpent = 0;
+
+        // 刪除該筆
+        logList.splice(logIndex, 1);
+        t.timeLog = JSON.stringify(logList);
+
+        // 存檔並刷新 UI
+        saveTodos();
+        renderTodoPage();
+        renderTimerHistory(t);
+      }
     }
 
     // 完成待辦任務並結案
@@ -8966,6 +9055,11 @@
     // --- ESC 關閉所有 Modal ---
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
+        const timerModal = document.getElementById('todo-timer-modal');
+        if (timerModal && timerModal.classList.contains('active')) {
+          closeTodoTimerModal();
+          return;
+        }
         const todoModal = document.getElementById('add-todo-modal');
         if (todoModal && todoModal.classList.contains('active')) {
           closeTodoModal();
