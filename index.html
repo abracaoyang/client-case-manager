@@ -8554,6 +8554,30 @@
       return result;
     }
 
+    // 無條件重設所有計時器按鈕與顯示 UI 到初始狀態
+    function resetTimerButtonsUI() {
+      // 1. 碼錶數字與狀態
+      document.getElementById('timer-clock-display').textContent = '00:00:00';
+      document.getElementById('timer-clock-display').className = 'timer-display';
+      
+      // 2. 開始按鈕啟用
+      document.getElementById('btn-timer-start').disabled = false;
+      
+      // 3. 暫停按鈕還原為「暫停」與橘色樣式，並禁用
+      const pauseBtn = document.getElementById('btn-timer-pause');
+      pauseBtn.disabled = true;
+      pauseBtn.textContent = '暫停';
+      pauseBtn.style.color = '#f59e0b';
+      pauseBtn.style.borderColor = '#f59e0b';
+      pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
+      
+      // 4. 結束按鈕禁用
+      document.getElementById('btn-timer-stop').disabled = true;
+      
+      // 5. 當次備忘清空
+      document.getElementById('timer-current-note').value = '';
+    }
+
     // 開啟待辦計時 Modal
     function openTodoTimerModal(todoId) {
       // 防呆：如果原本就有其他任務正在計時，警告使用者
@@ -8579,16 +8603,7 @@
 
       // 初始化當次計時顯示
       if (!activeTodoTimer.intervalId) {
-        activeTodoTimer.seconds = 0;
-        activeTodoTimer.isPaused = false;
-        activeTodoTimer.startTime = null;
-        document.getElementById('timer-clock-display').textContent = '00:00:00';
-        document.getElementById('timer-clock-display').className = 'timer-display';
-        
-        // 按鈕初態
-        document.getElementById('btn-timer-start').disabled = false;
-        document.getElementById('btn-timer-pause').disabled = true;
-        document.getElementById('btn-timer-stop').disabled = true;
+        resetTimerButtonsUI();
       } else {
         // 若此任務本來就在計時中，維持畫面按鈕與發光狀態
         document.getElementById('timer-clock-display').className = 'timer-display running';
@@ -8596,8 +8611,6 @@
         document.getElementById('btn-timer-pause').disabled = false;
         document.getElementById('btn-timer-stop').disabled = false;
       }
-
-      document.getElementById('timer-current-note').value = '';
 
       // 渲染累計時間與歷史紀錄
       renderTimerHistory(t);
@@ -8715,13 +8728,8 @@
         if (document.getElementById('todo-timer-modal').classList.contains('active')) {
           renderTimerHistory(t);
           
-          // 重設按鈕與顯示
-          document.getElementById('timer-clock-display').textContent = '00:00:00';
-          document.getElementById('timer-clock-display').className = 'timer-display';
-          document.getElementById('btn-timer-start').disabled = false;
-          document.getElementById('btn-timer-pause').disabled = true;
-          document.getElementById('btn-timer-stop').disabled = true;
-          document.getElementById('timer-current-note').value = '';
+          // 重設按鈕與顯示 UI
+          resetTimerButtonsUI();
         }
       }
     }
