@@ -1900,6 +1900,31 @@
     box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
   }
 
+  /* 子 Modal 樣式 (權重高於計時 Modal，z-index: 1200) */
+  #edit-log-modal, #timer-confirm-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+  }
+  #edit-log-modal.active, #timer-confirm-modal.active {
+    display: flex;
+  }
+  .sub-modal-box {
+    background: #1b1b22;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 1.25rem;
+    width: 380px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    animation: modal-fade 0.2s ease-out;
+  }
+
   #add-todo-box {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -2490,6 +2515,47 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- 待辦工作紀錄編輯 Modal (取代瀏覽器 prompt) -->
+  <div id="edit-log-modal">
+    <div class="sub-modal-box">
+      <h3 style="margin: 0 0 12px 0; font-size: 0.95rem; font-weight: 700; color: var(--accent);">✏️ 編輯工作紀錄</h3>
+      <input type="hidden" id="edit-log-todo-id">
+      <input type="hidden" id="edit-log-index">
+      
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 0.72rem; color: var(--text-secondary);">花費時間 (分鐘)</label>
+          <input type="number" id="edit-log-duration" class="form-input" min="0" style="padding: 6px; font-size: 0.8rem; background: var(--bg-dark); color: #fff;">
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 0.72rem; color: var(--text-secondary);">工作備忘</label>
+          <textarea id="edit-log-note" class="form-input" style="padding: 6px; font-size: 0.8rem; min-height: 60px; resize: none; background: var(--bg-dark); color: #fff;"></textarea>
+        </div>
+      </div>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px;">
+        <button class="btn" onclick="closeEditLogModal()" style="font-size: 0.75rem; padding: 4px 12px;">取消</button>
+        <button class="btn btn-primary" onclick="submitEditLogModal()" style="font-size: 0.75rem; padding: 4px 12px;">儲存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 計時紀錄刪除確認 Modal (取代瀏覽器 confirm) -->
+  <div id="timer-confirm-modal">
+    <div class="sub-modal-box" style="border-color: rgba(239, 68, 68, 0.2);">
+      <h3 style="margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 700; color: #ef4444;">⚠️ 刪除工作紀錄</h3>
+      <input type="hidden" id="del-log-todo-id">
+      <input type="hidden" id="del-log-index">
+      
+      <p id="del-log-message" style="margin: 0 0 15px 0; font-size: 0.75rem; color: var(--text-primary); line-height: 1.4;"></p>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn" onclick="closeTimerConfirmModal()" style="font-size: 0.75rem; padding: 4px 12px;">取消</button>
+        <button class="btn" onclick="submitTimerConfirmModal()" style="font-size: 0.75rem; padding: 4px 12px; background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171;">確認刪除</button>
       </div>
     </div>
   </div>
@@ -8782,7 +8848,7 @@
       });
     }
 
-    // 編輯特定一次的計時紀錄 (ADHD UX)
+    // 編輯特定一次的計時紀錄 (系統 UI 風格對話框版)
     function editTimerLog(todoId, logIndex) {
       const t = todos.find(x => x.id === todoId);
       if (!t) return;
@@ -8797,40 +8863,64 @@
       const log = logList[logIndex];
       if (!log) return;
 
-      // 1. 詢問工作備忘
-      const newNote = prompt("請輸入修正後的工作備忘：", log.note);
-      if (newNote === null) return; // 使用者按取消
+      // 填入 Modal 欄位
+      document.getElementById('edit-log-todo-id').value = todoId;
+      document.getElementById('edit-log-index').value = logIndex;
+      document.getElementById('edit-log-duration').value = Math.round(log.duration / 60);
+      document.getElementById('edit-log-note').value = log.note || '';
 
-      // 2. 詢問工作時間（分鐘）
-      const currentMins = Math.round(log.duration / 60);
-      const newMinsStr = prompt("請輸入修正後的工作時間（分鐘）：", currentMins);
-      if (newMinsStr === null) return;
+      // 開啟 Modal
+      document.getElementById('edit-log-modal').classList.add('active');
+    }
 
-      const newMins = parseInt(newMinsStr, 10);
+    function closeEditLogModal() {
+      document.getElementById('edit-log-modal').classList.remove('active');
+    }
+
+    function submitEditLogModal() {
+      const todoId = document.getElementById('edit-log-todo-id').value;
+      const logIndex = parseInt(document.getElementById('edit-log-index').value, 10);
+      const newMins = parseInt(document.getElementById('edit-log-duration').value, 10);
+      const newNote = document.getElementById('edit-log-note').value.trim();
+
       if (isNaN(newMins) || newMins < 0) {
-        alert("請輸入大於或等於 0 的整數分鐘！");
+        alert("請輸入大於或等於 0 的分鐘數！");
         return;
       }
 
+      const t = todos.find(x => x.id === todoId);
+      if (!t) return;
+
+      let logList = [];
+      try {
+        logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+      } catch (e) {
+        return;
+      }
+
+      const log = logList[logIndex];
+      if (!log) return;
+
       const newDuration = newMins * 60;
-      
-      // 重新計算總時間：扣除舊的時間，加上新的時間
+
+      // 重新計算總時間
       t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) - log.duration + newDuration;
       if (t.totalTimeSpent < 0) t.totalTimeSpent = 0;
 
       // 更新紀錄
-      log.note = newNote.trim() || '無工作備忘';
+      log.note = newNote || '無工作備忘';
       log.duration = newDuration;
 
       t.timeLog = JSON.stringify(logList);
 
-      // 存檔並刷新 UI
+      // 存檔與渲染
       saveTodos();
       renderTodoPage();
       renderTimerHistory(t);
+      closeEditLogModal();
     }
 
-    // 刪除特定一次的計時紀錄
+    // 刪除特定一次的計時紀錄 (系統 UI 風格對話框版)
     function deleteTimerLog(todoId, logIndex) {
       const t = todos.find(x => x.id === todoId);
       if (!t) return;
@@ -8845,20 +8935,49 @@
       const log = logList[logIndex];
       if (!log) return;
 
-      if (confirm(`確定要刪除此筆計時工作紀錄（花費時間：${formatSecondsToShortTime(log.duration)}）嗎？\n總累計時間將會扣除此數值。`)) {
-        // 從總時間扣除
-        t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) - log.duration;
-        if (t.totalTimeSpent < 0) t.totalTimeSpent = 0;
+      // 填充 Modal 欄位
+      document.getElementById('del-log-todo-id').value = todoId;
+      document.getElementById('del-log-index').value = logIndex;
+      document.getElementById('del-log-message').textContent = `您確定要刪除這筆計時紀錄嗎？\n該次花費時間為：${formatSecondsToShortTime(log.duration)}。\n刪除後此時間將會自該待辦任務的總時數中扣除。`;
 
-        // 刪除該筆
-        logList.splice(logIndex, 1);
-        t.timeLog = JSON.stringify(logList);
+      // 開啟 Modal
+      document.getElementById('timer-confirm-modal').classList.add('active');
+    }
 
-        // 存檔並刷新 UI
-        saveTodos();
-        renderTodoPage();
-        renderTimerHistory(t);
+    function closeTimerConfirmModal() {
+      document.getElementById('timer-confirm-modal').classList.remove('active');
+    }
+
+    function submitTimerConfirmModal() {
+      const todoId = document.getElementById('del-log-todo-id').value;
+      const logIndex = parseInt(document.getElementById('del-log-index').value, 10);
+
+      const t = todos.find(x => x.id === todoId);
+      if (!t) return;
+
+      let logList = [];
+      try {
+        logList = typeof t.timeLog === 'string' ? JSON.parse(t.timeLog) : t.timeLog;
+      } catch (e) {
+        return;
       }
+
+      const log = logList[logIndex];
+      if (!log) return;
+
+      // 扣除時間
+      t.totalTimeSpent = (parseInt(t.totalTimeSpent, 10) || 0) - log.duration;
+      if (t.totalTimeSpent < 0) t.totalTimeSpent = 0;
+
+      // 刪除紀錄
+      logList.splice(logIndex, 1);
+      t.timeLog = JSON.stringify(logList);
+
+      // 存檔與渲染
+      saveTodos();
+      renderTodoPage();
+      renderTimerHistory(t);
+      closeTimerConfirmModal();
     }
 
     // 完成待辦任務並結案
@@ -8963,11 +9082,19 @@
         const pMeta = getPriorityMeta(uVal, iVal);
         const pBadge = pMeta ? `<span class="priority-badge ${pMeta.class}" style="font-size:0.6rem; padding:1px 4px; border-radius:3px;">${pMeta.label}</span>` : '';
 
-        return `<div ondblclick="toggleTodoDoneInNotify('${t.id}')" style="display:flex; align-items:center; justify-content:flex-start; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); padding:8px 10px; border-radius:8px; margin-bottom:8px; gap:10px; cursor:pointer;" title="雙擊此項即可結案完成">
-          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; pointer-events:none; text-align:left;">
-            <div style="font-weight:bold; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; margin:0; flex-shrink:0;">${t.title}</div>
+        // 累計時間小標籤
+        let timeSpentHtml = '';
+        if (t.totalTimeSpent && parseInt(t.totalTimeSpent, 10) > 0) {
+          timeSpentHtml = `<span style="background: rgba(16, 185, 129, 0.08); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.2); font-family: monospace; font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; display: inline-block;">⏱️ ${formatSecondsToShortTime(t.totalTimeSpent)}</span>`;
+        }
+
+        return `<div ondblclick="openTodoTimerModal('${t.id}')" style="display:flex; align-items:center; justify-content:flex-start; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); padding:8px 10px; border-radius:8px; margin-bottom:8px; gap:10px; cursor:pointer;" title="雙擊開啟計時面板與歷史紀錄">
+          <div class="todo-check" ondblclick="event.stopPropagation(); toggleTodoDoneInNotify('${t.id}')" title="雙擊切換完成狀態" style="margin-right:2px; flex-shrink:0;"></div>
+          <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; text-align:left;">
+            <div style="font-weight:bold; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; margin:0; flex-shrink:0;">${t.title}</div>
             ${pBadge ? `<div style="flex-shrink:0; display:flex;">${pBadge}</div>` : ''}
-            ${(caseName || stageText || subTagText) ? `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; flex-shrink:1;">[${caseName}${stageText}${subTagText}]</span>` : ''}
+            ${timeSpentHtml ? `<div style="flex-shrink:0; display:flex;">${timeSpentHtml}</div>` : ''}
+            ${(caseName || stageText || subTagText) ? `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; flex-shrink:1;">[${caseName}${stageText}${subTagText}]</span>` : ''}
           </div>
           <div style="margin-left:auto; flex-shrink:0; display:flex; align-items:center;">
             ${dueLabel}
@@ -9055,6 +9182,16 @@
     // --- ESC 關閉所有 Modal ---
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
+        const editLogModal = document.getElementById('edit-log-modal');
+        if (editLogModal && editLogModal.classList.contains('active')) {
+          closeEditLogModal();
+          return;
+        }
+        const confirmModal = document.getElementById('timer-confirm-modal');
+        if (confirmModal && confirmModal.classList.contains('active')) {
+          closeTimerConfirmModal();
+          return;
+        }
         const timerModal = document.getElementById('todo-timer-modal');
         if (timerModal && timerModal.classList.contains('active')) {
           closeTodoTimerModal();
