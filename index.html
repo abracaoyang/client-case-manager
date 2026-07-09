@@ -8683,14 +8683,11 @@
       const spentSeconds = activeTodoTimer.seconds;
       const noteText = document.getElementById('timer-current-note').value.trim();
 
-      // 重設計時器狀態
-      activeTodoTimer = {
-        todoId: null,
-        seconds: 0,
-        intervalId: null,
-        isPaused: false,
-        startTime: null
-      };
+      // 重設計時器狀態（但保留當前 todoId，以相容同一個面板內進行第二輪計時）
+      activeTodoTimer.seconds = 0;
+      activeTodoTimer.intervalId = null;
+      activeTodoTimer.isPaused = false;
+      activeTodoTimer.startTime = null;
 
       // 儲存至資料庫
       const t = todos.find(x => x.id === todoId);
