@@ -66,13 +66,13 @@ function getOrCreateSheet() {
 function getOrCreateTodosSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(TODOS_SHEET_NAME);
-  const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important"];
+  const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important", "totalTimeSpent", "timeLog"];
   if (!sheet) {
     sheet = ss.insertSheet(TODOS_SHEET_NAME);
     sheet.appendRow(headers);
     sheet.setFrozenRows(1);
   } else {
-    // 強制用最新表頭覆蓋第一行，自動把欄位擴展至 11 欄，保證 urgent 和 important 存在且順序正確
+    // 強制用最新表頭覆蓋第一行，自動把欄位擴展，保證欄位完整存在且順序正確
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
@@ -178,7 +178,7 @@ function doPost(e) {
     if (action === 'saveTodos') {
       const todosSheet = getOrCreateTodosSheet();
       const todosList = payload.todos || [];
-      const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important"];
+      const headers = ["id", "title", "caseId", "stage", "subTag", "dueDate", "note", "done", "createdAt", "urgent", "important", "totalTimeSpent", "timeLog"];
       
       // 清除舊資料（保留第一列表頭）
       const lastRow = todosSheet.getLastRow();
