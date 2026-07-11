@@ -1,0 +1,25 @@
+# 開發任務看板 (Project Task Board)
+
+我們將採取「小步快跑、分模組確認」的方式開發。以下是我們的開發藍圖：
+
+## 📌 第一階段：系統設計與需求對齊 (目前階段)
+- [x] **1.1 業務功能定義**：定義核心的案件管理流程與心理學引導機制（如 UMBC/CARE 與台灣保險實務）。
+- [x] **1.2 資料欄位規劃**：確認客戶基本資料與案件流程資料庫欄位。
+- [x] **1.3 技術堆疊選型**：確認前端框架（選定單一 HTML）與視覺風格（選定深色微光）。
+
+## 📌 第二階段：前端介面與小流程設計 (目前階段)
+- [x] **2.1 各階段小流程定義**：一步一步對齊 SA、OA、PC、C、S 的子任務與欄位。
+- [x] **2.2 主畫面與 RWD 佈局**：設計深色霓虹主看板與流程線。
+- [x] **2.3 行動抽屜與視覺錨定**：實作點擊亮燈、正下方彈出抽屜的互動。
+- [x] Fix active style check for "喬時間中" button in SA drawer (`index.html`)
+- [x] Implement toggle-off logic for `meetState` in `updateOAField`, `updatePCField`, `updateCField`, and `updateSField` (`index.html`)
+- [x] Update date-clearing logic to set `meetState` to `""` instead of `'pending'` when date is cleared (`index.html`)
+- [x] Add active drawer refresh logic to `updateOAField` on `isStateOrSlot` changes (`index.html`)
+
+## 📌 第三階段：資料與儲存基礎 (網頁完成後進行)
+- [x] **3.1 本機資料 CRUD**：設計 LocalStorage 資料儲存與 mock 測試。
+- [x] **3.2 Google Sheet 雲端同步**：設計 Apps Script 雲端同步與權限引導。
+
+## 📌 第四階段：系統整合與拋光
+- [x] **4.1 語音聽寫整合**：(依需求取消此功能)
+- [x] **4.2 疑難排解與離線模式**：實作本機同步佇列與斷線重試機制。

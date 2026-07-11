@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>客戶案件管理系統</title>
+  <!-- 最早期錯誤偵錯器 (必須在所有其他 script 之前) -->
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ff0000;color:#fff;padding:20px;z-index:999999;font-family:monospace;font-size:14px;white-space:pre-wrap;';
+      div.textContent = '❌ JS錯誤：' + message + '\n行號：' + lineno + '\n來源：' + source;
+      document.body ? document.body.appendChild(div) : document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(div); });
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      var div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:60px;left:0;right:0;background:#f97316;color:#fff;padding:20px;z-index:999999;font-family:monospace;font-size:14px;';
+      div.textContent = '❌ Promise錯誤：' + (e.reason ? (e.reason.message || String(e.reason)) : '未知');
+      document.body ? document.body.appendChild(div) : document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(div); });
+    });
+  </script>
+  <!-- Tablet Fix: Mobile Drag & Drop Polyfill -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/default.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/index.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+
+  <!-- 自訂確認彈窗 (custom confirm dialog) -->
+  <div id="custom-confirm-overlay">
+    <div id="custom-confirm-box">
+      <div id="custom-confirm-title"></div>
+      <div id="custom-confirm-body"></div>
+      <div id="custom-confirm-actions">
+        <button class="btn" id="custom-confirm-cancel">取消</button>
+        <button class="btn" id="custom-confirm-ok" style="background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;">確認</button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <h1 ondblclick="toggleTodoPage()" style="cursor:default; user-select:none;">客戶案件管理系統</h1>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <!-- 搜尋欄位 -->
+      <div class="search-container" id="search-container">
+        <div class="search-input-wrapper">
+          <!-- Removed search icon -->
+          <input type="text" class="search-input" id="global-search-input" placeholder="搜尋案件 (例: 警察, 癌症)..." autocomplete="off">
+          <button class="search-clear-btn" id="search-clear-btn">✕</button>
+        </div>
+        <!-- 下拉面板 -->
+        <div class="search-dropdown" id="search-dropdown" style="display: none; right: 0; left: auto;">
+          <div class="search-dropdown-section">
+            <div class="search-dropdown-title">最近搜尋</div>
+            <div class="search-history-list" id="search-history-list"></div>
+          </div>
+          <div class="search-dropdown-section">
+            <div class="search-dropdown-title">議題標籤</div>
+            <div class="search-tags-grid" id="search-tags-list"></div>
+          </div>
+        </div>
+      </div>
+      <!-- 案件排序三態按鈕 -->
+      <button class="sort-toggle-btn mode-manual" id="btn-sort-toggle" onclick="cycleSortMode()" title="點擊切換排序：🖐️手動 ➔ ⚡狀態 ➔ ⏳時間">
+        <span>🖐️ 手動排序</span>
+      </button>
+      <!-- 連線狀態指示燈 -->
+      <div id="connection-status-bar" style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; background: var(--bg-card); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color);">
+        <span id="connection-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></span>
+        <span id="connection-text" style="color: var(--text-secondary); font-weight: 600;">檢查連線中...</span>
+      </div>
+      <!-- 字體縮放控制 -->
+      <div style="display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <button class="btn" id="btn-font-dec" style="padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border: none; background: transparent; min-width: 28px; height: 28px;">A-</button>
+        <button class="btn" id="btn-font-inc" style="padding: 4px 8px; font-size: 0.75rem; font-weight: bold; border: none; background: transparent; min-width: 28px; height: 28px;">A+</button>
+      </div>
+      <button class="btn" id="btn-show-archived" onclick="toggleArchivedView()" style="opacity: 0.65;" title="已封存">📦</button>
+      <button class="btn btn-visit-today-pulsing" id="btn-visit-today" onclick="toggleVisitDrawer(true)" title="🚗 今日到訪備忘提醒" style="font-size: 0.85rem; padding: 6px 12px; display: none; transition: all 0.3s; margin-right: 4px;">
+        🚗 今日到訪
+      </button>
+      <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
+        ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
+      </button>
+      <button class="btn" id="btn-open-todos" onclick="toggleTodoPage()" title="待辦事項管理" style="font-size: 1.1rem; padding: 6px 10px; transition: all 0.3s; position: relative; margin-right: 4px;">
+        📋 <span id="todo-global-badge" style="position: absolute; top: -4px; right: -4px; background: #f59e0b; color: #000; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1;">0</span>
+      </button>
+      <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
+      <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋待辦</button>
+      <button class="btn btn-primary" id="btn-add-case">＋案件</button>
+    </div>
+  </header>
+
+  <!-- ===== 待辦事項管理頁面 ===== -->
+  <div id="todo-page">
+    <div id="todo-page-header">
+      <button class="btn" onclick="toggleTodoPage()" style="padding: 5px 12px; font-size: 0.82rem;">← 返回</button>
+      <h2>📋 待辦事項管理</h2>
+      <button class="btn btn-primary" onclick="openTodoModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增待辦</button>
+    </div>
+    <div id="todo-body"></div>
+  </div>
+
+  <!-- 新增/編輯待辦 Modal -->
+  <div id="add-todo-modal">
+    <div id="add-todo-box">
+      <h3 id="todo-modal-title">新增待辦事項</h3>
+      <input type="hidden" id="todo-edit-id" value="">
+      
+      <!-- 左右橫式雙欄佈局 -->
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; text-align: left; margin-top: 5px;">
+        
+        <!-- 左欄：待辦任務自身設定 -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="todo-form-row">
+            <label>任務標題 *</label>
+            <input type="text" class="form-input" id="todo-input-title" placeholder="例如：打電話約訪、補交要保書..." autocomplete="off">
+          </div>
+          
+          <div class="todo-form-row">
+            <label>到期日（可選）</label>
+            <input type="date" class="form-input" id="todo-input-due" onclick="this.showPicker()" style="cursor: pointer;">
+          </div>
+
+          <div class="todo-form-row">
+            <label style="margin-bottom:6px;">優先度分類（可選）</label>
+            <input type="hidden" id="todo-input-urgent" value="">
+            <input type="hidden" id="todo-input-important" value="">
+            <div class="priority-matrix">
+              <div class="priority-cell" data-q="1" onclick="selectPriorityCell(this, true, true)">
+                <span class="priority-cell-icon">🔴</span>
+                <span class="priority-cell-label">緊急重要</span>
+              </div>
+              <div class="priority-cell" data-q="2" onclick="selectPriorityCell(this, true, false)">
+                <span class="priority-cell-icon">🟠</span>
+                <span class="priority-cell-label">緊急不重要</span>
+              </div>
+              <div class="priority-cell" data-q="3" onclick="selectPriorityCell(this, false, true)">
+                <span class="priority-cell-icon">🟡</span>
+                <span class="priority-cell-label">重要不緊急</span>
+              </div>
+              <div class="priority-cell" data-q="4" onclick="selectPriorityCell(this, false, false)">
+                <span class="priority-cell-icon">⚪</span>
+                <span class="priority-cell-label">不緊要</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="todo-form-row">
+            <label>備忘說明</label>
+            <textarea class="form-input" id="todo-input-note" rows="3" placeholder="詳細內容或記錄..." style="resize: vertical; min-height: 80px;"></textarea>
+          </div>
+        </div>
+
+        <!-- 右欄：指定關聯對象（客戶案件、階段與次標籤） -->
+        <div style="display: flex; flex-direction: column; gap: 14px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 10px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--accent); margin-bottom: 2px;">🔗 案件與階段關聯</div>
+          
+          <div class="todo-form-row">
+            <label>指定客戶案件</label>
+            <select class="form-input" id="todo-input-case">
+              <option value="">— 不指定案件 —</option>
+            </select>
+          </div>
+
+          <div class="todo-form-row">
+            <label>指定大階段</label>
+            <select class="form-input" id="todo-input-stage" onchange="onTodoStageChange()">
+              <option value="">— 不指定階段 —</option>
+              <option value="SA">SA 約訪</option>
+              <option value="OA">OA 初訪</option>
+              <option value="PC">PC 計畫說明</option>
+              <option value="C">C 成交簽約</option>
+              <option value="S">S 服務維繫</option>
+            </select>
+          </div>
+
+          <div class="todo-form-row">
+            <label>指定次標籤</label>
+            <select class="form-input" id="todo-input-subtag">
+              <option value="">— 不指定次標籤 —</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="todo-form-actions" style="margin-top: 10px;">
+        <button class="btn" onclick="closeTodoModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveTodo()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 待辦事項計時控制面板 (雙擊待辦列觸發) -->
+  <div id="todo-timer-modal">
+    <div id="todo-timer-box">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;">
+        <div>
+          <h3 id="timer-todo-title" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--accent);">🎯 待辦事項計時</h3>
+          <p id="timer-todo-meta" style="margin: 4px 0 0 0; font-size: 0.72rem; color: var(--text-secondary);"></p>
+        </div>
+        <span style="cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);" onclick="closeTodoTimerModal()">✕</span>
+      </div>
+
+      <!-- 總花費時間展示區 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 8px; margin-bottom: 15px;">
+        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">⏱️ 累計總時間：</span>
+        <span id="timer-total-accumulated" style="font-size: 0.95rem; font-weight: 700; color: var(--color-sa); font-family: monospace;">0 秒</span>
+      </div>
+
+      <!-- 左右雙欄版面佈局 -->
+      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px;">
+        
+        <!-- 左欄：計時器與控制 -->
+        <div style="display: flex; flex-direction: column;">
+          <!-- 當次計時顯示 -->
+          <div id="timer-clock-display" class="timer-display">00:00:00</div>
+          
+          <!-- 計時按鈕群組 -->
+          <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <button class="btn" id="btn-timer-start" onclick="startTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(16, 185, 129, 0.1); border-color: #10b981; color: #10b981;">開始計時</button>
+            <button class="btn" id="btn-timer-pause" onclick="pauseTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(245, 158, 11, 0.1); border-color: #f59e0b; color: #f59e0b;" disabled>暫停</button>
+            <button class="btn" id="btn-timer-stop" onclick="stopTodoTimer()" style="flex: 1; height: 32px; font-weight: 700; background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; color: #3b82f6;" disabled>結束當次</button>
+          </div>
+
+          <!-- 當次工作備忘 -->
+          <div class="form-group" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">當次工作備忘 (結束時一併儲存)</label>
+            <textarea id="timer-current-note" placeholder="例如：今日完成草案，剩下精算..." style="min-height: 50px; font-size: 0.78rem; resize: none; padding: 6px; box-sizing: border-box;"></textarea>
+          </div>
+
+          <!-- 結案按鈕 -->
+          <button class="btn" id="btn-timer-complete" onclick="timerMarkAsDone()" style="width: 100%; height: 36px; font-weight: 700; background: var(--color-c); color: #000; border: none; border-radius: 8px; margin-top: auto;">✓ 完成此任務並結案</button>
+        </div>
+
+        <!-- 右欄：歷次歷史紀錄 (可滾動) -->
+        <div style="display: flex; flex-direction: column; border-left: 1px solid var(--border-color); padding-left: 20px; max-height: 290px; min-height: 290px; overflow: hidden;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px;">⏳ 歷次工作紀錄</div>
+          <div id="timer-history-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+            <!-- 歷史紀錄動態填充 -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 待辦工作紀錄編輯 Modal (取代瀏覽器 prompt) -->
+  <div id="edit-log-modal">
+    <div class="sub-modal-box">
+      <h3 style="margin: 0 0 12px 0; font-size: 0.95rem; font-weight: 700; color: var(--accent);">✏️ 編輯工作紀錄</h3>
+      <input type="hidden" id="edit-log-todo-id">
+      <input type="hidden" id="edit-log-index">
+      
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 0.72rem; color: var(--text-secondary);">花費時間 (分鐘)</label>
+          <input type="number" id="edit-log-duration" class="form-input" min="0" style="padding: 6px; font-size: 0.8rem; background: var(--bg-dark); color: #fff;">
+        </div>
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 0.72rem; color: var(--text-secondary);">工作備忘</label>
+          <textarea id="edit-log-note" class="form-input" style="padding: 6px; font-size: 0.8rem; min-height: 60px; resize: none; background: var(--bg-dark); color: #fff;"></textarea>
+        </div>
+      </div>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px;">
+        <button class="btn" onclick="closeEditLogModal()" style="font-size: 0.75rem; padding: 4px 12px;">取消</button>
+        <button class="btn btn-primary" onclick="submitEditLogModal()" style="font-size: 0.75rem; padding: 4px 12px;">儲存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 計時紀錄刪除確認 Modal (取代瀏覽器 confirm) -->
+  <div id="timer-confirm-modal">
+    <div class="sub-modal-box" style="border-color: rgba(239, 68, 68, 0.2);">
+      <h3 style="margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 700; color: #ef4444;">⚠️ 刪除工作紀錄</h3>
+      <input type="hidden" id="del-log-todo-id">
+      <input type="hidden" id="del-log-index">
+      
+      <p id="del-log-message" style="margin: 0 0 15px 0; font-size: 0.75rem; color: var(--text-primary); line-height: 1.4;"></p>
+      
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn" onclick="closeTimerConfirmModal()" style="font-size: 0.75rem; padding: 4px 12px;">取消</button>
+        <button class="btn" onclick="submitTimerConfirmModal()" style="font-size: 0.75rem; padding: 4px 12px; background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171;">確認刪除</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 待辦任務 Toast 通知 -->
+  <div id="todo-toast">
+    <div id="todo-toast-title">📋 有待辦任務需注意</div>
+    <div id="todo-toast-list"></div>
+    <div id="todo-toast-actions">
+      <button class="btn" onclick="dismissTodoToast()" style="font-size: 0.72rem; padding: 3px 10px;">稍後再說</button>
+      <button class="btn btn-primary" onclick="goToTodoPage()" style="font-size: 0.72rem; padding: 3px 10px;">前往管理</button>
+    </div>
+  </div>
+
+  <!-- 週約訪看板 -->
+  <div id="weekly-calendar-bar"></div>
+
+  <div class="canvas-container" id="canvas-container">
+    <!-- 表頭已隱藏 -->
+    
+    <!-- 案件列表 (JS 動態產生) -->
+    <div id="case-list-body"></div>
+  </div>
+
+  <!-- 送件提醒對話框 -->
+<!-- 待辦送件時程提醒對話框 -->
+  <div class="modal-overlay" id="reminder-modal">
+    <div class="modal-box" style="width: 820px; max-width: 95vw; max-height: 85vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+      
+      <!-- 頂部 Header -->
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-shrink: 0;">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; margin: 0;">待辦送件時程提醒</h3>
+        <span style="cursor:pointer; font-size: 1.2rem; color: var(--text-secondary);" id="btn-close-reminder-modal">✕</span>
+      </div>
+
+      <!-- 三欄版面主體 -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; flex: 1; min-height: 320px; overflow: hidden; margin-bottom: 1rem;">
+        
+        <!-- 左欄：已過期需立刻處理 (紅色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(239,68,68,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 4px;">已過期需立刻處理</span>
+            <span id="reminder-expired-count" style="font-size: 0.72rem; background: #ef4444; color: #fff; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-expired-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 中欄：今天需送件待辦 (黃色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(245,158,11,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; display: flex; align-items: center; gap: 4px;">今天需送件待辦</span>
+            <span id="reminder-today-count" style="font-size: 0.72rem; background: #f59e0b; color: #000; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-today-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
+        <!-- 右欄：未來送件時程預告 (綠色邊框) -->
+        <div style="display: flex; flex-direction: column; background: rgba(0,0,0,0.15); border: 1px solid rgba(34,197,94,0.25); border-radius: 8px; padding: 10px; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(34,197,94,0.2); padding-bottom: 6px; flex-shrink: 0;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #22c55e; display: flex; align-items: center; gap: 4px;">未來送件時程預告</span>
+            <span id="reminder-future-count" style="font-size: 0.72rem; background: #22c55e; color: #fff; padding: 1px 6px; border-radius: 10px; font-weight: bold;">0</span>
+          </div>
+          <div id="reminder-future-list" style="flex: 1; overflow-y: auto;"></div>
+        </div>
+
+      </div>
+
+      <!-- 底部操作列 -->
+      <div style="display: flex; justify-content: flex-end; flex-shrink: 0; border-top: 1px solid var(--border-color); padding-top: 10px;">
+        <button class="btn" onclick="toggleReminderModal(false)" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">關閉</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 待辦任務通知看板 -->
+  <div class="modal-overlay" id="todo-notify-modal">
+    <div class="modal-box" style="width: 680px; max-width: 96vw; max-height: 88vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+
+      <!-- 頂部 Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0;">
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff; margin: 0; display:flex; align-items:center; gap:8px;">📋 待辦任務提醒</h3>
+        <span style="cursor:pointer; font-size: 1.2rem; color: var(--text-secondary);" onclick="toggleTodoNotifyModal(false)">✕</span>
+      </div>
+
+      <!-- Tab 切換 -->
+      <div class="todo-notify-tabs" style="margin-bottom: 1rem; flex-shrink: 0;">
+        <button class="todo-notify-tab active" id="tab-btn-priority" onclick="switchTodoNotifyTab('priority')">🎯 優先度看板</button>
+        <button class="todo-notify-tab" id="tab-btn-timeline" onclick="switchTodoNotifyTab('timeline')">🕐 時間序看板</button>
+      </div>
+
+      <!-- Panel A：優先度看板 -->
+      <div id="todo-notify-panel-priority" class="todo-notify-panel active" style="flex:1; overflow-y:auto; min-height:240px; padding-right:2px;"></div>
+
+      <!-- Panel B：時間序看板 -->
+      <div id="todo-notify-panel-timeline" class="todo-notify-panel" style="flex:1; overflow-y:auto; min-height:240px; padding-right:2px;"></div>
+
+      <!-- 底部操作列 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 1rem;">
+        <button class="btn btn-primary" onclick="toggleTodoNotifyModal(false); goToTodoPage();" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">前往待辦管理</button>
+        <button class="btn" onclick="toggleTodoNotifyModal(false)" style="font-size: 0.8rem; padding: 6px 16px; cursor: pointer;">關閉</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 新增案件對話框 -->
+  <div class="modal-overlay" id="add-case-modal">
+    <div class="modal-box" style="width: 520px;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">＋ 新增客戶與議題</h3>
+        <span style="cursor:pointer;" onclick="toggleAddCaseModal(false)">✕</span>
+      </div>
+      <form id="add-case-form" onsubmit="submitAddCase(event)">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">客戶姓名</label>
+          <input type="text" id="add-client-name" required placeholder="例如：林智強" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+        </div>
+        <!-- 訪談類型與險種分類 (次標籤按鈕) -->
+        <div class="form-group" style="margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">訪談類型</label>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-visit-type', 'issue', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">議題訪</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'life', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">生活訪</button>
+            </div>
+            <input type="hidden" id="add-visit-type" value="issue">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">險種分類</label>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-case-type', 'life', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">壽險</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-case-type', 'property', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">產險</button>
+            </div>
+            <input type="hidden" id="add-case-type" value="life">
+          </div>
+        </div>
+        
+
+        
+        <!-- 開拓管道與客戶來源 (次標籤按鈕) -->
+        <div class="form-group" style="margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">開拓管道</label>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-case-source', 'outbound', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">開發客</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-case-source', 'inbound', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">自來客</button>
+            </div>
+            <input type="hidden" id="add-case-source" value="outbound">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">客戶來源</label>
+            <div style="display: flex; gap: 4px; width: 100%;">
+              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-source', 'relative', this)" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 6px 0;">緣故</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-source', 'referral', this)" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 6px 0;">轉介</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-source', 'cold', this)" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 6px 0;">陌開</button>
+            </div>
+            <input type="hidden" id="add-source" value="relative">
+          </div>
+        </div>
+
+        <!-- 轉介紹連動輸入欄位 -->
+        <div class="form-group" id="add-referrer-row" style="margin-bottom: 1rem; display: none;">
+          <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">轉介紹自誰</label>
+          <input type="text" id="add-referrer-name" placeholder="例如：介紹人姓名" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">首發議題名稱</label>
+          <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+            <input type="text" id="add-issue-name" required placeholder="輸入議題，或從右側選取" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+            <select id="add-issue-select" onchange="document.getElementById('add-issue-name').value = this.value; this.value = '';" style="width: 36px; min-width: 36px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 0 2px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; appearance: auto;">
+              <option value=""></option>
+              <optgroup label="👶 家庭與兒女">
+                <option value="新生兒保單">新生兒保單</option>
+                <option value="子女教育基金">子女教育基金</option>
+              </optgroup>
+              <optgroup label="🚗 生活與財產">
+                <option value="車險">車險</option>
+                <option value="旅平卡">旅平卡</option>
+              </optgroup>
+              <optgroup label="🔍 專業檢視服務">
+                <option value="保單檢視">保單檢視</option>
+                <option value="財務檢視">財務檢視</option>
+              </optgroup>
+            </select>
+          </div>
+          <!-- 生活訪時才展示第二議題欄位 -->
+          <div id="add-second-issue-row" style="display: none; margin-bottom: 8px;">
+            <label style="display: block; font-size: 0.8rem; margin-bottom: 4px; color: var(--text-secondary);">第二議題名稱</label>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="add-issue-name-2" placeholder="輸入第二議題，或從右側選取" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+              <select id="add-issue-select-2" onchange="document.getElementById('add-issue-name-2').value = this.value; this.value = '';" style="width: 36px; min-width: 36px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 0 2px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; appearance: auto;">
+                <option value=""></option>
+                <optgroup label="👶 家庭與兒女">
+                  <option value="新生兒保單">新生兒保單</option>
+                  <option value="子女教育基金">子女教育基金</option>
+                </optgroup>
+                <optgroup label="🚗 生活與財產">
+                  <option value="車險">車險</option>
+                  <option value="旅平卡">旅平卡</option>
+                </optgroup>
+                <optgroup label="🔍 專業檢視服務">
+                  <option value="保單檢視">保單檢視</option>
+                  <option value="財務檢視">財務檢視</option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          <input type="text" id="add-contact-detail" placeholder="聯絡備註 (例如：通話時提到新生兒...)" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 8px; border-radius: 4px; font-size: 0.8rem;">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+          <button class="btn" type="button" onclick="toggleAddCaseModal(false)">取消</button>
+          <button class="btn btn-primary" type="submit">建立案件</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 系統與議題綜合設定對話框 -->
+<!-- 系統與議題綜合設定對話框 -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-box" style="width: 720px; max-width: 95vw; max-height: 85vh; padding: 0; display: flex; flex-direction: column; overflow: hidden;">
+      
+      <!-- 頂部 Header -->
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem; border-bottom: 1px solid var(--border-color); margin: 0; flex-shrink: 0;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">⚙️ 系統設定與維護中心</h3>
+        <span style="cursor:pointer; font-size: 1.2rem;" id="btn-close-settings-modal">✕</span>
+      </div>
+
+      <!-- 左右分欄主體 -->
+      <div style="display: flex; flex: 1; min-height: 380px; overflow: hidden;">
+        
+        <!-- 左側：項目垂直選單 -->
+        <div style="width: 170px; border-right: 1px solid var(--border-color); background: rgba(0,0,0,0.1); padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+          <button class="btn btn-tab active" id="settings-tab-sync" onclick="switchSettingsTab('sync')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🌐 雲端串接設定</button>
+          <button class="btn btn-tab" id="settings-tab-reminder" onclick="switchSettingsTab('reminder')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📅 時程提醒設定</button>
+          <button class="btn btn-tab" id="settings-tab-issues" onclick="switchSettingsTab('issues')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">💬 常規議題維護</button>
+          <button class="btn btn-tab" id="settings-tab-groups" onclick="switchSettingsTab('groups')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📂 分群管理維護</button>
+          <button class="btn btn-tab" id="settings-tab-rules" onclick="switchSettingsTab('rules')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🔧 推進規則自訂</button>
+        </div>
+
+        <!-- 右側：設定內容區 -->
+        <div style="flex: 1; min-width: 0; padding: 1.25rem; display: flex; flex-direction: column; overflow-y: auto; justify-content: space-between;">
+          <div style="flex: 1;">
+            
+            <!-- 雲端串接設定 Tab -->
+            <div id="settings-pane-sync">
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">連線模式</label>
+                <div style="display: flex; gap: 10px;">
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="radio" name="crm-offline-mode" id="settings-mode-offline" value="1" checked> 離線模擬 (LocalStorage)
+                  </label>
+                  <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; background: var(--bg-input); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                    <input type="radio" name="crm-offline-mode" id="settings-mode-cloud" value="0"> 雲端同步模式
+                  </label>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">Google Apps Script Web App URL</label>
+                <input type="text" id="settings-api-url" placeholder="https://script.google.com/macros/s/.../exec" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; font-size: 0.8rem;">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-top: 4px; line-height: 1.45;">
+                  * 請輸入以 /exec 結尾的 GAS 網頁應用程式網址。<br>
+                  * 首次切換為雲端模式時，會從雲端覆蓋拉取客戶清單。
+                </span>
+              </div>
+
+              <!-- 離線同步暫存提示與強制同步按鈕 -->
+              <div id="settings-sync-status-box" style="margin-bottom: 1.25rem; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; display: none; align-items: center; justify-content: space-between; gap: 10px;">
+                <div>
+                  <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">離線未同步資料</span>
+                  <strong id="settings-sync-queue-count" style="font-size: 1.1rem; color: var(--color-sa);">0 筆</strong>
+                </div>
+                <button class="btn" id="btn-force-sync" style="background: var(--color-sa); color: #1e1e24; border: none; font-size: 0.78rem; padding: 6px 12px; font-weight: bold;">立即手動同步 📤</button>
+              </div>
+
+              <!-- 診斷詳情區塊 -->
+              <div id="settings-diagnostic-log" style="display: none; background: #18181b; border: 1px solid #ef444455; border-radius: 6px; padding: 10px; margin-bottom: 1.25rem; font-family: monospace;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; border-bottom: 1px solid #ef444433; padding-bottom: 4px;">
+                  <span style="color: #ef4444; font-size: 0.75rem; font-weight: bold;">🔍 雲端連線診斷報告</span>
+                  <span id="btn-clear-diagnostic" style="color: var(--text-secondary); font-size: 0.7rem; cursor: pointer;">清除</span>
+                </div>
+                <div id="settings-diagnostic-text" style="color: #fca5a5; font-size: 0.72rem; max-height: 120px; overflow-y: auto; white-space: pre-wrap; line-height: 1.4;"></div>
+              </div>
+            </div>
+
+            <!-- 時程提醒設定 Tab -->
+            <div id="settings-pane-reminder" style="display: none;">
+              <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary); font-weight: bold;">未來送件預告範圍 (天)</label>
+                <input type="number" id="settings-reminder-days" min="1" max="90" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; font-size: 0.8rem;">
+                <span style="font-size: 0.72rem; color: var(--text-secondary); display: block; margin-top: 6px; line-height: 1.45;">
+                  * 設定多少天以內的送件預告，會顯示在未來預告欄中。<br>
+                  * 預設為 14 天，最大可設 90 天，防範資訊過度稠密。
+                </span>
+              </div>
+            </div>
+
+            <!-- 議題管理 Tab -->
+            <div id="settings-pane-issues" style="display:none;">
+              <div style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增議題到清單</p>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 8px;">
+                  <input type="text" id="issue-new-name" placeholder="議題名稱（例如：癌症權益說明）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; width: 100%;">
+                  <button class="btn btn-primary" onclick="addCustomIssue()" style="white-space: nowrap;">新增</button>
+                </div>
+                <select id="issue-new-group" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+                </select>
+              </div>
+              <div id="issue-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- 分群管理 Tab -->
+            <div id="settings-pane-groups" style="display:none;">
+              <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 10px;">新增自訂分群</p>
+                <div style="display: grid; grid-template-columns: 60px 1fr auto; gap: 8px;">
+                  <input type="text" id="group-new-emoji" placeholder="🏥" maxlength="4" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px; text-align: center; font-size: 1.1rem;">
+                  <input type="text" id="group-new-label" placeholder="分群名稱（例如：健康醫療）" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+                  <button class="btn btn-primary" onclick="addCustomGroup()" style="white-space: nowrap;">新增</button>
+                </div>
+                <p style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 6px;">刪除分群時，該分群下的所有議題也會一併移除。</p>
+              </div>
+              <div id="group-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- 推進規則自訂 Tab -->
+            <div id="settings-pane-rules" style="display:none;">
+              <div class="rules-container">
+                <div>
+                  <div class="rules-section-title">🧭 狀態排序優先順序自訂 (次標籤順序)</div>
+                  <p style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px;">設定切換為「⚡狀態排序」時，哪一種類型的案件最應該被排在最上面。數值越大越優先。</p>
+                  
+                  <div style="display:flex; gap:8px; margin-bottom:10px;">
+                    <button type="button" class="template-badge" onclick="applyRulesTemplate('close')">🎯 臨門一腳優先 (收單/補件優先)</button>
+                    <button type="button" class="template-badge" onclick="applyRulesTemplate('dev')">✨ 新客開發優先 (約訪/說明優先)</button>
+                  </div>
+
+                  <div class="priority-sort-list" id="rules-priority-list">
+                    <!-- JS 自動填充次標籤順序 -->
+                  </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                  <div class="rules-section-title">🔔 智能事件訂閱通知</div>
+                  <p style="font-size:0.74rem; color:var(--text-secondary); margin-bottom:8px;">自訂要在登入時，讓提醒面板額外跳出哪些重要的卡關或狀態通知。</p>
+                  
+                  <div style="display:flex; flex-direction:column; gap:8px; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px; border:1px solid var(--border-color);">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; cursor:pointer;">
+                      <input type="checkbox" id="rules-notify-due" checked> 🔔 訂閱「時程/送件提醒」到期通知
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; cursor:pointer;">
+                      <input type="checkbox" id="rules-notify-stuck" checked> ⚠️ 訂閱「卡關提醒」：前置規劃/討論超過 5 天未更新時警示
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 全局通用儲存/測試動作欄 -->
+          <div id="settings-global-actions" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem; flex-shrink: 0; margin-top: 1rem;">
+            <button class="btn" id="btn-test-connection" style="border-color: var(--color-sa); color: var(--color-sa); cursor: pointer;">測試連線 ⚡</button>
+            <button class="btn btn-primary" id="btn-save-settings" style="cursor: pointer;">儲存設定</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 議題維護對話框 -->
+  <div class="modal-overlay" id="topic-modal">
+    <div class="modal-box">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">🛠️ 維護常規議題</h3>
+        <span style="cursor:pointer;" onclick="toggleTopicModal(false)">✕</span>
+      </div>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label>新增常規議題</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="new-topic-input" placeholder="例如：新生兒醫療保障、車險續保">
+          <button class="btn btn-primary" onclick="addGlobalTopic()">新增</button>
+        </div>
+      </div>
+      <label>現有議題清單</label>
+      <div id="modal-topic-list" style="max-height: 200px; overflow-y: auto; margin-top: 4px;"></div>
+    </div>
+  </div>
+
+  <!-- 今日到訪備忘抽屜 (Visit Drawer) -->
+  <div class="visit-drawer-overlay" id="visit-drawer-overlay" onclick="toggleVisitDrawer(false)"></div>
+  <div class="visit-drawer" id="visit-drawer">
+    <div class="visit-drawer-header">
+      <h3 style="font-size: 1.05rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 8px; margin: 0;">🚗 今日到訪備忘提醒</h3>
+      <span style="cursor:pointer; font-size: 1.2rem; color: var(--text-secondary);" onclick="toggleVisitDrawer(false)">✕</span>
+    </div>
+    <div class="visit-drawer-body" id="visit-drawer-body">
+      <!-- 動態載入到訪案件與檢核清單 -->
+    </div>
+    <div class="visit-drawer-footer">
+      <button class="btn" onclick="toggleVisitDrawer(false)" style="flex: 1; font-size: 0.82rem; padding: 8px;">關閉</button>
+    </div>
+  </div>
+
+  <!-- 載入中遮罩 -->
+  <div class="modal-overlay" id="loading-overlay" style="z-index: 10000; flex-direction: column; gap: 12px; color: var(--text-secondary);">
+    <div class="loader" style="border: 4px solid rgba(255,255,255,0.05); border-radius: 50%; border-top: 4px solid var(--color-sa); width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+    <div id="loading-text" style="font-size: 0.9rem; font-weight: 600;">資料同步中，請稍候...</div>
+  </div>
+
+  
+  <!-- 客製化確認對話框元件 (ADHD 減法高對比) -->
+  <div class="modal-overlay" id="confirm-modal" style="z-index: 9999;">
+    <div class="modal-box" style="width: 380px; border-color: var(--border-color); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); padding: 1.25rem;">
+      <div style="font-size: 1rem; font-weight: bold; color: #fff; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;" id="confirm-modal-title">確認操作</div>
+      <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.25rem;" id="confirm-modal-body">確定要執行此操作嗎？</div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn" id="confirm-modal-btn-cancel" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">取消</button>
+        <button class="btn btn-primary" id="confirm-modal-btn-ok" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">確定</button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
+

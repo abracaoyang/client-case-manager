@@ -1,0 +1,81 @@
+🗺️ 保險業務 CRM 系統：程式碼骨架地圖 (Skeleton Map)
+本文件摘錄自本機工作區 index.html 的 JavaScript 腳本區塊，提供變數、常數與所有函數的完整結構索引。
+
+1. 核心大階段定義 (Phases)
+系統生命週期共分為 5 大核心推進階段：
+
+SA (約訪)：未約定 ➔ 喬時間 ➔ 擱置中 (黑底白框) ➔ 已約定 ➔ 還原 狀態鏈。
+OA (初訪)：需求分析 ➔ 訪後討論 ➔ 建議書草案。
+PC (計畫說明)：計畫說明 ➔ 要保簽署 ➔ 訪後討論。
+C (成交簽約)：文件準備 ➔ 簽約 ➔ 補件 ➔ 送件 ➔ 要保簽署 ➔ 保費首扣。
+S (服務維繫)：服務維繫 ➔ 年度回顧 ➔ 轉介紹跟進。
+2. 核心全域變數與資料結構
+window.cases (Array)：存放所有客戶案件資料的陣列。每個案件物件包含：
+id (String)：唯一識別碼
+clientName (String)：客戶姓名
+visitType (String)：issue (議題訪) 或 life (生活訪)
+caseSource (String)：outbound (開發客) 或 inbound (自來客)
+source (String)：relative (緣故), referral (轉介), cold (陌開)
+referrerName (String)：介紹人姓名
+issueName, issueName2 (String)：首發與第二級議題名稱
+currentPhase (String)：當前大階段 (SA, OA, PC, C, S)
+isArchived (Boolean)：是否已封存
+saDetails, oaDetails, pcDetails, cDetails, sDetails (Object)：各階段詳細資訊（包含日期、次步驟狀態、亮燈邏輯等）
+todos (Array)：存放所有待辦任務的陣列。
+crmSettings (Object)：系統設定，包含離線模式、GAS API URL、時程預警天數限制、推進規則權重等。
+activeTodoTimer (Object)：當前正在運行的待辦事項計時器狀態載體。
+TODO_SUBTAG_MAP (Object)：各階段關聯待辦時可選用的次步驟標籤對應表。
+3. 函數索引與功能簡述
+3.1 初始化與生命週期 (Lifecycle & Initialization)
+window.onerror = function(...)：全域捕捉錯誤，並於頁面頂部以紅色警示條呈現 JS Runtime Error。
+window.addEventListener('unhandledrejection', ...)：全域捕捉未處理的 Promise Rejection 錯誤。
+document.addEventListener('DOMContentLoaded', ...)：頁面 DOM 加載完成後觸發，初始化語系、連線測試與加載資料。
+initFontScaling()：初始化並綁定網頁字體縮放按鈕的 click 事件。
+testConnectionOnLoad()：啟動時非同步向雲端 GAS 發送 Ping 測試連線狀態。
+3.2 雲端同步與資料存取 (Data Synchronization & Storage)
+loadLocalSettings()：從 localStorage 載入設定檔 crm_settings。
+saveLocalSettings()：將全域 crmSettings 存回 localStorage。
+loadCases()：從 localStorage 載入客戶案件 crm_cases。
+saveCases()：將 window.cases 存入 localStorage，若雲端模式則發送異步 API 同步。
+syncCasesToCloud()：非同步將本機案件變更發送 POST 到雲端試算表。
+syncQueuedData()：非同步處理離線時暫存的資料上傳隊列。
+loadTodos()：從 localStorage 載入待辦事項 crm_todos。
+saveTodos()：將 todos 存入 localStorage 並觸發雲端待辦同步。
+syncTodosToCloud()：非同步將本機待辦變更上傳覆蓋雲端試算表。
+3.3 待辦事項計時器模組 (Time Tracker & Log Management)
+formatSecondsToClock(totalSeconds)：將秒數格式化為 00:00:00 碼錶格式。
+formatSecondsToShortTime(totalSeconds)：將秒數格式化為 X 小時 Y 分 Z 秒 易讀格式。
+openTodoTimerModal(todoId)：雙擊待辦卡片時，開啟計時 Modal，初始化狀態並渲染工時歷史紀錄。
+closeTodoTimerModal()：防呆判定，若計時中則警告並禁止關閉，否則關閉 Modal。
+resetTimerButtonsUI()：重設所有計時控制按鈕的 disabled 狀態、黃色外觀與文字。
+startTodoTimer()：啟動定時累加器（setInterval），進入計時狀態。
+pauseTodoTimer()：切換計時器的暫停/繼續狀態，保持黃色主題外觀。
+stopTodoTimer()：結束當次計時，結合當次備忘欄內容，寫入 timeLog 並累加總工時，存檔並同步雲端。
+timerMarkAsDone()：結案待辦任務，防呆提示是否自動儲存當前計時。
+renderTimerHistory(t)：於 Modal 右側渲染該任務的所有歷次工時與備忘紀錄，並附上 [修改] / [刪除] 按鈕。
+editTimerLog(todoId, logIndex)：開啟系統自訂磨砂玻璃對話框，對特定一次的工作備忘與分鐘數進行修改。
+closeEditLogModal() / submitEditLogModal()：編輯工作紀錄的取消與送出儲存處理。
+deleteTimerLog(todoId, logIndex)：開啟自訂紅色警告框，確認是否刪除該次工作紀錄。
+closeTimerConfirmModal() / submitTimerConfirmModal()：刪除工作紀錄的取消與執行扣除總時間刪除處理。
+3.4 案件看板與階段渲染 (UI Rendering)
+renderCases()：核心主畫面渲染函數，依據排序規則（手動、狀態、冷案）將客戶卡片與五大燈泡流程輸出至頁面。
+renderItemHtml(t)：通知看板中生成每筆待辦項目的內部樣式範本。
+getSubmitBtnClass(c)：為成交簽約 (C 階段) 根據到期日計算並返回紅、黃、綠、呼吸預警等 CSS Class。
+renderCalendarWeekBar()：渲染週約訪快速預覽列 (行事曆快速排程列)。
+toggleArchivedView()：切換普通視窗與已封存專區的卡片顯示。
+3.5 案件編輯、排序與拖曳 (Case Interaction)
+cycleSortMode()：於「🖐️ 手動排序 ➔ ⚡ 智能狀態 ➔ ⏳ 冷案追蹤」三態間循環切換排序規則。
+toggleAddCaseModal(show)：開啟/關閉新增案件 Modal。
+selectFormTab(inputId, value, element)：輔助新增案件 Modal 中的次標籤按鈕群組狀態切換。
+submitAddCase(event)：新增案件表單送出，寫入預設結構並儲存。
+deleteCase(caseId)：觸發自訂確認彈窗以刪除案件。
+archiveCase(caseId)：封存案件。
+unarchiveCase(caseId)：還原已封存案件。
+3.6 狀態鏈跳轉與細節抽屜 (State Machine & Popover Drawers)
+openDrawer(caseId, phase)：開啟指定案件特定大階段的正下方工作抽屜。
+closeDrawer()：關閉當前打開的抽屜。
+toggleSAAgreeDirect(caseId, event)：SA 約訪大燈的「未約定 ➔ 喬時間 ➔ 擱置中 ➔ 已約定」雙擊狀態鏈跳轉。
+toggleOADetailsDirect(caseId, type, event)：OA 初訪次標籤雙擊防呆狀態推進。
+togglePCDetailsDirect(caseId, type, event)：PC 計畫說明次標籤雙擊防呆狀態推進。
+toggleCDetailsDirect(caseId, type, event)：C 成交簽約次標籤雙擊防呆狀態推進。
+toggleSDetailsDirect(caseId, type, event)：S 服務維繫次標籤雙擊防呆狀態推進。
