@@ -3076,7 +3076,7 @@
 
     let subTagClickTimeout = null;
 
-    // === 子流程按鈕點擊亮燈與抽屜引導連動邏輯 ===
+    // === 子流程按燈與抽屜引導連動邏輯 ===
     function handleSubTagToggle(caseId, phase, stateKey, dateKey, dateFieldForSelector, event, forcePhase = null) {
       if (event) event.stopPropagation();
       const c = cases.find(item => item.id === caseId);
@@ -3093,69 +3093,40 @@
       
       const curState = details[stateKey] || 'dim';
 
-      // 雙擊事件 (DblClick) ➔ 變更為已完成，或還原為未開始
-      if (event && event.detail >= 2) {
-        if (subTagClickTimeout) {
-          clearTimeout(subTagClickTimeout);
-          subTagClickTimeout = null;
-        }
-
+      if (curState === 'dim') {
+        // 未亮燈點擊：永久標記為 ongoing (進行中) 呼吸，並儲存，然後打開抽屜彈出日曆
         updateCase(caseId, item => {
           const itemDetails = phase === 'oa' ? item.oaDetails :
                               phase === 'pc' ? item.pcDetails :
                               phase === 'c' ? item.cDetails : item.sDetails;
-          if (curState === 'active') {
-            itemDetails[stateKey] = 'dim';
-            itemDetails[dateKey] = '';
-          } else {
-            itemDetails[stateKey] = 'active';
-            itemDetails[dateKey] = new Date().toISOString().split('T')[0];
-          }
+          itemDetails[stateKey] = 'ongoing';
         });
-        return;
-      }
-
-      // 單擊事件 (Click) ➔ 變更為進行中，並彈出日曆
-      if (subTagClickTimeout) {
-        clearTimeout(subTagClickTimeout);
-        subTagClickTimeout = null;
-      }
-
-      subTagClickTimeout = setTimeout(() => {
-        if (curState === 'dim') {
-          // 不分大階段，單擊轉為 ongoing 進行中，先在前端局部重繪
-          details[stateKey] = 'ongoing';
-          renderCases(); // 僅渲染主畫面呈現 ⚡
+        
+        openDrawer(caseId, phase.toUpperCase());
+        setTimeout(() => {
+          const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+          if (drawerContent) {
+            if (phase === 'oa') renderOADrawer(c, drawerContent);
+            else if (phase === 'pc') renderPCDrawer(c, drawerContent);
+            else if (phase === 'c') renderCDrawer(c, drawerContent);
+            else if (phase === 's') renderSDrawer(c, drawerContent);
+          }
           
-          // 自動呼叫開啟對應階段的抽屜並彈出行事曆
-          openDrawer(caseId, phase.toUpperCase());
-          setTimeout(() => {
-            // 局部繪製對應階段的 Drawer 後模擬開啟日曆
-            const drawerContent = document.getElementById(`drawer-content-${caseId}`);
-            if (drawerContent) {
-              if (phase === 'oa') renderOADrawer(c, drawerContent);
-              else if (phase === 'pc') renderPCDrawer(c, drawerContent);
-              else if (phase === 'c') renderCDrawer(c, drawerContent);
-              else if (phase === 's') renderSDrawer(c, drawerContent);
-            }
-            
-            setTimeout(() => {
-              const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-              if (dateInput) {
-                dateInput.click();
-              }
-            }, 100);
-          }, 100);
-        } else if (curState === 'ongoing') {
-          // 已經是進行中，單擊直接開啟抽屜並彈出日曆
-          openDrawer(caseId, phase.toUpperCase());
           setTimeout(() => {
             const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
-            if (dateInput) dateInput.click();
-          }, 150);
-        }
-        subTagClickTimeout = null;
-      }, 250);
+            if (dateInput) {
+              dateInput.click();
+            }
+          }, 100);
+        }, 100);
+      } else {
+        // 已經是進行中 (ongoing) 或已完成 (active)，單擊直接開啟抽屜並彈出日曆
+        openDrawer(caseId, phase.toUpperCase());
+        setTimeout(() => {
+          const dateInput = document.getElementById(`date-input-${caseId}-${stateKey}`);
+          if (dateInput) dateInput.click();
+        }, 150);
+      }
     }
 
     function toggleOAPlanDirect(caseId, event) {

@@ -2225,15 +2225,15 @@ html {
 
   /* === C階段次標籤呼吸亮燈特效 === */
   @keyframes ongoing-purple-pulse {
-    0% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
-    50% { background: rgba(192, 132, 252, 0.35); border-color: rgba(192, 132, 252, 0.95); box-shadow: 0 0 10px rgba(192, 132, 252, 0.6); }
-    100% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
+    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
+    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
   }
-  /* OA 階段次標籤呼吸發光 (紫色) */
+  /* OA 階段次標籤呼吸發光 (統一橘色) */
   @keyframes ongoing-oa-pulse {
-    0% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
-    50% { background: rgba(192, 132, 252, 0.35); border-color: rgba(192, 132, 252, 0.95); box-shadow: 0 0 10px rgba(192, 132, 252, 0.6); }
-    100% { background: rgba(192, 132, 252, 0.08); border-color: rgba(192, 132, 252, 0.3); box-shadow: 0 0 3px rgba(192, 132, 252, 0.2); }
+    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
+    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
   }
   .status-badge-btn.ongoing-oa, .sub-tag-btn.ongoing-oa {
     transition: none !important;
@@ -2242,11 +2242,11 @@ html {
     border-style: solid !important;
   }
 
-  /* PC 階段次標籤呼吸發光 (藍色) */
+  /* PC 階段次標籤呼吸發光 (統一橘色) */
   @keyframes ongoing-pc-pulse {
-    0% { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 3px rgba(96, 165, 250, 0.2); }
-    50% { background: rgba(96, 165, 250, 0.35); border-color: rgba(96, 165, 250, 0.95); box-shadow: 0 0 10px rgba(96, 165, 250, 0.6); }
-    100% { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.3); box-shadow: 0 0 3px rgba(96, 165, 250, 0.2); }
+    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
+    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
   }
   .status-badge-btn.ongoing-pc, .sub-tag-btn.ongoing-pc {
     transition: none !important;
@@ -2255,11 +2255,11 @@ html {
     border-style: solid !important;
   }
 
-  /* C 階段次標籤呼吸發光 (綠色) */
+  /* C 階段次標籤呼吸發光 (統一橘色) */
   @keyframes ongoing-c-pulse {
-    0% { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.3); box-shadow: 0 0 3px rgba(52, 211, 153, 0.2); }
-    50% { background: rgba(52, 211, 153, 0.35); border-color: rgba(52, 211, 153, 0.95); box-shadow: 0 0 10px rgba(52, 211, 153, 0.6); }
-    100% { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.3); box-shadow: 0 0 3px rgba(52, 211, 153, 0.2); }
+    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
+    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
   }
   .status-badge-btn.ongoing-c, .sub-tag-btn.ongoing-c {
     transition: none !important;
@@ -2268,11 +2268,11 @@ html {
     border-style: solid !important;
   }
 
-  /* S 階段次標籤呼吸發光 (紅色) */
+  /* S 階段次標籤呼吸發光 (統一橘色) */
   @keyframes ongoing-s-pulse {
-    0% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
-    50% { background: rgba(244, 63, 94, 0.35); border-color: rgba(244, 63, 94, 0.95); box-shadow: 0 0 10px rgba(244, 63, 94, 0.6); }
-    100% { background: rgba(244, 63, 94, 0.08); border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 3px rgba(244, 63, 94, 0.2); }
+    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
+    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
   }
   .status-badge-btn.ongoing-s, .sub-tag-btn.ongoing-s {
     transition: none !important;
