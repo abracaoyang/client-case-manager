@@ -529,12 +529,13 @@
             meetState: row["ＯＡ已面談"] === '已面談' ? 'confirmed' : (row["ＯＡ已面談"] === '喬時間中' ? 'pending' : ''),
             meetTimeSlot: row["ＯＡ時段"] || '',
             planState: row["ＯＡ訪前規劃狀態"] || 'dim',
-            planDate: row["ＯＡ"] || '',
+            planDate: row["ＯＡ訪前規劃日期"] || '',
             practiceState: row["ＯＡ訪前演練狀態"] || 'dim',
-            practiceDate: row["ＯＡ"] || '',
+            practiceDate: row["ＯＡ訪前演練日期"] || '',
             discussState: row["ＯＡ訪後討論狀態"] || 'dim',
-            discussDate: row["ＯＡ"] || '',
+            discussDate: row["ＯＡ訪後討論日期"] || '',
             planNotes: row["ＯＡ訪前規劃備忘"] || '',
+            practiceNotes: row["ＯＡ訪前演練備忘"] || '',
             discussNotes: row["ＯＡ訪後討論備忘"] || '',
             rescheduleHistory: row["ＯＡ改期歷史"] ? parseJsonSafe(row["ＯＡ改期歷史"]) : []
           },
@@ -543,11 +544,13 @@
             meetState: row["ＰＣ已遞送"] === '已遞送' ? 'confirmed' : '',
             meetTimeSlot: row["ＰＣ時段"] || '',
             planState: row["ＰＣ訪前規劃狀態"] || 'dim',
-            planDate: row["ＰＣ"] || '',
+            planDate: row["ＰＣ規劃建議日期"] || '',
             practiceState: row["ＰＣ訪前演練狀態"] || 'dim',
-            practiceDate: row["ＰＣ"] || '',
+            practiceDate: row["ＰＣ講解演練日期"] || '',
             discussState: row["ＰＣ訪後討論狀態"] || 'dim',
-            discussDate: row["ＰＣ"] || '',
+            discussDate: row["ＰＣ已傳建議日期"] || '',
+            planNotes: row["ＰＣ規劃建議備忘"] || '',
+            practiceNotes: row["ＰＣ講解演練備忘"] || '',
             discussNotes: row["ＰＣ訪後討論備忘"] || '',
             rescheduleHistory: row["ＰＣ改期歷史"] ? parseJsonSafe(row["ＰＣ改期歷史"]) : []
           },
@@ -615,16 +618,25 @@
         "ＯＡ訪前演練狀態": oa.practiceState || 'dim',
         "ＯＡ訪後討論狀態": oa.discussState || 'dim',
         "ＯＡ訪前規劃備忘": oa.planNotes || '',
+        "ＯＡ訪前演練備忘": oa.practiceNotes || '',
         "ＯＡ訪後討論備忘": oa.discussNotes || '',
         "ＯＡ改期歷史": JSON.stringify(oa.rescheduleHistory || []),
+        "ＯＡ訪前規劃日期": oa.planDate || '',
+        "ＯＡ訪前演練日期": oa.practiceDate || '',
+        "ＯＡ訪後討論日期": oa.discussDate || '',
         "ＰＣ": pc.meetDate || '',
         "ＰＣ已遞送": pc.meetState === 'confirmed' ? '已遞送' : '未遞送',
         "ＰＣ時段": pc.meetTimeSlot || '',
         "ＰＣ訪前規劃狀態": pc.planState || 'dim',
         "ＰＣ訪前演練狀態": pc.practiceState || 'dim',
         "ＰＣ訪後討論狀態": pc.discussState || 'dim',
+        "ＰＣ規劃建議備忘": pc.planNotes || '',
+        "ＰＣ講解演練備忘": pc.practiceNotes || '',
         "ＰＣ訪後討論備忘": pc.discussNotes || '',
         "ＰＣ改期歷史": JSON.stringify(pc.rescheduleHistory || []),
+        "ＰＣ規劃建議日期": pc.planDate || '',
+        "ＰＣ講解演練日期": pc.practiceDate || '',
+        "ＰＣ已傳建議日期": pc.discussDate || '',
         "Ｃ": cc.meetDate || '',
         "Ｃ已成交": cc.meetState === 'confirmed' ? '已成交' : '未成交',
         "Ｃ文件準備狀態": cc.planState || 'dim',
@@ -1808,9 +1820,6 @@
       const activeCases = cases.filter(c => !c.archived);
       activeCases.forEach(c => {
         const targetDates = [];
-        if (c.saDetails && (c.saDetails.agreeState === 'active' || c.saDetails.intentState === 'intent-yes')) {
-          if (c.saDetails.agreeDate) targetDates.push(c.saDetails.agreeDate);
-        }
         if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
           if (c.oaDetails.meetDate) targetDates.push(c.oaDetails.meetDate);
         }
@@ -1886,9 +1895,7 @@
     function getFilterMatchedClass(c, phase) {
       if (!filterWeeklyDate) return '';
       let targetDate = '';
-      if (phase === 'SA') {
-        if (c.saDetails && c.saDetails.agreeState === 'active') targetDate = c.saDetails.agreeDate || '';
-      } else if (phase === 'OA') {
+      if (phase === 'OA') {
         if (c.oaDetails && c.oaDetails.meetState === 'confirmed') targetDate = c.oaDetails.meetDate || '';
       } else if (phase === 'PC') {
         if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
@@ -1984,9 +1991,6 @@
       if (filterWeeklyDate) {
         visibleCases = visibleCases.filter(c => {
           const targetDates = [];
-          if (c.saDetails && (c.saDetails.agreeState === 'active' || c.saDetails.intentState === 'intent-yes')) {
-            if (c.saDetails.agreeDate) targetDates.push(c.saDetails.agreeDate);
-          }
           if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
             if (c.oaDetails.meetDate) targetDates.push(c.oaDetails.meetDate);
           }
@@ -6460,11 +6464,7 @@
       const todayCases = activeCases.filter(c => {
         let targetDate = '';
         const phase = c.currentPhase || 'SA';
-        if (phase === 'SA') {
-          if (c.saDetails && (c.saDetails.agreeState === 'active' || c.saDetails.intentState === 'intent-yes')) {
-            targetDate = c.saDetails.agreeDate || '';
-          }
-        } else if (phase === 'OA') {
+        if (phase === 'OA') {
           if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
             targetDate = c.oaDetails.meetDate || '';
           }
@@ -6533,11 +6533,7 @@
       const todayCases = activeCases.filter(c => {
         let targetDate = '';
         const phase = c.currentPhase || 'SA';
-        if (phase === 'SA') {
-          if (c.saDetails && (c.saDetails.agreeState === 'active' || c.saDetails.intentState === 'intent-yes')) {
-            targetDate = c.saDetails.agreeDate || '';
-          }
-        } else if (phase === 'OA') {
+        if (phase === 'OA') {
           if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
             targetDate = c.oaDetails.meetDate || '';
           }
