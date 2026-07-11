@@ -5006,7 +5006,8 @@
           details[dateKey] = '';
         } else {
           details[stateKey] = 'active';
-          details[dateKey] = new Date().toISOString().split('T')[0];
+          // 優先保留原本已選定的約定討論/演練日期，若沒有才預設填入今天
+          details[dateKey] = details[dateKey] || new Date().toISOString().split('T')[0];
         }
       });
       
