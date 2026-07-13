@@ -124,10 +124,11 @@
     if (!crmSettings.customSubTagPriority) {
       crmSettings.customSubTagPriority = {
         "sa_send": 5, "sa_reply": 4, "sa_agree": 3,
-        "oa_plan": 8, "oa_practice": 7, "oa_discuss": 10,
-        "pc_plan": 7, "pc_discuss": 6, "pc_practice": 8,
-        "c_plan": 9, "c_sign": 7, "c_practice": 6, "c_remedy": 10, "c_submit": 8, "c_discuss": 5,
-        "s_plan": 4, "s_practice": 3, "s_discuss": 3
+        "sa_pending": 3, "sa_intent_pending": 2, "sa_intent_no": 0,
+        "oa_plan": 8, "oa_practice": 7, "oa_discuss": 10, "oa_pending": 3,
+        "pc_plan": 7, "pc_discuss": 6, "pc_practice": 8, "pc_pending": 3,
+        "c_plan": 9, "c_sign": 7, "c_practice": 6, "c_remedy": 10, "c_submit": 8, "c_discuss": 5, "c_pending": 3,
+        "s_plan": 4, "s_practice": 3, "s_discuss": 3, "s_pending": 3
       };
     }
     if (!crmSettings.activeNotificationRules) {
@@ -537,7 +538,8 @@
             planNotes: row["ＯＡ訪前規劃備忘"] || '',
             practiceNotes: row["ＯＡ訪前演練備忘"] || '',
             discussNotes: row["ＯＡ訪後討論備忘"] || '',
-            rescheduleHistory: row["ＯＡ改期歷史"] ? parseJsonSafe(row["ＯＡ改期歷史"]) : []
+            rescheduleHistory: row["ＯＡ改期歷史"] ? parseJsonSafe(row["ＯＡ改期歷史"]) : [],
+            visitTasks: row["ＯＡ現場任務"] ? parseJsonSafe(row["ＯＡ現場任務"]) : []
           },
           pcDetails: {
             meetDate: row["ＰＣ"] || '',
@@ -552,7 +554,8 @@
             planNotes: row["ＰＣ規劃建議備忘"] || '',
             practiceNotes: row["ＰＣ講解演練備忘"] || '',
             discussNotes: row["ＰＣ訪後討論備忘"] || '',
-            rescheduleHistory: row["ＰＣ改期歷史"] ? parseJsonSafe(row["ＰＣ改期歷史"]) : []
+            rescheduleHistory: row["ＰＣ改期歷史"] ? parseJsonSafe(row["ＰＣ改期歷史"]) : [],
+            visitTasks: row["ＰＣ現場任務"] ? parseJsonSafe(row["ＰＣ現場任務"]) : []
           },
           cDetails: {
             meetDate: row["Ｃ"] || '',
@@ -573,7 +576,8 @@
             discussState: row["Ｃ保費首扣狀態"] || 'dim',
             discussDate: row["Ｃ保費首扣日期"] || '',
             discussNotes: row["Ｃ保費首扣備忘"] || '',
-            rescheduleHistory: row["Ｃ改期歷史"] ? parseJsonSafe(row["Ｃ改期歷史"]) : []
+            rescheduleHistory: row["Ｃ改期歷史"] ? parseJsonSafe(row["Ｃ改期歷史"]) : [],
+            visitTasks: row["Ｃ現場任務"] ? parseJsonSafe(row["Ｃ現場任務"]) : []
           },
           sDetails: {
             meetDate: row["Ｓ"] || '',
@@ -585,7 +589,8 @@
             practiceDate: row["Ｓ"] || '',
             discussState: row["Ｓ週年服務狀態"] || 'dim',
             discussDate: row["Ｓ"] || '',
-            discussNotes: row["Ｓ週年服務備忘"] || ''
+            discussNotes: row["Ｓ週年服務備忘"] || '',
+            visitTasks: row["Ｓ現場任務"] ? parseJsonSafe(row["Ｓ現場任務"]) : []
           }
         };
       });
@@ -673,6 +678,10 @@
         "議題發想備忘": c.issueNote || '',
         "Ｃ時段": (c.cDetails ? c.cDetails.meetTimeSlot : '') || '',
         "Ｓ時段": (c.sDetails ? c.sDetails.meetTimeSlot : '') || '',
+        "ＯＡ現場任務": JSON.stringify(oa.visitTasks || []),
+        "ＰＣ現場任務": JSON.stringify(pc.visitTasks || []),
+        "Ｃ現場任務": JSON.stringify(cc.visitTasks || []),
+        "Ｓ現場任務": JSON.stringify(s.visitTasks || []),
         "最後更新時間": c.lastUpdated || ''
       };
     }
@@ -1220,6 +1229,11 @@
     }
 
     async function init() {
+      // 偵測是否為觸控平板/行動裝置，若是則加上 is-touch-device class
+      const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      if (isTouch) {
+        document.body.classList.add('is-touch-device');
+      }
       initKeyboardShortcuts();
       debugLog("init() 流程啟動");
       try {
@@ -2022,10 +2036,12 @@
         visibleCases.sort((a, b) => {
           const getCaseWeight = (c) => {
             let maxW = 0;
-            const check = (state, tagKey) => {
-              if (state === 'active' || state === 'ongoing') {
-                const w = priorityMap[tagKey] || 5;
-                if (w > maxW) maxW = w;
+            // expectedStates 預設為 active 和 ongoing
+            const check = (state, tagKey, expectedStates = ['active', 'ongoing']) => {
+              if (expectedStates.includes(state)) {
+                // 優先使用自訂權重，設為 0 表示不參與排序
+                const w = priorityMap[tagKey] !== undefined ? priorityMap[tagKey] : 5;
+                if (w > 0 && w > maxW) maxW = w;
               }
             };
             // SA
@@ -2033,18 +2049,26 @@
               if (c.saDetails.sendState === 'active') check('active', 'sa_send');
               if (c.saDetails.replyState === 'active' || c.saDetails.replyState === 'ongoing') check('active', 'sa_reply');
               if (c.saDetails.agreeState === 'active') check('active', 'sa_agree');
+              // 新增：SA 喬時間中、考慮中、沒意願的排序權重判斷
+              if (c.saDetails.intentState === 'pending') check('pending', 'sa_pending', ['pending']);
+              if (c.saDetails.intentState === 'intent-pending') check('intent-pending', 'sa_intent_pending', ['intent-pending']);
+              if (c.saDetails.intentState === 'intent-no') check('intent-no', 'sa_intent_no', ['intent-no']);
             }
             // OA
             if (c.oaDetails) {
               check(c.oaDetails.planState, 'oa_plan');
               check(c.oaDetails.practiceState, 'oa_practice');
               check(c.oaDetails.discussState, 'oa_discuss');
+              // 新增：OA 喬時間中
+              if (c.oaDetails.meetState === 'pending') check('pending', 'oa_pending', ['pending']);
             }
             // PC
             if (c.pcDetails) {
               check(c.pcDetails.planState, 'pc_plan');
               check(c.pcDetails.discussState, 'pc_discuss');
               check(c.pcDetails.practiceState, 'pc_practice');
+              // 新增：PC 喬時間中
+              if (c.pcDetails.meetState === 'pending') check('pending', 'pc_pending', ['pending']);
             }
             // C
             if (c.cDetails) {
@@ -2054,12 +2078,16 @@
               check(c.cDetails.remedyState, 'c_remedy');
               check(c.cDetails.submitState, 'c_submit');
               check(c.cDetails.discussState, 'c_discuss');
+              // 新增：C 喬時間中
+              if (c.cDetails.meetState === 'pending') check('pending', 'c_pending', ['pending']);
             }
             // S
             if (c.sDetails) {
               check(c.sDetails.planState, 's_plan');
               check(c.sDetails.practiceState, 's_practice');
               check(c.sDetails.discussState, 's_discuss');
+              // 新增：S 喬時間中
+              if (c.sDetails.meetState === 'pending') check('pending', 's_pending', ['pending']);
             }
             return maxW;
           };
@@ -2373,20 +2401,25 @@
 
       // Tablet Fix: 重新調整平板與桌機之 RWD 斷點，並做響應式定位與對齊，防止橫向溢出
       if (window.innerWidth >= 1024) {
+        // 設定為 row 滿寬，但不能小於各階段原定之最低橫寬 (drawerWidth)
+        const finalWidth = ['OA', 'PC', 'C', 'S'].includes(section)
+          ? Math.max(drawerWidth, rowWidth - 20)
+          : drawerWidth;
+
         const lightCenter = elementLeft + elementWidth / 2;
-        let computedLeft = lightCenter - (drawerWidth / 2);
+        let computedLeft = lightCenter - (finalWidth / 2);
         
         // 避免超出右邊界
-        if (computedLeft + drawerWidth > rowWidth - 20) {
-          computedLeft = rowWidth - 20 - drawerWidth;
+        if (computedLeft + finalWidth > rowWidth - 20) {
+          computedLeft = rowWidth - 20 - finalWidth;
         }
         
         // 避免超出左邊界
         if (computedLeft < 10) computedLeft = 10;
 
         drawerContent.style.marginLeft = `${computedLeft}px`;
-        drawerContent.style.width = `${drawerWidth}px`;
-
+        drawerContent.style.width = `${finalWidth}px`;
+        
         // 箭頭定位在亮燈中心
         const arrowLeft = (targetRect.left + targetRect.width / 2) - rowRect.left;
         arrow.style.left = `${arrowLeft - 8}px`;
@@ -3415,6 +3448,8 @@
             </div>
           </div>
 
+          ${renderVisitTasksSection(c, 'OA')}
+
           <div style="flex: 4.2; min-width: 0; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
             <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 訪前訪後準備工作</div>
@@ -3542,6 +3577,8 @@
             </div>
           </div>
 
+          ${renderVisitTasksSection(c, 'PC')}
+
           <div style="flex: 4.2; min-width: 0; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
             <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 建議草案規劃與演練</div>
@@ -3667,6 +3704,8 @@
             </div>
           </div>
 
+          ${renderVisitTasksSection(c, 'C')}
+
           <div style="flex: 4.2; min-width: 0; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
             <div style="height:100%; display:flex; flex-direction:column; justify-content:space-between;">
               <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">🛠️ 成交及核保追蹤</div>
@@ -3784,6 +3823,8 @@
             </div>
             <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000; margin-top: 12px;">✓ 完成</button>
           </div>
+
+          ${renderVisitTasksSection(c, 'S')}
 
           <div style="flex: 3.4; min-width: 0; display:flex; flex-direction:column; justify-content:space-between; height:100%;">
             <div>
@@ -5689,8 +5730,17 @@
       seconds: 0,
       intervalId: null,
       isPaused: false,
-      startTime: null
+      startTime: null,
+      isPomodoro: false,
+      pomodoroRemaining: 1500
     };
+
+    // 格式化秒數為番茄鐘格式 MM:SS
+    function formatPomodoroTime(totalSeconds) {
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
 
     // 格式化秒數為碼表格式 00:00:00
     function formatSecondsToClock(totalSeconds) {
@@ -5715,8 +5765,13 @@
     // 無條件重設所有計時器按鈕與顯示 UI 到初始狀態
     function resetTimerButtonsUI() {
       // 1. 碼錶數字與狀態
-      document.getElementById('timer-clock-display').textContent = '00:00:00';
-      document.getElementById('timer-clock-display').className = 'timer-display';
+      if (activeTodoTimer.isPomodoro) {
+        document.getElementById('timer-clock-display').textContent = formatPomodoroTime(activeTodoTimer.pomodoroRemaining);
+        document.getElementById('timer-clock-display').className = 'timer-display pomodoro';
+      } else {
+        document.getElementById('timer-clock-display').textContent = '00:00:00';
+        document.getElementById('timer-clock-display').className = 'timer-display';
+      }
       
       // 2. 開始按鈕啟用
       document.getElementById('btn-timer-start').disabled = false;
@@ -5734,6 +5789,16 @@
       
       // 5. 當次備忘清空
       document.getElementById('timer-current-note').value = '';
+      
+      // 6. 重置番茄鐘按鈕啟用
+      const pomoBtn = document.getElementById('btn-timer-pomodoro');
+      if (pomoBtn) {
+        pomoBtn.disabled = false;
+        pomoBtn.textContent = '🍅 啟動番茄專注 (25分鐘)';
+        pomoBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+        pomoBtn.style.borderColor = '#ef4444';
+        pomoBtn.style.color = '#f87171';
+      }
     }
 
     // 開啟待辦計時 Modal
@@ -5748,6 +5813,8 @@
       if (!t) return;
 
       activeTodoTimer.todoId = todoId;
+      activeTodoTimer.isPomodoro = false;
+      activeTodoTimer.pomodoroRemaining = 1500;
       
       // 更新標題與關聯資訊
       document.getElementById('timer-todo-title').textContent = `🎯 ${t.title}`;
@@ -5795,17 +5862,34 @@
       activeTodoTimer.startTime = activeTodoTimer.startTime || new Date();
       
       const displayEl = document.getElementById('timer-clock-display');
-      displayEl.className = 'timer-display running';
+      displayEl.className = 'timer-display running' + (activeTodoTimer.isPomodoro ? ' pomodoro' : '');
 
       document.getElementById('btn-timer-start').disabled = true;
+      const pomoBtn = document.getElementById('btn-timer-pomodoro');
+      if (pomoBtn) {
+        pomoBtn.disabled = true;
+        pomoBtn.textContent = '🍅 番茄專注倒數中...';
+      }
+
       document.getElementById('btn-timer-pause').disabled = false;
       document.getElementById('btn-timer-stop').disabled = false;
 
       if (!activeTodoTimer.intervalId) {
         activeTodoTimer.intervalId = setInterval(() => {
           if (!activeTodoTimer.isPaused) {
-            activeTodoTimer.seconds++;
-            displayEl.textContent = formatSecondsToClock(activeTodoTimer.seconds);
+            if (activeTodoTimer.isPomodoro) {
+              activeTodoTimer.seconds++;
+              activeTodoTimer.pomodoroRemaining--;
+              displayEl.textContent = formatPomodoroTime(activeTodoTimer.pomodoroRemaining);
+              
+              if (activeTodoTimer.pomodoroRemaining <= 0) {
+                // 自動結束當次計時並儲存，觸發番茄鐘完工彈窗
+                stopTodoTimer();
+              }
+            } else {
+              activeTodoTimer.seconds++;
+              displayEl.textContent = formatSecondsToClock(activeTodoTimer.seconds);
+            }
           }
         }, 1000);
       }
@@ -5824,13 +5908,13 @@
         pauseBtn.style.color = '#f59e0b';
         pauseBtn.style.borderColor = '#f59e0b';
         pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
-        displayEl.className = 'timer-display'; // 取消綠光
+        displayEl.className = 'timer-display' + (activeTodoTimer.isPomodoro ? ' pomodoro' : ''); // 取消綠光
       } else {
         pauseBtn.textContent = '暫停計時';
         pauseBtn.style.color = '#f59e0b';
         pauseBtn.style.borderColor = '#f59e0b';
         pauseBtn.style.background = 'rgba(245, 158, 11, 0.1)';
-        displayEl.className = 'timer-display running'; // 恢復綠光
+        displayEl.className = 'timer-display running' + (activeTodoTimer.isPomodoro ? ' pomodoro' : ''); // 恢復綠光
       }
     }
 
@@ -5843,13 +5927,19 @@
       
       const todoId = activeTodoTimer.todoId;
       const spentSeconds = activeTodoTimer.seconds;
-      const noteText = document.getElementById('timer-current-note').value.trim();
+      const noteText = activeTodoTimer.isPomodoro 
+        ? '🍅 完成 25 分鐘番茄鐘專注' 
+        : document.getElementById('timer-current-note').value.trim();
+
+      const wasPomodoro = activeTodoTimer.isPomodoro;
 
       // 重設計時器狀態（但保留當前 todoId，以相容同一個面板內進行第二輪計時）
       activeTodoTimer.seconds = 0;
       activeTodoTimer.intervalId = null;
       activeTodoTimer.isPaused = false;
       activeTodoTimer.startTime = null;
+      activeTodoTimer.isPomodoro = false;
+      activeTodoTimer.pomodoroRemaining = 1500;
 
       // 儲存至資料庫
       const t = todos.find(x => x.id === todoId);
@@ -5889,6 +5979,11 @@
           
           // 重設按鈕與顯示 UI
           resetTimerButtonsUI();
+        }
+
+        // 觸發番茄鐘完工多巴胺提醒
+        if (wasPomodoro) {
+          showPomodoroSuccessModal(t.title);
         }
       }
     }
@@ -6326,18 +6421,24 @@
       let html = '';
       
       // 定義實存於案件主幹道/抽屜中的次標籤（以大階段固定順序排列，點擊 +/- 絕不跑位跳行）
+      // 擴展狀態：將「喬時間中」、「考慮中」與「沒意願」狀態獨立拆分，以便自訂優先級。
       const sortingTags = [
         { phase: 'SA', value: 'sa_send', label: '已發出' },
         { phase: 'SA', value: 'sa_reply', label: '互動中' },
         { phase: 'SA', value: 'sa_agree', label: '已約定' },
+        { phase: 'SA', value: 'sa_pending', label: '喬時間中' },
+        { phase: 'SA', value: 'sa_intent_pending', label: '考慮中/未約定' },
+        { phase: 'SA', value: 'sa_intent_no', label: '沒意願/已擱置' },
         
         { phase: 'OA', value: 'oa_plan', label: '訪前規劃' },
         { phase: 'OA', value: 'oa_practice', label: '訪前演練' },
         { phase: 'OA', value: 'oa_discuss', label: '訪後討論' },
+        { phase: 'OA', value: 'oa_pending', label: '喬時間中' },
         
         { phase: 'PC', value: 'pc_plan', label: '規劃建議' },
         { phase: 'PC', value: 'pc_discuss', label: '已傳建議' },
         { phase: 'PC', value: 'pc_practice', label: '講解演練' },
+        { phase: 'PC', value: 'pc_pending', label: '喬時間中' },
         
         { phase: 'C', value: 'c_plan', label: '文件準備' },
         { phase: 'C', value: 'c_sign', label: '簽約' },
@@ -6345,10 +6446,12 @@
         { phase: 'C', value: 'c_remedy', label: '補件' },
         { phase: 'C', value: 'c_submit', label: '送件' },
         { phase: 'C', value: 'c_discuss', label: '保費首扣' },
+        { phase: 'C', value: 'c_pending', label: '喬時間中' },
         
         { phase: 'S', value: 's_plan', label: '保單送達' },
         { phase: 'S', value: 's_practice', label: '契撤追蹤' },
-        { phase: 'S', value: 's_discuss', label: '週年服務' }
+        { phase: 'S', value: 's_discuss', label: '週年服務' },
+        { phase: 'S', value: 's_pending', label: '喬時間中' }
       ];
       
       const items = sortingTags.map(item => {
@@ -6357,11 +6460,14 @@
       });
       
       html = items.map(item => {
+        const isZero = item.weight === 0;
+        const weightStyle = isZero ? 'color:#6c757d; font-weight:normal;' : '';
+        const weightDisplay = isZero ? '0 (不排序)' : item.weight;
         return `<div class="priority-sort-item">
           <span style="font-weight:600;"><span style="color:${getPhaseColor(item.phase)}; font-size:0.7rem; font-family:monospace; margin-right:4px;">${item.phase}</span> ${item.label}</span>
           <div class="priority-weight-control">
             <button type="button" class="priority-btn" onclick="changePriorityWeight('${item.value}', -1)">-</button>
-            <span class="priority-weight-display" id="weight-display-${item.value}">${item.weight}</span>
+            <span class="priority-weight-display" id="weight-display-${item.value}" style="${weightStyle}">${weightDisplay}</span>
             <button type="button" class="priority-btn" onclick="changePriorityWeight('${item.value}', 1)">+</button>
           </div>
         </div>`;
@@ -6374,14 +6480,24 @@
       if (!crmSettings.customSubTagPriority) crmSettings.customSubTagPriority = {};
       let current = crmSettings.customSubTagPriority[subTag] !== undefined ? crmSettings.customSubTagPriority[subTag] : 5;
       current += delta;
-      if (current < 1) current = 1;
+      if (current < 0) current = 0; // 下限改為 0，表示不參與排序
       if (current > 10) current = 10;
       
       crmSettings.customSubTagPriority[subTag] = current;
       localStorage.setItem('crm_settings', JSON.stringify(crmSettings));
       
       const display = document.getElementById(`weight-display-${subTag}`);
-      if (display) display.textContent = current;
+      if (display) {
+        if (current === 0) {
+          display.textContent = '0 (不排序)';
+          display.style.color = '#6c757d';
+          display.style.fontWeight = 'normal';
+        } else {
+          display.textContent = current;
+          display.style.color = '';
+          display.style.fontWeight = '600';
+        }
+      }
       
       // 更新權重後只重新排序渲染案件卡片，不再重繪自訂列表以防跳行
       renderCases();
@@ -6392,20 +6508,22 @@
         // 臨門一腳優先 (收單/補件優先)
         crmSettings.customSubTagPriority = {
           "sa_send": 3, "sa_reply": 4, "sa_agree": 5,
-          "oa_plan": 5, "oa_practice": 6, "oa_discuss": 7,
-          "pc_plan": 7, "pc_discuss": 8, "pc_practice": 6,
-          "c_plan": 9, "c_sign": 9, "c_practice": 8, "c_remedy": 10, "c_submit": 10, "c_discuss": 7,
-          "s_plan": 4, "s_practice": 3, "s_discuss": 3
+          "sa_pending": 3, "sa_intent_pending": 2, "sa_intent_no": 0,
+          "oa_plan": 5, "oa_practice": 6, "oa_discuss": 7, "oa_pending": 3,
+          "pc_plan": 7, "pc_discuss": 8, "pc_practice": 6, "pc_pending": 3,
+          "c_plan": 9, "c_sign": 9, "c_practice": 8, "c_remedy": 10, "c_submit": 10, "c_discuss": 7, "c_pending": 3,
+          "s_plan": 4, "s_practice": 3, "s_discuss": 3, "s_pending": 3
         };
         showToast('已套用：🎯 臨門一腳收單優先模版', 'success');
       } else if (type === 'dev') {
         // 新客開發優先 (約訪/說明優先)
         crmSettings.customSubTagPriority = {
           "sa_send": 8, "sa_reply": 9, "sa_agree": 10,
-          "oa_plan": 9, "oa_practice": 8, "oa_discuss": 6,
-          "pc_plan": 8, "pc_discuss": 6, "pc_practice": 7,
-          "c_plan": 6, "c_sign": 5, "c_practice": 5, "c_remedy": 5, "c_submit": 5, "c_discuss": 4,
-          "s_plan": 3, "s_practice": 2, "s_discuss": 2
+          "sa_pending": 8, "sa_intent_pending": 5, "sa_intent_no": 0,
+          "oa_plan": 9, "oa_practice": 8, "oa_discuss": 6, "oa_pending": 6,
+          "pc_plan": 8, "pc_discuss": 6, "pc_practice": 7, "pc_pending": 6,
+          "c_plan": 6, "c_sign": 5, "c_practice": 5, "c_remedy": 5, "c_submit": 5, "c_discuss": 4, "c_pending": 4,
+          "s_plan": 3, "s_practice": 2, "s_discuss": 2, "s_pending": 3
         };
         showToast('已套用：✨ 新客開發優先模版', 'success');
       }
@@ -6544,12 +6662,26 @@
         // 預設的出門備忘 (Checklist)
         const defaultChecklistKey = `visit_checklist_${c.id}_${todayStr}`;
         let localChecklist = {};
-        try {
-          localChecklist = JSON.parse(localStorage.getItem(defaultChecklistKey)) || {
-            props: false, docs: false, device: false, gift: false, note: false
-          };
-        } catch(e) {
-          localChecklist = { props: false, docs: false, device: false, gift: false, note: false };
+        // 讀取該階段的現場任務規劃
+        const detailsKey = `${phase.toLowerCase()}Details`;
+        const visitTasks = (c[detailsKey] && c[detailsKey].visitTasks) || [];
+
+        let visitTasksHtml = '';
+        if (visitTasks.length === 0) {
+          visitTasksHtml = `
+            <div style="font-size:0.72rem; color:var(--text-secondary); text-align:center; padding:10px 0; border: 1px dashed rgba(255,255,255,0.06); border-radius:6px; background:rgba(255,255,255,0.01); width:100%; box-sizing:border-box;">
+              📭 無特定現場任務，可點開案件抽屜進行任務規劃
+            </div>
+          `;
+        } else {
+          visitTasksHtml = visitTasks.map(t => {
+            return `
+              <div class="visit-checklist-item ${t.done ? 'checked' : ''}" onclick="toggleVisitTask('${c.id}', '${phase}', '${t.id}')" style="width:100%; box-sizing:border-box;">
+                <span class="visit-checklist-checkbox">${t.done ? '✓' : ''}</span>
+                <span class="visit-checklist-text" style="${t.done ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">${t.text}</span>
+              </div>
+            `;
+          }).join('');
         }
 
         // 讀取該案件今天到期的待辦事項
@@ -6567,32 +6699,13 @@
             <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:12px;">
               📍 階段進度備忘：${c.summaryDescription || '無備忘描述'}
             </div>
-
-            <!-- 出門必備勾選 -->
+            
+            <!-- 現場執行任務清單 -->
             <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
               <div style="font-size:0.75rem; font-weight:700; color:var(--accent); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
-                🧳 出門物品防呆檢核
+                🧳 現場執行任務防呆檢核
               </div>
-              <div class="visit-checklist-item ${localChecklist.props ? 'checked' : ''}" onclick="toggleVisitCheckItem('${c.id}', 'props')">
-                <span class="visit-checklist-checkbox">${localChecklist.props ? '✓' : ''}</span>
-                <span class="visit-checklist-text">建議書 / 方案說明文件</span>
-              </div>
-              <div class="visit-checklist-item ${localChecklist.docs ? 'checked' : ''}" onclick="toggleVisitCheckItem('${c.id}', 'docs')">
-                <span class="visit-checklist-checkbox">${localChecklist.docs ? '✓' : ''}</span>
-                <span class="visit-checklist-text">要保書 / 申請表單空本</span>
-              </div>
-              <div class="visit-checklist-item ${localChecklist.device ? 'checked' : ''}" onclick="toggleVisitCheckItem('${c.id}', 'device')">
-                <span class="visit-checklist-checkbox">${localChecklist.device ? '✓' : ''}</span>
-                <span class="visit-checklist-text">iPad / 筆記型電腦 (確保充滿電)</span>
-              </div>
-              <div class="visit-checklist-item ${localChecklist.gift ? 'checked' : ''}" onclick="toggleVisitCheckItem('${c.id}', 'gift')">
-                <span class="visit-checklist-checkbox">${localChecklist.gift ? '✓' : ''}</span>
-                <span class="visit-checklist-text">伴手禮 / 面試小禮物</span>
-              </div>
-              <div class="visit-checklist-item ${localChecklist.note ? 'checked' : ''}" onclick="toggleVisitCheckItem('${c.id}', 'note')">
-                <span class="visit-checklist-checkbox">${localChecklist.note ? '✓' : ''}</span>
-                <span class="visit-checklist-text">隨身文具 / 簽字筆 / 筆記本</span>
-              </div>
+              ${visitTasksHtml}
             </div>
 
             <!-- 當日關聯待辦 -->
@@ -6766,6 +6879,109 @@
       }
     }
 
+    window.addVisitTask = function(caseId, phase, taskText) {
+      if (!taskText || !taskText.trim()) return;
+      updateCase(caseId, c => {
+        const detailsKey = `${phase.toLowerCase()}Details`;
+        if (!c[detailsKey]) c[detailsKey] = {};
+        if (!c[detailsKey].visitTasks) c[detailsKey].visitTasks = [];
+        c[detailsKey].visitTasks.push({
+          id: 'vt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          text: taskText.trim(),
+          done: false
+        });
+      }, false);
+      saveCasesToStorage();
+      const updatedC = cases.find(item => item.id === caseId);
+      refreshDrawerContent(caseId, phase, updatedC);
+      
+      // 新增後自動聚焦回輸入框，方便連續輸入現場任務
+      setTimeout(() => {
+        const inputEl = document.getElementById(`new-visit-task-input-${caseId}-${phase}`);
+        if (inputEl) {
+          inputEl.focus();
+        }
+      }, 50);
+    };
+
+    window.toggleVisitTask = function(caseId, phase, taskId) {
+      updateCase(caseId, c => {
+        const detailsKey = `${phase.toLowerCase()}Details`;
+        if (c[detailsKey] && c[detailsKey].visitTasks) {
+          const task = c[detailsKey].visitTasks.find(t => t.id === taskId);
+          if (task) {
+            task.done = !task.done;
+          }
+        }
+      }, false);
+      saveCasesToStorage();
+      const updatedC = cases.find(item => item.id === caseId);
+      refreshDrawerContent(caseId, phase, updatedC);
+      const visitDrawer = document.getElementById('visit-drawer');
+      if (visitDrawer && visitDrawer.classList.contains('active')) {
+        renderVisitDrawer();
+      }
+    };
+
+    window.deleteVisitTask = function(caseId, phase, taskId) {
+      updateCase(caseId, c => {
+        const detailsKey = `${phase.toLowerCase()}Details`;
+        if (c[detailsKey] && c[detailsKey].visitTasks) {
+          c[detailsKey].visitTasks = c[detailsKey].visitTasks.filter(t => t.id !== taskId);
+        }
+      }, false);
+      saveCasesToStorage();
+      const updatedC = cases.find(item => item.id === caseId);
+      refreshDrawerContent(caseId, phase, updatedC);
+      const visitDrawer = document.getElementById('visit-drawer');
+      if (visitDrawer && visitDrawer.classList.contains('active')) {
+        renderVisitDrawer();
+      }
+    };
+
+    function renderVisitTasksSection(c, phase) {
+      const detailsKey = `${phase.toLowerCase()}Details`;
+      const details = c[detailsKey] || {};
+      const tasks = details.visitTasks || [];
+      const phaseColor = getPhaseColor(phase) || 'var(--accent)';
+
+      let tasksHtml = '';
+      if (tasks.length === 0) {
+        tasksHtml = `<div style="color:var(--text-secondary); font-size:0.72rem; text-align:center; padding:15px 0;">無現場任務，請於上方輸入新增</div>`;
+      } else {
+        tasksHtml = tasks.map(t => {
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); padding:4px 6px; border-radius:4px; margin-bottom:4px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.72rem; cursor:pointer; color:#fff; flex:1; min-width:0; user-select:none;">
+                <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleVisitTask('${c.id}', '${phase}', '${t.id}')" style="accent-color:${phaseColor}; cursor:pointer;">
+                <span style="${t.done ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.text}</span>
+              </label>
+              <button onclick="deleteVisitTask('${c.id}', '${phase}', '${t.id}')" style="background:transparent; border:none; color:var(--text-secondary); cursor:pointer; font-size:0.7rem; padding:2px 4px; display:flex; align-items:center; transition:color 0.2s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-secondary)'">🗑️</button>
+            </div>
+          `;
+        }).join('');
+      }
+
+      return `
+        <div style="flex: 1.8; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 12px; display:flex; flex-direction:column; gap:6px; min-width: 0; height:100%;">
+          <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📋 現場任務規劃</div>
+          
+
+
+          <!-- 新增任務輸入框與按鈕 -->
+          <div style="display:flex; gap:4px; margin-bottom:4px;">
+            <input type="text" id="new-visit-task-input-${c.id}-${phase}" placeholder="輸入現場任務..." style="flex:1; padding:2px 6px; font-size:0.72rem; height:22px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;" onkeydown="if(event.key === 'Enter') { addVisitTask('${c.id}', '${phase}', this.value); this.value=''; }">
+            <button onclick="const input = document.getElementById('new-visit-task-input-${c.id}-${phase}'); addVisitTask('${c.id}', '${phase}', input.value); input.value='';" class="btn" style="height:22px; padding:0 6px; font-size:0.72rem; border-color:${phaseColor}; color:${phaseColor}; background:${phaseColor}10; display:flex; align-items:center; justify-content:center;">＋</button>
+          </div>
+
+          <!-- 現場任務 Checklist 列表 -->
+          <div style="flex:1; overflow-y:auto; max-height:160px; padding-right:2px;">
+            ${tasksHtml}
+          </div>
+        </div>
+      `;
+    }
+
     // ===================================================
 
     // 頁面載入初始化
@@ -6778,3 +6994,65 @@
       debugLog("document 已載入完畢，直接執行 init()");
       init();
     }
+
+    // 啟動番茄鐘模式
+    window.startPomodoroMode = function() {
+      if (activeTodoTimer.intervalId) return;
+      
+      activeTodoTimer.isPomodoro = true;
+      activeTodoTimer.pomodoroRemaining = 1500; // 25 分鐘
+      activeTodoTimer.seconds = 0;
+      
+      // 更新時鐘為 25:00
+      document.getElementById('timer-clock-display').textContent = '25:00';
+      document.getElementById('timer-clock-display').className = 'timer-display pomodoro';
+      
+      startTodoTimer();
+    };
+
+    // 顯示多巴胺滿格專注成功 Modal
+    function showPomodoroSuccessModal(taskTitle) {
+      document.getElementById('pomodoro-completed-task-title').textContent = `專注任務：${taskTitle}`;
+      const overlay = document.getElementById('pomodoro-success-modal');
+      overlay.style.display = 'flex';
+      setTimeout(() => {
+        overlay.style.opacity = '1';
+        overlay.querySelector('.modal-box').style.transform = 'scale(1)';
+      }, 50);
+      
+      // 播放提示聲 (使用原生 Audio API API 產出簡短的叮咚聲反饋)
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); // E5
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.3); // G5
+        osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.45); // C6
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.8);
+      } catch (e) {
+        console.warn('音效播放失敗', e);
+      }
+    }
+
+    window.closePomodoroSuccessModal = function() {
+      const overlay = document.getElementById('pomodoro-success-modal');
+      overlay.style.opacity = '0';
+      overlay.querySelector('.modal-box').style.transform = 'scale(0.9)';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 300);
+    };
+
+    window.startNextPomodoro = function() {
+      closePomodoroSuccessModal();
+      setTimeout(() => {
+        startPomodoroMode();
+      }, 400);
+    };

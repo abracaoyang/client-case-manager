@@ -1168,8 +1168,46 @@ html {
 
 
 
-    /* 📱 響應式 RWD 介面設計 */
-    @media (max-width: 1024px) {
+    /* 📱 響應式 RWD 介面設計 - 平板專屬微調 (769px ~ 1024px) */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      body {
+        padding: 0.75rem 1rem !important;
+      }
+      .case-row {
+        gap: 8px !important;
+        padding: 8px 12px !important;
+      }
+      .flow-track {
+        gap: 2px !important;
+      }
+      .flow-node {
+        width: 62px !important;
+      }
+      .node-dot {
+        width: 24px !important;
+        height: 24px !important;
+        font-size: 0.65rem !important;
+      }
+      .node-label {
+        font-size: 0.6rem !important;
+        transform: scale(0.95);
+      }
+      .sub-tag-group {
+        gap: 3px !important;
+      }
+      .sub-tag-btn {
+        font-size: 0.62rem !important;
+        padding: 1px 4px !important;
+      }
+      /* 調整客戶姓名與進度條的彈性縮放比例 */
+      .case-row > div:first-child {
+        min-width: 130px !important;
+        max-width: 160px !important;
+      }
+    }
+
+    /* 📱 響應式 RWD 介面設計 - 手機版卡片排版 */
+    @media (max-width: 768px) {
       body {
         padding: 1rem;
       }
@@ -1881,6 +1919,15 @@ html {
     border-color: #10b981;
     box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
   }
+  .timer-display.pomodoro {
+    color: #f87171;
+    border-color: #ef4444;
+  }
+  .timer-display.running.pomodoro {
+    color: #f87171;
+    border-color: #ef4444;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.35);
+  }
 
   /* 子 Modal 樣式 (權重高於計時 Modal，z-index: 1200) */
   #edit-log-modal, #timer-confirm-modal {
@@ -2225,11 +2272,11 @@ html {
 
   /* === C階段次標籤呼吸亮燈特效 === */
   @keyframes ongoing-purple-pulse {
-    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
-    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
-    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    0% { background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.3); box-shadow: 0 0 3px rgba(168, 85, 247, 0.2); }
+    50% { background: rgba(168, 85, 247, 0.35); border-color: rgba(168, 85, 247, 0.95); box-shadow: 0 0 10px rgba(168, 85, 247, 0.6); }
+    100% { background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.3); box-shadow: 0 0 3px rgba(168, 85, 247, 0.2); }
   }
-  /* OA 階段次標籤呼吸發光 (統一橘色) */
+  /* OA 階段次標籤呼吸發光 (暖橘色) */
   @keyframes ongoing-oa-pulse {
     0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
     50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
@@ -2238,46 +2285,46 @@ html {
   .status-badge-btn.ongoing-oa, .sub-tag-btn.ongoing-oa {
     transition: none !important;
     animation: ongoing-oa-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
+    color: var(--color-oa) !important;
     border-style: solid !important;
   }
 
-  /* PC 階段次標籤呼吸發光 (統一橘色) */
+  /* PC 階段次標籤呼吸發光 (紫色) */
   @keyframes ongoing-pc-pulse {
-    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
-    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
-    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    0% { background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.3); box-shadow: 0 0 3px rgba(168, 85, 247, 0.2); }
+    50% { background: rgba(168, 85, 247, 0.35); border-color: rgba(168, 85, 247, 0.95); box-shadow: 0 0 10px rgba(168, 85, 247, 0.6); }
+    100% { background: rgba(168, 85, 247, 0.08); border-color: rgba(168, 85, 247, 0.3); box-shadow: 0 0 3px rgba(168, 85, 247, 0.2); }
   }
   .status-badge-btn.ongoing-pc, .sub-tag-btn.ongoing-pc {
     transition: none !important;
     animation: ongoing-pc-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
+    color: var(--color-pc) !important;
     border-style: solid !important;
   }
 
-  /* C 階段次標籤呼吸發光 (統一橘色) */
+  /* C 階段次標籤呼吸發光 (綠色) */
   @keyframes ongoing-c-pulse {
-    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
-    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
-    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    0% { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.3); box-shadow: 0 0 3px rgba(34, 197, 94, 0.2); }
+    50% { background: rgba(34, 197, 94, 0.35); border-color: rgba(34, 197, 94, 0.95); box-shadow: 0 0 10px rgba(34, 197, 94, 0.6); }
+    100% { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.3); box-shadow: 0 0 3px rgba(34, 197, 94, 0.2); }
   }
   .status-badge-btn.ongoing-c, .sub-tag-btn.ongoing-c {
     transition: none !important;
     animation: ongoing-c-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
+    color: var(--color-c) !important;
     border-style: solid !important;
   }
 
-  /* S 階段次標籤呼吸發光 (統一橘色) */
+  /* S 階段次標籤呼吸發光 (藍色) */
   @keyframes ongoing-s-pulse {
-    0% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
-    50% { background: rgba(249, 115, 22, 0.35); border-color: rgba(249, 115, 22, 0.95); box-shadow: 0 0 10px rgba(249, 115, 22, 0.6); }
-    100% { background: rgba(249, 115, 22, 0.08); border-color: rgba(249, 115, 22, 0.3); box-shadow: 0 0 3px rgba(249, 115, 22, 0.2); }
+    0% { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 3px rgba(59, 130, 246, 0.2); }
+    50% { background: rgba(59, 130, 246, 0.35); border-color: rgba(59, 130, 246, 0.95); box-shadow: 0 0 10px rgba(59, 130, 246, 0.6); }
+    100% { background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 3px rgba(59, 130, 246, 0.2); }
   }
   .status-badge-btn.ongoing-s, .sub-tag-btn.ongoing-s {
     transition: none !important;
     animation: ongoing-s-pulse 1.8s infinite ease-in-out !important;
-    color: #fff !important;
+    color: var(--color-s) !important;
     border-style: solid !important;
   }
 
@@ -2424,3 +2471,13 @@ html {
       gap: 10px;
     }
   }
+
+  /* 觸控裝置專屬防呆與反饋優化 */
+  .is-touch-device .sub-tag-btn:active, 
+  .is-touch-device .btn:active, 
+  .is-touch-device .case-row:active {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+  

@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>客戶案件管理系統</title>
   <!-- 最早期錯誤偵錯器 (必須在所有其他 script 之前) -->
   <script>
@@ -218,6 +218,9 @@
         <div style="display: flex; flex-direction: column;">
           <!-- 當次計時顯示 -->
           <div id="timer-clock-display" class="timer-display">00:00:00</div>
+          
+          <!-- 番茄鐘專注按鈕 -->
+          <button class="btn" id="btn-timer-pomodoro" onclick="startPomodoroMode()" style="width: 100%; height: 32px; font-weight: 700; background: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #f87171; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;">🍅 啟動番茄專注 (25分鐘)</button>
           
           <!-- 計時按鈕群組 -->
           <div style="display: flex; gap: 8px; margin-bottom: 15px;">
@@ -708,6 +711,23 @@
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
         <button class="btn" id="confirm-modal-btn-cancel" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">取消</button>
         <button class="btn btn-primary" id="confirm-modal-btn-ok" style="font-size: 0.78rem; padding: 5px 14px; cursor: pointer;">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🍅 番茄鐘專注成功多巴胺獎勵 Modal -->
+  <div class="modal-overlay" id="pomodoro-success-modal" style="z-index: 10005; display: none; opacity: 0; transition: opacity 0.3s ease;">
+    <div class="modal-box" style="width: 400px; text-align: center; padding: 2rem; border-color: #ef4444; background: #1e1515; box-shadow: 0 0 30px rgba(239, 68, 68, 0.25); border-radius: 16px; transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="font-size: 4rem; margin-bottom: 1rem; animation: pulse 1s infinite;">🍅</div>
+      <h2 style="color: #f87171; margin: 0 0 10px 0; font-size: 1.5rem; font-weight: 800;">太棒了！專注達成！</h2>
+      <p style="color: #fff; font-size: 0.88rem; margin: 0 0 12px 0; font-weight: 600;" id="pomodoro-completed-task-title"></p>
+      <p style="color: var(--text-secondary); font-size: 0.8rem; line-height: 1.6; margin: 0 0 20px 0;">
+        您已成功完成一個 25 分鐘的番茄鐘專注！<br>
+        大腦工作辛苦了，現在給自己 5 分鐘的休息時間吧。
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+        <button class="btn" onclick="closePomodoroSuccessModal()" style="padding: 8px 18px; font-size: 0.82rem; font-weight: 700; flex: 1;">休息 5 分鐘 ☕</button>
+        <button class="btn" onclick="startNextPomodoro()" style="padding: 8px 18px; font-size: 0.82rem; font-weight: 700; background: #ef4444; border-color: #ef4444; color: #fff; flex: 1;">再專注一次 🍅</button>
       </div>
     </div>
   </div>
