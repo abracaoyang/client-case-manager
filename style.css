@@ -110,6 +110,9 @@ html {
     .search-container {
       position: relative;
     }
+    .search-trigger-btn {
+      display: none;
+    }
     .search-input-wrapper {
       position: relative;
       display: flex;
@@ -513,6 +516,16 @@ html {
       background: rgba(239, 68, 68, 0.15); /* 議題：紅色 */
       color: #f87171;
       border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .source-badge.service-visit {
+      background: rgba(45, 212, 191, 0.15); /* 服務：青色 */
+      color: #2dd4bf;
+      border: 1px solid rgba(45, 212, 191, 0.3);
+    }
+    .source-badge.coffee-visit {
+      background: rgba(244, 63, 94, 0.15); /* 咖啡：玫瑰紅 */
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
     }
 
     /* 客戶姓名 (可點擊維護) */
@@ -939,6 +952,18 @@ html {
       color: #fb923c;
       border-color: #f97316;
       box-shadow: 0 0 8px rgba(249, 115, 22, 0.25);
+    }
+    .status-badge-btn.active[data-type="service-visit"] {
+      background: rgba(45, 212, 191, 0.15);
+      color: #2dd4bf;
+      border-color: #2dd4bf;
+      box-shadow: 0 0 8px rgba(45, 212, 191, 0.25);
+    }
+    .status-badge-btn.active[data-type="coffee-visit"] {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border-color: #fb7185;
+      box-shadow: 0 0 8px rgba(244, 63, 94, 0.25);
     }
 
     /* OA 子標籤亮燈樣式 */
@@ -2481,3 +2506,376 @@ html {
     transition: transform 0.1s ease;
   }
   
+
+    /* 搜尋欄位平板/手機折疊樣式 */
+    @media (max-width: 1024px) {
+      .search-container {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .search-trigger-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+        padding: 0;
+      }
+      .search-trigger-btn:active {
+        transform: scale(0.92);
+      }
+      /* 預設把輸入框隱藏，點擊 active 後以 absolute 下拉浮出 */
+      .search-container .search-input-wrapper {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        z-index: 1001;
+        background: rgba(24, 24, 36, 0.98);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-color);
+        padding: 8px 12px;
+        border-radius: 24px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        display: none; /* 預設收合 */
+        align-items: center;
+      }
+      .search-container #global-search-input {
+        width: 240px;
+        padding: 8px 32px 8px 12px;
+        border: 1px solid var(--border-color);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      
+      /* 當 active 時展開 */
+      .search-container.active .search-input-wrapper {
+        display: flex !important;
+        animation: dropdown-slide 0.2s ease-out;
+      }
+      .search-container.active .search-dropdown {
+        top: calc(100% + 60px) !important;
+        right: 0 !important;
+        left: auto !important;
+        width: 266px !important;
+        animation: dropdown-slide 0.25s ease-out;
+      }
+    }
+
+
+  /* 🔍 客戶案件快速跳轉側欄 (Sidebar) */
+  .left-sidebar {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 300px;
+    height: 100vh;
+    background: rgba(20, 20, 30, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid var(--border-color);
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    z-index: 10002;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+  }
+  .left-sidebar.active {
+    left: 0;
+  }
+  .left-sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 10001;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .left-sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sidebar-item {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0; /* 防止被 flex 容器強行擠壓切斷 */
+  }
+  .sidebar-item:active {
+    background: rgba(255, 255, 255, 0.08) !important;
+    transform: scale(0.97);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .sidebar-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+
+  /* ==========================================================================
+     👥 客戶 360° 顧問畫布 & 三欄式抽屜面板樣式
+     ========================================================================== */
+  
+  /* 視角切換器 active 狀態 */
+  .view-tab {
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+  }
+  .view-tab.active {
+    background: var(--accent) !important;
+    color: #fff !important;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  }
+  
+  /* 客戶網格佈局 */
+  .customer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    padding: 10px 0;
+  }
+  
+  /* 客戶卡片 */
+  .customer-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  }
+  .customer-card:active {
+    transform: scale(0.98);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .customer-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+      transform: translateY(-2px);
+    }
+  }
+  
+  /* 360° 抽屜 Overlay */
+  .customer-360-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .customer-360-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  /* 360° 抽屜 Panel */
+  .customer-360-drawer {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 85%;
+    max-width: 1100px;
+    height: 100%;
+    background: rgba(15, 17, 26, 0.95);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border-color);
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    z-index: 1001;
+    transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+  }
+  .customer-360-drawer.active {
+    right: 0;
+  }
+  
+  .customer-360-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.01);
+  }
+  
+  /* 三欄式佈局 */
+  .c360-three-columns {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr 0.9fr;
+    gap: 20px;
+    height: 100%;
+  }
+  
+  @media (max-width: 1024px) {
+    .c360-three-columns {
+      grid-template-columns: 1fr;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .customer-360-drawer {
+      width: 100%;
+    }
+  }
+  
+  .c360-column {
+    background: rgba(255, 255, 255, 0.015);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .c360-section-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--accent);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  
+  .c360-subsection label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+  
+  /* 列表容器 */
+  .c360-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  /* 框架網格（勾選） */
+  .c360-framework-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  /* 框架勾選項目 */
+  .c360-framework-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .c360-framework-item.checked {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+  }
+  .c360-framework-item.unchecked {
+    border-color: rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.05);
+    animation: c360-pulse-red 2s infinite;
+  }
+  
+  @keyframes c360-pulse-red {
+    0% { border-color: rgba(239, 68, 68, 0.2); }
+    50% { border-color: rgba(239, 68, 68, 0.5); }
+    100% { border-color: rgba(239, 68, 68, 0.2); }
+  }
+  
+  /* 列表項目 */
+  .c360-list-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+  }
+  
+  /* 議題邀約狀態下拉 */
+  .c360-status-select {
+    background: rgba(15, 17, 26, 0.8);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    font-weight: 600;
+  }
+  
+  /* 時間軸案件樣式 */
+  .c360-timeline-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 12px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .c360-timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    font-weight: bold;
+  }

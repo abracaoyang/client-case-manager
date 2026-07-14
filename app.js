@@ -489,7 +489,7 @@
         
         return {
           id: row["客戶姓名"] || ("case-" + Date.now() + "-" + index),
-          visitType: isLifeVisit ? 'life' : 'issue',
+          visitType: row["訪談類型"] || (isLifeVisit ? 'life' : 'issue'),
           preparedIssues: preparedIssues,
           type: row["險種分類"] === '壽' ? 'life' : 'property',
           caseSource: row["開拓管道"] === '開發' ? 'outbound' : 'inbound',
@@ -609,6 +609,7 @@
         "險種分類": c.type === 'life' ? '壽' : '產',
         "客戶姓名": c.clientName || '',
         "預計議題": c.preparedIssues ? c.preparedIssues.join(',') : '',
+        "訪談類型": c.visitType || 'issue',
         "ＳＡ": c.issueDate || sa.sendDate || '',
         "邀約議題": c.issueName || '',
         "是否已讀": sa.sendState === 'active' ? '已讀' : '未讀',
@@ -1179,21 +1180,7 @@
     // === 鍵盤快捷鍵配置 (ADHD 減法高效優化) ===
     function initKeyboardShortcuts() {
       window.addEventListener('keydown', (e) => {
-        // 0. 若時程看板（通知看板）處於開啟狀態，按下 Enter 鍵則關閉
-        const reminderModal = document.getElementById('reminder-modal');
-        if (reminderModal && reminderModal.classList.contains('active') && e.key === 'Enter') {
-          e.preventDefault();
-          toggleReminderModal(false);
-          return;
-        }
-
-        // 0.5. 若待辦任務提醒看板處於開啟狀態，按下 Enter 鍵則關閉
-        const todoNotifyModal = document.getElementById('todo-notify-modal');
-        if (todoNotifyModal && todoNotifyModal.classList.contains('active') && e.key === 'Enter') {
-          e.preventDefault();
-          toggleTodoNotifyModal(false);
-          return;
-        }
+        // Reminders Enter-to-close removed for ADHD focus workflow
 
         // 1. Cmd + I (Mac) 或 Ctrl + I (Win) -> 快速開啟建案彈窗 (避開 Raycast 衝突)
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'i') {
@@ -1471,8 +1458,28 @@
       debugLog("拖曳排序初始化完畢");
 
       // 搜尋欄位事件綁定
+      const searchTrigger = document.getElementById('search-trigger-btn');
+      const searchContainer = document.getElementById('search-container');
       const searchInput = document.getElementById('global-search-input');
       const searchClear = document.getElementById('search-clear-btn');
+
+      if (searchTrigger && searchContainer && searchInput) {
+        searchTrigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          searchContainer.classList.toggle('active');
+          if (searchContainer.classList.contains('active')) {
+            searchInput.focus();
+            showSearchDropdown();
+          }
+        });
+      }
+
+      // 點擊輸入框內部防止冒泡收合
+      if (searchInput) {
+        searchInput.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
       if (searchInput) {
         searchInput.addEventListener('focus', showSearchDropdown);
         searchInput.addEventListener('click', (e) => {
@@ -1504,6 +1511,7 @@
         const dropdown = document.getElementById('search-dropdown');
         if (container && dropdown && !container.contains(e.target)) {
           dropdown.style.display = 'none';
+          if (container) container.classList.remove('active'); // 移除 active 狀態
         }
       });
 
@@ -1516,9 +1524,10 @@
         loadCasesFromStorage();
         debugLog("本機快取載入完畢，準備渲染 (renderCases)...");
         renderCases();
+        renderSidebarList(); // 同步渲染側欄案件清單
         debugLog("本機案件渲染完畢");
       }
-      checkAndShowDailyReminders();
+      startADHDStartupFlow();
       checkTodayVisits();
       // 啟動時從雲端同步待辦事項（非同步，不影響主流程）
       fetchTodosFromCloud();
@@ -2187,9 +2196,23 @@
         const cDateText = formatShortDate((c.cDetails && c.cDetails.practiceDate) || '');
         const sDateText = formatShortDate((c.sDetails && c.sDetails.meetDate) || '');
 
-        const visitTypeText = c.visitType === 'life' ? '生' : '議';
-        const visitTypeClass = c.visitType === 'life' ? 'life-visit' : 'issue-visit';
-        const visitTypeBadge = `<span class="source-badge ${visitTypeClass}" title="訪談類型: ${c.visitType === 'life' ? '生活訪' : '議題訪'}">${visitTypeText}</span>`;
+        let visitTypeText = '議';
+        let visitTypeClass = 'issue-visit';
+        let visitTypeTitle = '議題訪';
+        if (c.visitType === 'life') {
+          visitTypeText = '生';
+          visitTypeClass = 'life-visit';
+          visitTypeTitle = '生活訪';
+        } else if (c.visitType === 'service') {
+          visitTypeText = '服';
+          visitTypeClass = 'service-visit';
+          visitTypeTitle = '服務訪';
+        } else if (c.visitType === 'coffee') {
+          visitTypeText = '咖';
+          visitTypeClass = 'coffee-visit';
+          visitTypeTitle = '咖啡訪';
+        }
+        const visitTypeBadge = `<span class="source-badge ${visitTypeClass}" title="訪談類型: ${visitTypeTitle}">${visitTypeText}</span>`;
 
         // 迫切度微章 (今日約訪與喬時間中)
         let urgencyBadge = '';
@@ -2857,9 +2880,11 @@
             <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px; width: 100%;">
               <div>
                 <label style="display: block; font-size: 0.75rem; margin-bottom: 4px; color: var(--text-secondary); font-weight: 600;">訪談類型</label>
-                <div style="display: flex; gap: 6px; width: 100%;">
-                  <button type="button" class="btn btn-tab ${c.visitType !== 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'issue')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">議題訪</button>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; width: 100%;">
+                  <button type="button" class="btn btn-tab ${(c.visitType === 'issue' || !c.visitType) ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'issue')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">議題訪</button>
                   <button type="button" class="btn btn-tab ${c.visitType === 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'life')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">生活訪</button>
+                  <button type="button" class="btn btn-tab ${c.visitType === 'service' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'service')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">服務訪</button>
+                  <button type="button" class="btn btn-tab ${c.visitType === 'coffee' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'coffee')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">咖啡訪</button>
                 </div>
               </div>
               <div>
@@ -4224,15 +4249,23 @@
     }
 
 
-    function toggleReminderModal(show) {
+    let reminderModalCallback = null;
+    function toggleReminderModal(show, callback) {
       const modal = document.getElementById('reminder-modal');
       if (!modal) return;
       if (show) {
+        reminderModalCallback = callback || null;
         modal.classList.add('active');
       } else {
         modal.classList.remove('active');
-        // 送件看板關閉後，接著跳出待辦任務通知
-        setTimeout(() => { checkAndShowTodoReminders(); }, 400);
+        if (reminderModalCallback) {
+          const cb = reminderModalCallback;
+          reminderModalCallback = null;
+          cb();
+        } else {
+          // 如果是一般手動點開（非啟動引導流），維持原有的關閉後自動跳出待辦任務通知
+          setTimeout(() => { checkAndShowTodoReminders(); }, 400);
+        }
       }
     }
 
@@ -4596,9 +4629,11 @@
     }
 
     
-    function toggleAddCaseModal(show) {
+    let addCaseModalCallback = null;
+    function toggleAddCaseModal(show, callback) {
       const modal = document.getElementById('add-case-modal');
       if (show) {
+        addCaseModalCallback = callback || null;
         modal.classList.add('active');
         document.getElementById('add-client-name').value = '';
         document.getElementById('add-visit-type').value = 'issue';
@@ -4623,6 +4658,11 @@
         modal.querySelectorAll('[onclick*="\'add-source\', \'relative\'"]').forEach(btn => btn.classList.add('active'));
       } else {
         modal.classList.remove('active');
+        if (addCaseModalCallback) {
+          const cb = addCaseModalCallback;
+          addCaseModalCallback = null;
+          cb();
+        }
       }
     }
 
@@ -5559,10 +5599,12 @@
     }
 
     // --- Modal ---
-    function openTodoModal(editId, prefillCaseId) {
+    let todoModalCallback = null;
+    function openTodoModal(editId, prefillCaseId, callback) {
       const modal = document.getElementById('add-todo-modal');
       const titleEl = document.getElementById('todo-modal-title');
       if (!modal) return;
+      todoModalCallback = callback || null;
 
       // 清除優先度選取狀態
       const cells = document.querySelectorAll('.priority-cell');
@@ -5647,6 +5689,11 @@
     function closeTodoModal() {
       const modal = document.getElementById('add-todo-modal');
       if (modal) modal.classList.remove('active');
+      if (todoModalCallback) {
+        const cb = todoModalCallback;
+        todoModalCallback = null;
+        cb();
+      }
     }
 
     function onTodoStageChange() {
@@ -5700,7 +5747,7 @@
       }
 
       saveTodos();
-      closeTodoModal();
+      closeTodoModal(); // 這會自動觸發 todoModalCallback
       renderTodoPage();
       updateTodoBadge();
     }
@@ -6190,13 +6237,20 @@
     // --- 待辦通知雙 Tab 看板 ---
     let currentTodoNotifyTab = 'priority';
 
-    function toggleTodoNotifyModal(show) {
+    let todoNotifyModalCallback = null;
+    function toggleTodoNotifyModal(show, callback) {
       const modal = document.getElementById('todo-notify-modal');
       if (!modal) return;
       if (show) {
+        todoNotifyModalCallback = callback || null;
         modal.classList.add('active');
       } else {
         modal.classList.remove('active');
+        if (todoNotifyModalCallback) {
+          const cb = todoNotifyModalCallback;
+          todoNotifyModalCallback = null;
+          cb();
+        }
       }
     }
 
@@ -6366,7 +6420,7 @@
     // --- Toast 提醒 ---
 
 
-    // --- ESC 關閉所有 Modal ---
+    // --- ESC 關閉所有 Modal (ADHD 防呆優化版) ---
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         const editLogModal = document.getElementById('edit-log-modal');
@@ -6384,14 +6438,25 @@
           closeTodoTimerModal();
           return;
         }
+        const addCaseModal = document.getElementById('add-case-modal');
+        if (addCaseModal && addCaseModal.classList.contains('active')) {
+          toggleAddCaseModal(false);
+          return;
+        }
         const todoModal = document.getElementById('add-todo-modal');
         if (todoModal && todoModal.classList.contains('active')) {
           closeTodoModal();
           return;
         }
-        const notifyModal = document.getElementById('todo-notify-modal');
-        if (notifyModal && notifyModal.classList.contains('active')) {
+        const reminderModal = document.getElementById('reminder-modal');
+        if (reminderModal && reminderModal.classList.contains('active')) {
+          toggleReminderModal(false);
+          return;
+        }
+        const todoNotifyModal = document.getElementById('todo-notify-modal');
+        if (todoNotifyModal && todoNotifyModal.classList.contains('active')) {
           toggleTodoNotifyModal(false);
+          return;
         }
       }
     });
@@ -7056,3 +7121,190 @@
         startPomodoroMode();
       }, 400);
     };
+
+
+    // ===== 🔍 客戶案件快速跳轉側欄模組 (Left Sidebar Navigation) =====
+
+    // 開啟側欄
+    window.openLeftSidebar = function() {
+      const sidebar = document.getElementById('left-sidebar');
+      const overlay = document.getElementById('left-sidebar-overlay');
+      if (sidebar && overlay) {
+        sidebar.classList.add('active');
+        overlay.classList.add('active');
+        renderSidebarList(); // 每次開啟都動態重新渲染清單
+      }
+    };
+
+    // 關閉側欄
+    window.closeLeftSidebar = function() {
+      const sidebar = document.getElementById('left-sidebar');
+      const overlay = document.getElementById('left-sidebar-overlay');
+      if (sidebar && overlay) {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+      }
+    };
+
+    // 渲染側欄案件清單
+    function renderSidebarList() {
+      const listContainer = document.getElementById('sidebar-list');
+      if (!listContainer) return;
+
+      if (!cases || cases.length === 0) {
+        listContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:20px; opacity:0.6;">（尚無案件資料）</div>';
+        return;
+      }
+
+      // 取得維護中心常規議題的順序
+      let globalTopics = [];
+      try {
+        const _topicsRaw = localStorage.getItem('global_topics');
+        globalTopics = _topicsRaw ? JSON.parse(_topicsRaw) : [];
+        if (!Array.isArray(globalTopics)) globalTopics = [];
+      } catch(e) {
+        globalTopics = [];
+      }
+
+      // 複製一份案件資料進行排序
+      const sortedCases = [...cases];
+
+      sortedCases.sort((a, b) => {
+        const aIssue = a.issueName || '';
+        const bIssue = b.issueName || '';
+        
+        const aIdx = globalTopics.indexOf(aIssue);
+        const bIdx = globalTopics.indexOf(bIssue);
+        
+        const aInOrder = aIdx !== -1;
+        const bInOrder = bIdx !== -1;
+        
+        // 規則 1：不在維護中心的擺在最前面
+        if (!aInOrder && bInOrder) return -1;
+        if (aInOrder && !bInOrder) return 1;
+        
+        if (!aInOrder && !bInOrder) {
+          // 規則 2：都不在維護中心，以案件字首筆劃升冪排序
+          return (a.clientName || '').localeCompare(b.clientName || '', 'zh-Hant-TW');
+        }
+        
+        // 規則 3：都在維護中心，以維護中心設定順序排序
+        return aIdx - bIdx;
+      });
+
+      // 渲染為 HTML，格式為 [姓名]｜[議題名稱]
+      listContainer.innerHTML = sortedCases.map(c => {
+        const displayName = `${c.clientName || '未命名'}｜${c.issueName || '無議題'}`;
+        return `<div class="sidebar-item" onclick="scrollToCaseRow('${c.id}')" title="${displayName}">${displayName}</div>`;
+      }).join('');
+    }
+
+    // 點擊側欄項目跳轉並高亮
+    window.scrollToCaseRow = function(caseId) {
+      closeLeftSidebar();
+      setTimeout(() => {
+        const row = document.getElementById(`case-row-${caseId}`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // 高亮閃爍特效 (0.1秒視覺聚焦，加強多巴胺反饋)
+          row.classList.add('neon-flash');
+          setTimeout(() => {
+            row.classList.remove('neon-flash');
+          }, 2000);
+        }
+      }, 250); // 延遲 250ms 等側欄收合動畫完成後再平滑跳轉，體驗更佳
+    };
+
+    // 平板/手機邊緣向右滑動拉出側欄手勢監聽
+    (function() {
+      let swipeStartX = 0;
+      let swipeStartY = 0;
+      
+      document.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          const touch = e.touches[0];
+          swipeStartX = touch.clientX;
+          swipeStartY = touch.clientY;
+        }
+      }, { passive: true });
+      
+      document.addEventListener('touchend', (e) => {
+        if (e.changedTouches.length > 0) {
+          const touch = e.changedTouches[0];
+          const deltaX = touch.clientX - swipeStartX;
+          const deltaY = Math.abs(touch.clientY - swipeStartY);
+          
+          // 只有起點在最左側邊緣 40px 內，且往右滑動大於 80px，垂直偏移小於 50px 時觸發
+          if (swipeStartX < 40 && deltaX > 80 && deltaY < 50) {
+            openLeftSidebar();
+          }
+        }
+      }, { passive: true });
+    })();
+
+    // ===== 🧠 ADHD 快速開工線性引導流 (Linear Startup Flow) =====
+    // 依序跳出：新增案件 ➔ 新增待辦 ➔ 送件時程提醒 ➔ 今日待辦提醒
+    async function startADHDStartupFlow() {
+      debugLog("🧠 ADHD 啟動流：步驟 1 - 新增案件");
+      await new Promise(resolve => {
+        toggleAddCaseModal(true, resolve);
+      });
+
+      debugLog("🧠 ADHD 啟動流：步驟 2 - 新增待辦");
+      await new Promise(resolve => {
+        openTodoModal(null, null, resolve);
+      });
+
+      debugLog("🧠 ADHD 啟動流：步驟 3 - 送件提醒看板");
+      await new Promise(resolve => {
+        // 先載入並渲染
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        if (cases && cases.length > 0) {
+          cases.forEach(c => {
+            if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+              const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+              if (sDate < todayStr) expired.push(c);
+              else if (sDate === todayStr) today.push(c);
+              else if (sDate > todayStr && sDate <= limitDateStr) future.push(c);
+            }
+          });
+        }
+        updateGlobalReminderIcon(expired.length, today.length, future.length, expired, today, future);
+        renderReminderBoard(expired, today, future);
+        toggleReminderModal(true, resolve);
+      });
+
+      debugLog("🧠 ADHD 啟動流：步驟 4 - 今日待辦提醒");
+      await new Promise(resolve => {
+        loadTodos();
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const tw = new Date(utc + 3600000 * 8);
+        const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+        const pending = todos.filter(t => !t.done);
+        updateTodoBadge();
+        renderTodoNotifyModal(pending, todayStr);
+        switchTodoNotifyTab('priority');
+        toggleTodoNotifyModal(true, resolve);
+      });
+      
+      debugLog("🧠 ADHD 啟動流全部完成！");
+    }

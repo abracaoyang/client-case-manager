@@ -23,8 +23,8 @@
   <!-- Tablet Fix: Mobile Drag & Drop Polyfill -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/default.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/index.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.1">
-  <script src="app.js?v=1.1" defer></script>
+  <link rel="stylesheet" href="style.css?v=1.04.04">
+  <script src="app.js?v=1.04.04" defer></script>
 </head>
 
 <body>
@@ -42,10 +42,14 @@
   </div>
 
   <header>
-    <h1 ondblclick="toggleTodoPage()" style="cursor:default; user-select:none;">客戶案件管理系統</h1>
+    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+      <button class="btn" id="btn-sidebar-trigger" onclick="openLeftSidebar()" title="開啟快速跳轉側欄" style="font-size: 1.1rem; padding: 6px 10px;">☰</button>
+      <h1 ondblclick="toggleTodoPage()" style="cursor:default; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;">客戶案件管理系統</h1>
+    </div>
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- 搜尋欄位 -->
       <div class="search-container" id="search-container">
+        <button class="search-trigger-btn" id="search-trigger-btn" title="展開搜尋" style="display: none;">🔍</button>
         <div class="search-input-wrapper">
           <!-- Removed search icon -->
           <input type="text" class="search-input" id="global-search-input" placeholder="搜尋案件 (例: 警察, 癌症)..." autocomplete="off">
@@ -84,10 +88,17 @@
       <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
         ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
-      <button class="btn" id="btn-open-todos" onclick="toggleTodoPage()" title="待辦事項管理" style="font-size: 1.1rem; padding: 6px 10px; transition: all 0.3s; position: relative; margin-right: 4px;">
-        📋 <span id="todo-global-badge" style="position: absolute; top: -4px; right: -4px; background: #f59e0b; color: #000; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1;">0</span>
-      </button>
+      <!-- 三態視角切換組 (ADHD 網格對齊) -->
+      <div class="view-switcher-group" style="display: flex; gap: 4px; background: var(--bg-card); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0; margin-right: 4px;">
+        <button class="btn view-tab active" id="tab-view-case" onclick="switchViewMode('case')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2;">📊 案件</button>
+        <button class="btn view-tab" id="tab-view-todo" onclick="switchViewMode('todo')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2; position: relative;">
+          📋 待辦
+          <span id="todo-global-badge" style="position: absolute; top: -2px; right: -2px; background: #f59e0b; color: #000; font-size: 0.6rem; font-weight: bold; min-width: 12px; height: 12px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1; padding: 2px;">0</span>
+        </button>
+        <button class="btn view-tab" id="tab-view-customer" onclick="switchViewMode('customer')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2;">👥 客戶</button>
+      </div>
       <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
+      <button class="btn" onclick="location.reload()" title="重新整理" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">🔄</button>
       <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋待辦</button>
       <button class="btn btn-primary" id="btn-add-case">＋案件</button>
     </div>
@@ -101,6 +112,20 @@
       <button class="btn btn-primary" onclick="openTodoModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增待辦</button>
     </div>
     <div id="todo-body"></div>
+  </div>
+  <!-- ===== 客戶畫布管理頁面 ===== -->
+  <div id="customer-page" style="display: none;">
+    <div id="customer-page-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h2 style="margin: 0;">👥 客戶 360° 顧問畫布</h2>
+      </div>
+      <button class="btn btn-primary" onclick="openAddCustomerModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增客戶</button>
+    </div>
+    <div id="customer-body" style="padding: 20px; overflow-y: auto; height: calc(100vh - 120px);">
+      <div id="customer-grid" class="customer-grid">
+        <!-- 客戶卡片將動態生成於此 -->
+      </div>
+    </div>
   </div>
 
   <!-- 新增/編輯待辦 Modal -->
@@ -411,9 +436,11 @@
         <div class="form-group" style="margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label style="display: block; font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);">訪談類型</label>
-            <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-visit-type', 'issue', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">議題訪</button>
-              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'life', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0;">生活訪</button>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; width: 100%;">
+              <button type="button" class="btn btn-tab active" onclick="selectFormTab('add-visit-type', 'issue', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">議題訪</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'life', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">生活訪</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'service', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">服務訪</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'coffee', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">咖啡訪</button>
             </div>
             <input type="hidden" id="add-visit-type" value="issue">
           </div>
@@ -696,6 +723,155 @@
     </div>
   </div>
 
+
+  <!-- ===== 客戶 360° 顧問畫布抽屜 (Customer 360° Drawer) ===== -->
+  <div class="customer-360-overlay" id="customer-360-overlay" onclick="closeCustomer360Drawer()"></div>
+  <div class="customer-360-drawer" id="customer-360-drawer">
+    <div class="customer-360-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.3rem;">👤</span>
+        <h2 id="c360-client-name" style="margin: 0; font-weight: 800;">客戶姓名</h2>
+        <span id="c360-client-phone" style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 8px;"></span>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button class="btn" id="c360-edit-btn" style="padding: 4px 10px; font-size: 0.85rem;">✏ 編輯資料</button>
+        <button class="btn btn-close-c360" onclick="closeCustomer360Drawer()" style="padding: 4px 10px; font-size: 0.85rem; background: rgba(255,255,255,0.05);">✕</button>
+      </div>
+    </div>
+    <div class="customer-360-body" style="padding: 20px; overflow-y: auto; height: calc(100% - 70px);">
+      <!-- 三欄式磨砂玻璃佈局 -->
+      <div class="c360-three-columns">
+        
+        <!-- 左欄：家人家庭關係與基本保障框架 -->
+        <div class="c360-column c360-col-left">
+          <div class="c360-section-title">📂 家庭關係與基本保障</div>
+          
+          <div class="c360-subsection">
+            <label style="display:flex; justify-content:space-between; align-items:center;">
+              <span>👨‍👩‍👧‍👦 家人家庭關係</span>
+            </label>
+            <div id="c360-family-list" class="c360-list-container">
+              <!-- 顯示配偶、子女、父母等關聯，點擊可切換 -->
+            </div>
+            <button class="btn btn-sm" onclick="openAddFamilyModal()" style="margin-top: 6px; width: 100%; font-size: 0.75rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.2); color: var(--accent);">＋ 新增家人連結</button>
+          </div>
+
+          <div class="c360-subsection" style="margin-top: 16px;">
+            <label>🛡️ 基本保險框架 (有無勾選)</label>
+            <div id="c360-framework-grid" class="c360-framework-grid">
+              <!-- 壽險、意外、防癌、重大傷病、實支實付、長照、年金等 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 中欄：行銷議題邀約矩陣與多案件時間軸 -->
+        <div class="c360-column c360-col-center">
+          <div class="c360-section-title">🎯 行銷議題與案件時間軸</div>
+          
+          <div class="c360-subsection">
+            <label>🎯 行銷議題邀約狀態 (全局同步)</label>
+            <div id="c360-campaigns-list" class="c360-list-container">
+              <!-- 同步自維護中心的行銷議題，可下拉選擇狀態 -->
+            </div>
+          </div>
+
+          <div class="c360-subsection" style="margin-top: 16px;">
+            <label>⏱️ 進行中案件時間軸</label>
+            <div id="c360-timeline-container" class="c360-timeline-container">
+              <!-- 進行中與歷史已結案案件進度，支援雙向轉向案件管理 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 右欄：歸戶面談紀要與 Todos -->
+        <div class="c360-column c360-col-right">
+          <div class="c360-section-title">📋 面談紀要與待辦</div>
+          
+          <div class="c360-subsection">
+            <label>📋 待辦事項 (Todos)</label>
+            <div id="c360-todos-list" class="c360-list-container" style="max-height: 180px; overflow-y: auto;"></div>
+            <button class="btn btn-sm" onclick="openAddTodoFromC360()" style="margin-top: 6px; width: 100%; font-size: 0.75rem; background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.2); color: #f59e0b;">＋ 新增此客戶待辦</button>
+          </div>
+
+          <div class="c360-subsection" style="margin-top: 16px;">
+            <label>📝 歷次面談紀要 (備忘錄)</label>
+            <div id="c360-notes-list" class="c360-list-container" style="max-height: 250px; overflow-y: auto;"></div>
+            <button class="btn btn-sm" onclick="openAddNoteModal()" style="margin-top: 6px; width: 100%; font-size: 0.75rem; background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.2); color: #10b981;">＋ 新增面談備忘</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增客戶/編輯客戶 Modal -->
+  <div id="add-customer-modal" class="modal-overlay">
+    <div class="modal-box" style="width: 400px; text-align: left;">
+      <h3 id="customer-modal-title">新增客戶資料</h3>
+      <input type="hidden" id="customer-edit-id" value="">
+      
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="todo-form-row">
+          <label>客戶姓名 *</label>
+          <input type="text" class="form-input" id="customer-input-name" placeholder="請輸入客戶姓名..." autocomplete="off">
+        </div>
+        <div class="todo-form-row">
+          <label>電話號碼 (可選)</label>
+          <input type="text" class="form-input" id="customer-input-phone" placeholder="例如: 0912345678" autocomplete="off">
+        </div>
+      </div>
+      
+      <div class="todo-form-actions" style="margin-top: 20px;">
+        <button class="btn" onclick="closeAddCustomerModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveCustomer()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增家人關聯 Modal -->
+  <div id="add-family-modal" class="modal-overlay">
+    <div class="modal-box" style="width: 400px; text-align: left;">
+      <h3>新增家人關聯連結</h3>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="todo-form-row">
+          <label>選擇或搜尋家人客戶</label>
+          <select class="form-input" id="family-input-target-id">
+            <option value="">— 請選擇客戶 —</option>
+          </select>
+        </div>
+        <div class="todo-form-row">
+          <label>關係稱謂</label>
+          <input type="text" class="form-input" id="family-input-relation" placeholder="例如: 配偶、長子、長女、父親..." autocomplete="off">
+        </div>
+      </div>
+      <div class="todo-form-actions" style="margin-top: 20px;">
+        <button class="btn" onclick="closeAddFamilyModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveFamilyRelation()">建立關聯</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增面談紀要 Modal -->
+  <div id="add-note-modal" class="modal-overlay">
+    <div class="modal-box" style="width: 450px; text-align: left;">
+      <h3>新增面談紀要備忘</h3>
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="todo-form-row">
+          <label>日期 *</label>
+          <input type="date" class="form-input" id="note-input-date" onclick="this.showPicker()">
+        </div>
+        <div class="todo-form-row">
+          <label>面談備忘內容 *</label>
+          <textarea class="form-input" id="note-input-content" rows="6" placeholder="請詳細記錄本次面談的討論內容、客戶疑慮或行銷機會..." style="resize: vertical; min-height: 120px;"></textarea>
+        </div>
+      </div>
+      <div class="todo-form-actions" style="margin-top: 20px;">
+        <button class="btn" onclick="closeAddNoteModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveCustomerNote()">儲存紀要</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 載入中遮罩 -->
   <div class="modal-overlay" id="loading-overlay" style="z-index: 10000; flex-direction: column; gap: 12px; color: var(--text-secondary);">
     <div class="loader" style="border: 4px solid rgba(255,255,255,0.05); border-radius: 50%; border-top: 4px solid var(--color-sa); width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
@@ -714,6 +890,18 @@
       </div>
     </div>
   </div>
+
+  <!-- 🔍 客戶案件快速跳轉側欄 -->
+  <div id="left-sidebar" class="left-sidebar">
+    <div class="sidebar-header">
+      <h3 style="margin: 0; font-size: 1rem; color: var(--accent); font-weight: 700;">🔍 案件快速跳轉</h3>
+      <span class="close-sidebar-btn" onclick="closeLeftSidebar()" style="cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);">✕</span>
+    </div>
+    <div class="sidebar-list" id="sidebar-list">
+      <!-- 案件清單動態生成 -->
+    </div>
+  </div>
+  <div id="left-sidebar-overlay" class="left-sidebar-overlay" onclick="closeLeftSidebar()"></div>
 
   <!-- 🍅 番茄鐘專注成功多巴胺獎勵 Modal -->
   <div class="modal-overlay" id="pomodoro-success-modal" style="z-index: 10005; display: none; opacity: 0; transition: opacity 0.3s ease;">

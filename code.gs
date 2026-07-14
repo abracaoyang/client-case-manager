@@ -3,13 +3,14 @@
 
 const SHEET_NAME = 'Sheet1';
 const TODOS_SHEET_NAME = 'Todos';
+const CUSTOMERS_SHEET_NAME = 'Customers';
 
 // 取得或初始化試算表與表頭
 function getOrCreateSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
   const targetHeaders = [
-    "客戶姓名", "邀約議題", "險種分類", "預計議題", "ＳＡ", "是否已讀", "是否已回覆", 
+    "客戶姓名", "客戶ID", "邀約議題", "險種分類", "預計議題", "ＳＡ", "是否已讀", "是否已回覆", 
     "約定狀態", "已約定", "約定時段", "ＯＡ", "ＯＡ已面談", "ＯＡ時段", "ＯＡ訪前規劃狀態", 
     "ＯＡ訪前演練狀態", "ＯＡ訪後討論狀態", "ＯＡ訪前規劃備忘", "ＯＡ訪後討論備忘", "ＯＡ改期歷史",
     "ＯＡ訪前規劃日期", "ＯＡ訪前演練日期", "ＯＡ訪後討論日期", "ＯＡ訪前演練備忘",
@@ -20,7 +21,7 @@ function getOrCreateSheet() {
     "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
     "Ｓ", "Ｓ保單送達狀態", "Ｓ保單送達備忘", "Ｓ契撤追蹤狀態", "Ｓ週年服務狀態", 
     "Ｓ週年服務備忘", "當前階段", "開拓管道", "客戶來源", "介紹人", "緣故標籤", "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段",
-    "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "最後更新時間"
+    "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "訪談類型", "最後更新時間"
   ];
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
@@ -51,6 +52,7 @@ function getOrCreateSheet() {
     // 2. 檢查追加其他可能缺少的欄位，使用變數 nextCol 防止重複覆蓋最後一欄
     let nextCol = lastCol + 1;
     const columnsToCheck = [
+      "客戶ID",
       "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段",
       "Ｃ文件準備狀態", "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
       "ＯＡ訪前規劃日期", "ＯＡ訪前演練日期", "ＯＡ訪後討論日期", "ＯＡ訪前演練備忘",
@@ -65,6 +67,22 @@ function getOrCreateSheet() {
         nextCol++;
       }
     });
+  }
+  return sheet;
+}
+
+
+// 取得或建立「客戶基本資料」Sheet
+function getOrCreateCustomersSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CUSTOMERS_SHEET_NAME);
+  const headers = ["id", "name", "phone", "family", "framework", "campaigns", "lastUpdated"];
+  if (!sheet) {
+    sheet = ss.insertSheet(CUSTOMERS_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
   return sheet;
 }
@@ -88,6 +106,28 @@ function getOrCreateTodosSheet() {
 // 處理 GET 請求：讀取資料並以 JSON 回傳
 function doGet(e) {
   try {
+    // === 客戶基本資料讀取 ===
+    if (e && e.parameter && e.parameter.type === 'customers') {
+      const customersSheet = getOrCreateCustomersSheet();
+      const cValues = customersSheet.getDataRange().getValues();
+      if (cValues.length <= 1) {
+        return jsonResponse({ status: 'success', customers: [] });
+      }
+      const cHeaders = cValues[0];
+      const customersList = [];
+      for (let i = 1; i < cValues.length; i++) {
+        const row = cValues[i];
+        const item = {};
+        cHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        customersList.push(item);
+      }
+      return jsonResponse({ status: 'success', customers: customersList });
+    }
+
     // === 待辦事項讀取 ===
     if (e && e.parameter && e.parameter.type === 'todos') {
       const todosSheet = getOrCreateTodosSheet();
@@ -180,6 +220,26 @@ function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
     const action = payload.action;
+
+    // === 客戶基本資料覆蓋式同步 ===
+    if (action === 'saveCustomers') {
+      const customersSheet = getOrCreateCustomersSheet();
+      const customersList = payload.customers || [];
+      const headers = ["id", "name", "phone", "family", "framework", "campaigns", "lastUpdated"];
+      
+      const lastRow = customersSheet.getLastRow();
+      if (lastRow > 1) {
+        customersSheet.deleteRows(2, lastRow - 1);
+      }
+      
+      if (customersList.length > 0) {
+        const rows = customersList.map(c => headers.map(h => {
+          return c[h] !== undefined && c[h] !== null ? c[h] : '';
+        }));
+        customersSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '客戶基本資料已同步 (' + customersList.length + ' 筆)' });
+    }
 
     // === 待辦事項覆蓋式同步 ===
     if (action === 'saveTodos') {
