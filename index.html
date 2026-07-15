@@ -44,7 +44,7 @@
   <header>
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
       <button class="btn" id="btn-sidebar-trigger" onclick="openLeftSidebar()" title="開啟快速跳轉側欄" style="font-size: 1.1rem; padding: 6px 10px;">☰</button>
-      <h1 onclick="cycleViewMode()" style="cursor:pointer; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;" title="點擊切換視角 (案件 ➔ 待辦 ➔ 客戶)">客戶案件管理系統</h1>
+      <h1 onclick="cycleViewMode()" style="cursor:pointer; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;" title="點擊切換視角 (案件 ➔ 待辦 ➔ 客戶 ➔ 增員)">客戶案件管理系統</h1>
     </div>
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- 搜尋欄位 -->
@@ -116,6 +116,21 @@
     <div id="customer-body" style="padding: 20px; overflow-y: auto; height: calc(100vh - 120px);">
       <div id="customer-grid" class="customer-grid">
         <!-- 客戶卡片將動態生成於此 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 增員與輔導管理頁面 ===== -->
+  <div id="recruit-page" style="display: none;">
+    <div id="recruit-page-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h2 style="margin: 0;">👥 增員與輔導管理</h2>
+      </div>
+      <button class="btn btn-primary" onclick="openAddRecruitModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增增員對象</button>
+    </div>
+    <div id="recruit-body" style="padding: 20px; overflow-y: auto; height: calc(100vh - 120px);">
+      <div id="recruit-grid" class="customer-grid">
+        <!-- 增員卡片動態生成 -->
       </div>
     </div>
   </div>
@@ -716,6 +731,105 @@
   </div>
 
 
+  <!-- ===== 增員與輔導詳情抽屜 (Recruit Drawer) ===== -->
+  <div class="customer-360-overlay" id="recruit-drawer-overlay" onclick="closeRecruitDrawer()"></div>
+  <div class="customer-360-drawer" id="recruit-drawer" style="width: 800px; max-width: 90vw;">
+    <div class="customer-360-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.3rem;">👥</span>
+        <h2 id="recruit-drawer-name" style="margin: 0; font-weight: 800;">姓名</h2>
+        <span id="recruit-drawer-stage-badge" class="recruit-stage-badge contacting">階段</span>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button class="btn btn-close-c360" onclick="closeRecruitDrawer()" style="padding: 4px 10px; font-size: 0.85rem; background: rgba(255,255,255,0.05);">✕</button>
+      </div>
+    </div>
+    <div class="customer-360-body" style="padding: 20px; overflow-y: auto; height: calc(100% - 70px);">
+      <div class="c360-three-columns" style="grid-template-columns: 1fr 2fr;">
+        <!-- 左欄：基本資料與階段編輯 -->
+        <div class="c360-column" style="border-right: 1px solid var(--border-color); padding-right: 20px; display: flex; flex-direction: column; gap: 12px;">
+          <div class="c360-section-title">📂 增員基本資料</div>
+          <div class="todo-form-row">
+            <label style="font-size: 0.72rem; color: var(--text-secondary);">姓名</label>
+            <input type="text" id="recruit-detail-name" onchange="updateRecruitField('name', this.value)" style="height: 24px; font-size: 0.78rem;">
+          </div>
+          <div class="todo-form-row">
+            <label style="font-size: 0.72rem; color: var(--text-secondary);">電話</label>
+            <input type="text" id="recruit-detail-phone" onchange="updateRecruitField('phone', this.value)" style="height: 24px; font-size: 0.78rem;">
+          </div>
+          <div class="todo-form-row">
+            <label style="font-size: 0.72rem; color: var(--text-secondary);">現職</label>
+            <input type="text" id="recruit-detail-job" onchange="updateRecruitField('currentJob', this.value)" style="height: 24px; font-size: 0.78rem;">
+          </div>
+          <div class="todo-form-row">
+            <label style="font-size: 0.72rem; color: var(--text-secondary);">增員階段</label>
+            <select id="recruit-detail-stage" onchange="updateRecruitField('stage', this.value)" class="form-input" style="height: 28px; font-size: 0.78rem; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; padding: 0 6px;">
+              <option value="contacting">接觸中</option>
+              <option value="interviewing">面談中</option>
+              <option value="examining">考核中</option>
+              <option value="joined">已登錄下屬</option>
+            </select>
+          </div>
+          <div style="margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border-color);">
+            <button type="button" class="btn" onclick="deleteRecruit()" style="width: 100%; height: 26px; justify-content: center; font-size: 0.72rem; color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05);">🗑️ 刪除此對象</button>
+          </div>
+        </div>
+        
+        <!-- 右欄：動態切換面談紀錄或輔導紀錄 -->
+        <div class="c360-column" style="padding-left: 10px;">
+          <!-- 前期面談進度紀錄區 -->
+          <div id="recruit-interview-section" style="display: none; height: 100%; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="c360-section-title" style="margin: 0;">📅 增員面談進度紀錄</div>
+              <button class="btn btn-sm" onclick="openAddRecruitLogModal('interview')" style="font-size: 0.75rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.2); color: var(--accent);">＋ 新增面談紀錄</button>
+            </div>
+            <div id="recruit-interview-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              <!-- 面談進度列表 -->
+            </div>
+          </div>
+          
+          <!-- 後期輔導紀錄區 -->
+          <div id="recruit-coaching-section" style="display: none; height: 100%; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="c360-section-title" style="margin: 0;">🎓 下屬輔導紀錄</div>
+              <button class="btn btn-sm" onclick="openAddRecruitLogModal('coaching')" style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #10b981;">＋ 新增輔導紀錄</button>
+            </div>
+            <div id="recruit-coaching-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              <!-- 輔導紀錄列表 -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增增員/輔導紀錄 Modal -->
+  <div id="add-recruit-log-modal" class="modal-overlay" style="z-index: 10006;">
+    <div class="modal-box" style="width: 450px; text-align: left;">
+      <h3 id="recruit-log-modal-title">新增紀錄</h3>
+      <input type="hidden" id="recruit-log-type" value="">
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="todo-form-row">
+          <label>日期 *</label>
+          <input type="date" class="form-input" id="recruit-log-date" onclick="this.showPicker()">
+        </div>
+        <div class="todo-form-row" id="recruit-log-topic-row" style="display: none;">
+          <label>輔導主題 *</label>
+          <input type="text" class="form-input" id="recruit-log-topic" placeholder="例如: 目標設定、商品講解、談吐應對..." autocomplete="off">
+        </div>
+        <div class="todo-form-row">
+          <label>詳細內容備忘 *</label>
+          <textarea class="form-input" id="recruit-log-content" rows="6" placeholder="請詳細記錄本次談話或輔導的具體內容、建議與下一步規劃..." style="resize: vertical; min-height: 120px;"></textarea>
+        </div>
+      </div>
+      <div class="todo-form-actions" style="margin-top: 20px;">
+        <button class="btn" onclick="closeAddRecruitLogModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveRecruitLog()">儲存紀錄</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ===== 客戶 360° 顧問畫布抽屜 (Customer 360° Drawer) ===== -->
   <div class="customer-360-overlay" id="customer-360-overlay" onclick="closeCustomer360Drawer()"></div>
   <div class="customer-360-drawer" id="customer-360-drawer">
@@ -816,6 +930,43 @@
       <div class="todo-form-actions" style="margin-top: 20px;">
         <button class="btn" onclick="closeAddCustomerModal()">取消</button>
         <button class="btn btn-primary" onclick="saveCustomer()">儲存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增增員對象 Modal -->
+  <div id="add-recruit-modal" class="modal-overlay">
+    <div class="modal-box" style="width: 400px; text-align: left;">
+      <h3 id="recruit-modal-title">新增增員對象資料</h3>
+      <input type="hidden" id="recruit-edit-id" value="">
+      
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
+        <div class="todo-form-row">
+          <label>姓名 *</label>
+          <input type="text" class="form-input" id="recruit-input-name" placeholder="請輸入姓名..." autocomplete="off">
+        </div>
+        <div class="todo-form-row">
+          <label>電話號碼 (可選)</label>
+          <input type="text" class="form-input" id="recruit-input-phone" placeholder="例如: 0912345678" autocomplete="off">
+        </div>
+        <div class="todo-form-row">
+          <label>現職工作 (可選)</label>
+          <input type="text" class="form-input" id="recruit-input-job" placeholder="例如: 餐飲業主管、學生..." autocomplete="off">
+        </div>
+        <div class="todo-form-row">
+          <label>目前階段 *</label>
+          <select class="form-input" id="recruit-input-stage">
+            <option value="contacting">接觸中</option>
+            <option value="interviewing">面談中</option>
+            <option value="examining">考核中</option>
+            <option value="joined">已登錄下屬</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="todo-form-actions" style="margin-top: 20px;">
+        <button class="btn" onclick="closeAddRecruitModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveRecruit()">儲存</button>
       </div>
     </div>
   </div>

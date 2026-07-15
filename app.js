@@ -2336,7 +2336,7 @@
               ${caseSourceBadge}
             </div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
-            <div class="client-name" onclick="openC360FromCaseRow('${c.clientName}')">${(c.clientName || '').slice(0, 5)}</div>
+            <div class="client-name" onclick="openDrawer('${c.id}', 'client')">${(c.clientName || '').slice(0, 5)}</div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
             <div class="issue-start" onclick="openDrawer('${c.id}', 'issue')">${(c.issueName || '').slice(0, 5)}</div>
           </div>
@@ -2449,6 +2449,7 @@
     function openDrawer(caseId, section, forceOpen = false) {
       const c = cases.find(item => item.id === caseId);
       const drawerRow = document.getElementById(`drawer-row-${caseId}`);
+      if (!drawerRow) return; // 安全防呆：若 DOM 節點不存在則直接返回，避免 JS 崩潰
       const drawerContent = document.getElementById(`drawer-content-${caseId}`);
       const arrow = document.getElementById(`drawer-arrow-${caseId}`);
       
@@ -2483,6 +2484,8 @@
       } else {
         targetElement = rowElement.querySelector(`.flow-node[data-phase="${section}"]`);
       }
+
+      if (!targetElement) return; // 安全防呆：若目標定位點不存在則返回
 
       const rowRect = rowElement.getBoundingClientRect();
       const targetRect = targetElement.getBoundingClientRect();
@@ -2718,7 +2721,9 @@
           updateCase(caseId, item => {
             const itemDetails = item[phase + 'Details'];
             if (!itemDetails.rescheduleHistory) itemDetails.rescheduleHistory = [];
+            const originalDate = itemDetails.meetDate || '';
             itemDetails.rescheduleHistory.push({
+              originalDate: originalDate,
               newDate: newDate,
               reason: reason,
               recordedAt: new Date().toISOString().split('T')[0]
@@ -2737,7 +2742,29 @@
       });
     }
 
-    // 顯示與管理改期細節 (支援刪除)
+    // 全域提供刪除改期功能
+    window.deleteRescheduleDetail = function(caseId, phase, index) {
+      if (!confirm("確定要刪除此筆改期紀錄嗎？")) return;
+      updateCase(caseId, item => {
+        const itemDetails = item[phase + 'Details'];
+        if (itemDetails && itemDetails.rescheduleHistory) {
+          itemDetails.rescheduleHistory.splice(index, 1);
+        }
+      });
+      showToast("已刪除該筆改期紀錄", "success");
+      
+      const modal = document.getElementById('confirm-modal');
+      if (modal) modal.classList.remove('active');
+
+      // 重新整理抽屜內容
+      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+      if (drawerContent) {
+        const activeSection = document.getElementById(`drawer-row-${caseId}`).dataset.activeSection;
+        openDrawer(caseId, activeSection, true);
+      }
+    };
+
+    // 顯示與管理改期細節 (支援修改與刪除)
     function showRescheduleDetail(caseId, phase, index) {
       const c = cases.find(item => item.id === caseId);
       if (!c) return;
@@ -2747,28 +2774,56 @@
       const item = details.rescheduleHistory[index];
       if (!item) return;
 
+      const dateFieldPlaceholder = "請選擇日期";
       showConfirm({
         icon: '📝',
         title: `第 ${index + 1} 次改期詳情`,
         body: `
-          <div style="font-size:0.8rem; line-height:1.5;">
-            <div><b>登記時間：</b>${item.recordedAt || '無紀錄'}</div>
-            <div style="margin-top:4px;"><b>改期至：</b><span style="color:#fb923c; font-weight:700;">${item.newDate}</span></div>
-            <div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px;">
-              <b>原因備忘：</b><br>
-              <div style="color:var(--text-secondary); white-space:pre-wrap; margin-top:4px; background:rgba(0,0,0,0.15); padding:6px; border-radius:4px; max-height:120px; overflow-y:auto;">${item.reason || '未填寫原因'}</div>
+          <div style="font-size:0.8rem; line-height:1.5; display:flex; flex-direction:column; gap:8px; margin-top:4px;">
+            <div class="form-group">
+              <label style="display:block; font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px;">⏰ 原定日期 (改期前)</label>
+              <input type="text" id="edit-reschedule-original" readonly value="${item.originalDate || item.recordedAt || ''}" placeholder="${dateFieldPlaceholder}" onclick="showCustomDatePicker(this, '${caseId}', '', 'none')" style="height: 28px; font-size:0.8rem; padding: 4px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; width:100%; cursor:pointer;">
+            </div>
+            <div class="form-group">
+              <label style="display:block; font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px;">🎯 改期至</label>
+              <input type="text" id="edit-reschedule-new" readonly value="${item.newDate || ''}" placeholder="${dateFieldPlaceholder}" onclick="showCustomDatePicker(this, '${caseId}', '', 'none')" style="height: 28px; font-size:0.8rem; padding: 4px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; width:100%; cursor:pointer;">
+            </div>
+            <div class="form-group">
+              <label style="display:block; font-size:0.75rem; color:var(--text-secondary); margin-bottom:4px;">📝 原因備忘</label>
+              <textarea id="edit-reschedule-reason" placeholder="請輸入本次改期的原因或約定細節..." style="height:55px; resize:none; font-size:0.8rem; padding:4px; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; width:100%;">${item.reason || ''}</textarea>
+            </div>
+            <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+              <button type="button" class="btn" onclick="window.deleteRescheduleDetail('${caseId}', '${phase}', ${index})" style="background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3); color:#ef4444; font-size:0.72rem; padding:4px 10px; border-radius:4px; cursor:pointer; height:28px;">🗑️ 刪除此紀錄</button>
             </div>
           </div>
         `,
-        okText: '刪除此紀錄',
-        okStyle: 'background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.4); color:#ef4444;',
+        okText: '儲存修改',
+        okStyle: 'background:var(--color-sa); color:#000; font-weight:700; border-color:var(--color-sa);',
         onOk: () => {
+          const editOriginal = document.getElementById('edit-reschedule-original').value;
+          const editNew = document.getElementById('edit-reschedule-new').value;
+          const editReason = document.getElementById('edit-reschedule-reason').value;
+
+          if (!editNew) {
+            showToast("改期日期不能為空！", "error");
+            return;
+          }
+
           updateCase(caseId, item => {
             const itemDetails = item[phase + 'Details'];
-            itemDetails.rescheduleHistory.splice(index, 1);
+            if (itemDetails && itemDetails.rescheduleHistory && itemDetails.rescheduleHistory[index]) {
+              itemDetails.rescheduleHistory[index].originalDate = editOriginal;
+              itemDetails.rescheduleHistory[index].newDate = editNew;
+              itemDetails.rescheduleHistory[index].reason = editReason;
+              
+              // 若修改的是最後一筆，連動更新當前大階段的預定會面日期
+              if (index === itemDetails.rescheduleHistory.length - 1) {
+                itemDetails.meetDate = editNew;
+              }
+            }
           });
-          showToast("已刪除該筆改期紀錄", "success");
-          
+          showToast("已儲存改期修改 💾", "success");
+
           // 重新整理抽屜內容
           const drawerContent = document.getElementById(`drawer-content-${caseId}`);
           if (drawerContent) {
@@ -2939,7 +2994,9 @@
           </div>
 
           ${isClientDrawer ? `
-          <!-- 移到右面版底部，此處保留空白以利視覺延伸 -->
+          <div style="margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+            <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; border-color:var(--accent); color:var(--accent);">👥 客戶 360 畫布</button>
+          </div>
           ` : `
           <div style="margin-top: auto; padding-top: 10px; display: flex; border-top: 1px solid var(--border-color);">
             <button type="button" class="btn" onclick="deleteCase('${c.id}')" style="flex: 1; padding: 4px 6px; font-size: 0.72rem; justify-content: center; height: 26px; color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05);">
@@ -3173,8 +3230,9 @@
               <label style="font-size: 0.75rem;">約定階段備忘</label>
               <textarea placeholder="" style="flex: 1; min-height: 70px; font-size: 0.78rem; resize: none; padding: 6px; width: 100%; box-sizing: border-box;" onchange="updateSADate('${c.id}', 'notes', this.value)">${sa.notes || ''}</textarea>
             </div>
-            <div style="margin-top: auto; padding-top: 10px; display: flex; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
-              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="flex: 1; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
+            <div style="margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-color); width: 100%;">
+              <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent);">👥 客戶 360 畫布</button>
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700;">✓ 完成</button>
             </div>
           </div>
         </div>
@@ -3504,7 +3562,7 @@
           return `
             <div onclick="showRescheduleDetail('${c.id}', 'oa', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
               <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
-              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+              <span style="color:#fb923c; font-weight:700;">${item.originalDate || item.recordedAt || '無'}</span>
             </div>
           `;
         }).join('');
@@ -3528,6 +3586,7 @@
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px; width:100%;">
               <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'oa')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; border:1px dashed var(--color-oa); color:var(--color-oa); font-size:0.7rem;">登記新改期</button>
+              <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent);">👥 客戶 360 畫布</button>
               <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000;">✓ 完成</button>
             </div>
           </div>
@@ -3633,7 +3692,7 @@
           return `
             <div onclick="showRescheduleDetail('${c.id}', 'pc', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
               <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
-              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+              <span style="color:#fb923c; font-weight:700;">${item.originalDate || item.recordedAt || '無'}</span>
             </div>
           `;
         }).join('');
@@ -3657,6 +3716,7 @@
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px; width:100%;">
               <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'pc')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; border:1px dashed var(--color-pc); color:var(--color-pc); font-size:0.7rem;">登記新改期</button>
+              <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent);">👥 客戶 360 畫布</button>
               <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000;">✓ 完成</button>
             </div>
           </div>
@@ -3764,7 +3824,7 @@
           return `
             <div onclick="showRescheduleDetail('${c.id}', 'c', ${idx})" style="cursor:pointer; padding:4px 6px; border-radius:4px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); margin-bottom:4px; transition:var(--transition-smooth); display:flex; justify-content:space-between; align-items:center; font-size:0.68rem;">
               <span style="font-weight:600; color:rgba(255,255,255,0.8);">第 ${idx + 1} 次</span>
-              <span style="color:#fb923c; font-weight:700;">${item.newDate}</span>
+              <span style="color:#fb923c; font-weight:700;">${item.originalDate || item.recordedAt || '無'}</span>
             </div>
           `;
         }).join('');
@@ -3795,6 +3855,7 @@
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; margin-top:6px; width:100%;">
               <button class="status-badge-btn" onclick="showRescheduleRegisterForm('${c.id}', 'c')" style="width:100%; justify-content:center; padding:4px 0; border-radius:4px; font-weight:700; border:1px dashed var(--color-c); color:var(--color-c); font-size:0.7rem;">登記新改期</button>
+              <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent);">👥 客戶 360 畫布</button>
               <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000;">✓ 完成</button>
             </div>
           </div>
@@ -3930,7 +3991,8 @@
                 <input type="text" readonly value="${s.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 's')" placeholder="選擇服務日期" style="width:100%; text-align:center; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer; background:transparent; border:none; color:#fff;">
               </div>
             </div>
-            <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000; margin-top: 12px;">✓ 完成</button>
+            <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent); margin-top: 12px;">👥 客戶 360 畫布</button>
+            <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000; margin-top: 6px;">✓ 完成</button>
           </div>
 
           ${renderVisitTasksSection(c, 'S')}
@@ -6507,6 +6569,11 @@
     // --- ESC 關閉所有 Modal (ADHD 防呆優化版) ---
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
+        const visitDrawerOverlay = document.getElementById('visit-drawer-overlay');
+        if (visitDrawerOverlay && visitDrawerOverlay.classList.contains('active')) {
+          toggleVisitDrawer(false);
+          return;
+        }
         const editLogModal = document.getElementById('edit-log-modal');
         if (editLogModal && editLogModal.classList.contains('active')) {
           closeEditLogModal();
@@ -6776,7 +6843,20 @@
       let html = '';
 
       todayCases.forEach(c => {
-        const phase = c.currentPhase || 'SA';
+        // 依據今天日期比對，找出實際排定於今日之到訪階段，避免大階段未移轉時顯示錯誤
+        let phase = c.currentPhase || 'SA';
+        const saDate = ((c.saDetails && c.saDetails.agreeDate) || '').replace(/\//g, '-').trim();
+        const oaDate = ((c.oaDetails && c.oaDetails.meetDate) || '').replace(/\//g, '-').trim();
+        const pcDate = ((c.pcDetails && c.pcDetails.meetDate) || '').replace(/\//g, '-').trim();
+        const cDate = ((c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '').replace(/\//g, '-').trim();
+        const sDate = ((c.sDetails && c.sDetails.meetDate) || '').replace(/\//g, '-').trim();
+        
+        if (oaDate === todayStr) phase = 'OA';
+        else if (pcDate === todayStr) phase = 'PC';
+        else if (cDate === todayStr) phase = 'C';
+        else if (sDate === todayStr) phase = 'S';
+        else if (saDate === todayStr) phase = 'SA';
+
         const phaseLabels = { SA: '約訪/SA', OA: '初訪/OA', PC: '建議書/PC', C: '送件/C', S: '售服/S' };
         const phaseColor = getPhaseColor(phase);
 
@@ -7372,11 +7452,11 @@
     let activeC360CustomerId = null;
 
     window.cycleViewMode = function() {
-      const modes = ['case', 'todo', 'customer'];
+      const modes = ['case', 'todo', 'customer', 'recruit'];
       let nextIdx = (modes.indexOf(currentViewMode) + 1) % modes.length;
       switchViewMode(modes[nextIdx]);
       
-      const modeNames = { 'case': '📊 案件管理', 'todo': '📋 待辦事項', 'customer': '👥 客戶畫布' };
+      const modeNames = { 'case': '📊 案件管理', 'todo': '📋 待辦事項', 'customer': '👥 客戶畫布', 'recruit': '👥 增員輔導' };
       showToast(`已切換至：${modeNames[modes[nextIdx]]}`, 'success');
     };
 
@@ -7388,6 +7468,7 @@
       const canvasContainer = document.getElementById('canvas-container');
       const todoPage = document.getElementById('todo-page');
       const customerPage = document.getElementById('customer-page');
+      const recruitPage = document.getElementById('recruit-page');
       
       if (weeklyCalendar) weeklyCalendar.style.display = mode === 'case' ? '' : 'none';
       if (canvasContainer) canvasContainer.style.display = mode === 'case' ? '' : 'none';
@@ -7411,6 +7492,16 @@
           renderCustomerPage();
         } else {
           customerPage.style.display = 'none';
+        }
+      }
+
+      if (recruitPage) {
+        if (mode === 'recruit') {
+          recruitPage.style.display = 'block';
+          loadRecruits();
+          renderRecruitPage();
+        } else {
+          recruitPage.style.display = 'none';
         }
       }
     };
@@ -7997,7 +8088,10 @@
 
     // --- 點擊案件客戶姓名跳轉 360° 畫布 ---
     // 這會在 app.js 重繪案件行時綁定
-    window.openC360FromCaseRow = function(clientName) {
+    window.openC360FromCaseRow = function(clientName, caseId) {
+      if (caseId) {
+        closeCaseDrawer(caseId);
+      }
       // 尋找此客戶，如果不存在則先自動建立
       loadCustomers();
       let cust = customers.find(c => c.name === clientName);
@@ -8018,4 +8112,389 @@
       // 切換視角並打開 360 面板
       switchViewMode('customer');
       openCustomer360Drawer(cust.id);
+    };
+
+    // ==========================================================================
+    // 👥 增員與輔導管理核心邏輯
+    // ==========================================================================
+    let recruits = [];
+    let activeRecruitId = null;
+
+    window.loadRecruits = function() {
+      try {
+        const data = localStorage.getItem('crm_recruits');
+        recruits = data ? JSON.parse(data) : [];
+      } catch (e) {
+        console.error('Failed to load recruits:', e);
+        recruits = [];
+      }
+    };
+
+    window.saveRecruits = function() {
+      localStorage.setItem('crm_recruits', JSON.stringify(recruits));
+    };
+
+    // 渲染增員清單頁面
+    window.renderRecruitPage = function() {
+      const grid = document.getElementById('recruit-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      if (recruits.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-secondary); opacity:0.6;">（尚無增員資料，點擊右上角新增）</div>';
+        return;
+      }
+
+      // 依階段排序：接觸中 -> 面談中 -> 考核中 -> 已登錄下屬
+      const stageWeight = { 'contacting': 1, 'interviewing': 2, 'examining': 3, 'joined': 4 };
+      const sorted = [...recruits].sort((a, b) => (stageWeight[a.stage] || 0) - (stageWeight[b.stage] || 0));
+
+      const stageLabels = {
+        'contacting': '接觸中',
+        'interviewing': '面談中',
+        'examining': '考核中',
+        'joined': '已登錄下屬'
+      };
+
+      sorted.forEach(r => {
+        const card = document.createElement('div');
+        card.className = 'customer-card';
+        card.style.position = 'relative';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.justifyContent = 'space-between';
+        
+        // 取得最近一筆面談或輔導的備忘簡短摘要
+        let lastLogText = '暫無紀錄';
+        if (r.stage === 'joined') {
+          if (r.coachingLogs && r.coachingLogs.length > 0) {
+            const lastLog = r.coachingLogs[r.coachingLogs.length - 1];
+            lastLogText = `[輔導] ${lastLog.date}: ${lastLog.topic}`;
+          }
+        } else {
+          if (r.interviewLogs && r.interviewLogs.length > 0) {
+            const lastLog = r.interviewLogs[r.interviewLogs.length - 1];
+            lastLogText = `[面談] ${lastLog.date}: ${lastLog.content.slice(0, 15)}...`;
+          }
+        }
+
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-weight:800; font-size:1.05rem; color:#fff;">${r.name}</div>
+            <span class="recruit-stage-badge ${r.stage}">${stageLabels[r.stage] || '未知'}</span>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
+            <div>📱 電話：${r.phone || '無'}</div>
+            <div>💼 現職：${r.currentJob || '無'}</div>
+            <div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.04); color:rgba(255,255,255,0.6); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${lastLogText}">
+              📝 ${lastLogText}
+            </div>
+          </div>
+        `;
+        card.onclick = () => openRecruitDrawer(r.id);
+        grid.appendChild(card);
+      });
+    };
+
+    // 新增增員對象 Modal 控制
+    window.openAddRecruitModal = function() {
+      document.getElementById('recruit-edit-id').value = '';
+      document.getElementById('recruit-input-name').value = '';
+      document.getElementById('recruit-input-phone').value = '';
+      document.getElementById('recruit-input-job').value = '';
+      document.getElementById('recruit-input-stage').value = 'contacting';
+      document.getElementById('recruit-modal-title').textContent = '新增增員對象資料';
+      document.getElementById('add-recruit-modal').classList.add('active');
+    };
+
+    window.closeAddRecruitModal = function() {
+      document.getElementById('add-recruit-modal').classList.remove('active');
+    };
+
+    window.saveRecruit = function() {
+      const name = document.getElementById('recruit-input-name').value.trim();
+      const phone = document.getElementById('recruit-input-phone').value.trim();
+      const job = document.getElementById('recruit-input-job').value.trim();
+      const stage = document.getElementById('recruit-input-stage').value;
+
+      if (!name) {
+        showToast('請輸入姓名！', 'error');
+        return;
+      }
+
+      loadRecruits();
+      const newRecruit = {
+        id: 'recruit_' + Math.random().toString(36).substr(2, 9),
+        name: name,
+        phone: phone,
+        currentJob: job,
+        stage: stage,
+        interviewLogs: [],
+        coachingLogs: []
+      };
+
+      recruits.push(newRecruit);
+      saveRecruits();
+      closeAddRecruitModal();
+      renderRecruitPage();
+      showToast('增員對象新增成功！', 'success');
+    };
+
+    // 開啟詳情抽屜
+    window.openRecruitDrawer = function(id) {
+      activeRecruitId = id;
+      loadRecruits();
+      const r = recruits.find(item => item.id === id);
+      if (!r) return;
+
+      document.getElementById('recruit-drawer-name').textContent = r.name;
+      document.getElementById('recruit-detail-name').value = r.name;
+      document.getElementById('recruit-detail-phone').value = r.phone || '';
+      document.getElementById('recruit-detail-job').value = r.currentJob || '';
+      document.getElementById('recruit-detail-stage').value = r.stage;
+
+      // 更新 Badge 顯示
+      const badge = document.getElementById('recruit-drawer-stage-badge');
+      badge.className = 'recruit-stage-badge ' + r.stage;
+      const stageLabels = {
+        'contacting': '接觸中',
+        'interviewing': '面談中',
+        'examining': '考核中',
+        'joined': '已登錄下屬'
+      };
+      badge.textContent = stageLabels[r.stage] || '未知';
+
+      // 渲染紀錄區段
+      renderRecruitLogsUI(r);
+
+      document.getElementById('recruit-drawer-overlay').classList.add('active');
+      document.getElementById('recruit-drawer').classList.add('active');
+    };
+
+    window.closeRecruitDrawer = function() {
+      document.getElementById('recruit-drawer-overlay').classList.remove('active');
+      document.getElementById('recruit-drawer').classList.remove('active');
+      activeRecruitId = null;
+      renderRecruitPage();
+    };
+
+    // 依階段顯示與隱藏面談/輔導區塊，並渲染列表
+    window.renderRecruitLogsUI = function(r) {
+      const interviewSec = document.getElementById('recruit-interview-section');
+      const coachingSec = document.getElementById('recruit-coaching-section');
+
+      if (r.stage === 'joined') {
+        interviewSec.style.display = 'none';
+        coachingSec.style.display = 'flex';
+        renderCoachingList(r);
+      } else {
+        interviewSec.style.display = 'flex';
+        coachingSec.style.display = 'none';
+        renderInterviewList(r);
+      }
+    };
+
+    // 渲染面談進度紀錄清單
+    function renderInterviewList(r) {
+      const container = document.getElementById('recruit-interview-list');
+      container.innerHTML = '';
+      const logs = r.interviewLogs || [];
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:20px;">（尚無面談紀錄）</div>';
+        return;
+      }
+
+      // 日期由新到舊排序
+      const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach((log, idx) => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '4px';
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; color:var(--text-secondary);">
+            <span>📅 ${log.date}</span>
+            <span style="cursor:pointer; color:#ef4444;" onclick="deleteRecruitLog('interview', ${logs.indexOf(log)})">🗑️</span>
+          </div>
+          <div style="font-size:0.78rem; color:#fff; word-break:break-all; white-space:pre-wrap; margin-top:2px;">${log.content}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // 渲染輔導紀錄清單
+    function renderCoachingList(r) {
+      const container = document.getElementById('recruit-coaching-list');
+      container.innerHTML = '';
+      const logs = r.coachingLogs || [];
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:20px;">（尚無輔導紀錄）</div>';
+        return;
+      }
+
+      // 日期由新到舊排序
+      const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach((log, idx) => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '4px';
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; color:var(--text-secondary);">
+            <span style="font-weight:700; color:var(--accent);">🎯 ${log.topic}</span>
+            <div style="display:flex; gap:8px;">
+              <span>📅 ${log.date}</span>
+              <span style="cursor:pointer; color:#ef4444;" onclick="deleteRecruitLog('coaching', ${logs.indexOf(log)})">🗑️</span>
+            </div>
+          </div>
+          <div style="font-size:0.78rem; color:#fff; word-break:break-all; white-space:pre-wrap; margin-top:2px;">${log.content}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // 修改增員對象基本欄位
+    window.updateRecruitField = function(field, value) {
+      if (!activeRecruitId) return;
+      loadRecruits();
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+
+      r[field] = value.trim();
+      
+      // 如果修改了姓名，同步更新抽屜標題
+      if (field === 'name') {
+        document.getElementById('recruit-drawer-name').textContent = r.name;
+      }
+
+      // 如果修改了階段，更新 Badge 與紀錄版面
+      if (field === 'stage') {
+        const badge = document.getElementById('recruit-drawer-stage-badge');
+        badge.className = 'recruit-stage-badge ' + r.stage;
+        const stageLabels = {
+          'contacting': '接觸中',
+          'interviewing': '面談中',
+          'examining': '考核中',
+          'joined': '已登錄下屬'
+        };
+        badge.textContent = stageLabels[r.stage] || '未知';
+        renderRecruitLogsUI(r);
+      }
+
+      saveRecruits();
+      showToast('增員對象資料已更新。', 'success');
+    };
+
+    // 刪除增員對象
+    window.deleteRecruit = function() {
+      if (!activeRecruitId) return;
+      loadRecruits();
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+
+      showConfirm({
+        icon: '🗑️',
+        title: '確認刪除增員對象',
+        body: `確定要永久刪除 <b>${r.name}</b> 嗎？相關的所有面談與輔導紀錄將會一併清除，且無法還原。`,
+        okText: '確定刪除',
+        okStyle: 'background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;',
+        onOk: () => {
+          recruits = recruits.filter(item => item.id !== activeRecruitId);
+          saveRecruits();
+          closeRecruitDrawer();
+          showToast('已刪除該增員對象。', 'success');
+        }
+      });
+    };
+
+    // 新增紀錄對話框
+    window.openAddRecruitLogModal = function(type) {
+      document.getElementById('recruit-log-type').value = type;
+      
+      const d = new Date();
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const tw = new Date(utc + 3600000 * 8);
+      const todayStr = tw.getFullYear() + '-' + String(tw.getMonth()+1).padStart(2,'0') + '-' + String(tw.getDate()).padStart(2,'0');
+
+      document.getElementById('recruit-log-date').value = todayStr;
+      document.getElementById('recruit-log-content').value = '';
+      document.getElementById('recruit-log-topic').value = '';
+
+      if (type === 'coaching') {
+        document.getElementById('recruit-log-modal-title').textContent = '新增下屬輔導紀錄';
+        document.getElementById('recruit-log-topic-row').style.display = '';
+      } else {
+        document.getElementById('recruit-log-modal-title').textContent = '新增增員面談進度紀錄';
+        document.getElementById('recruit-log-topic-row').style.display = 'none';
+      }
+
+      document.getElementById('add-recruit-log-modal').classList.add('active');
+    };
+
+    window.closeAddRecruitLogModal = function() {
+      document.getElementById('add-recruit-log-modal').classList.remove('active');
+    };
+
+    // 儲存紀錄 (面談 or 輔導)
+    window.saveRecruitLog = function() {
+      const type = document.getElementById('recruit-log-type').value;
+      const date = document.getElementById('recruit-log-date').value;
+      const content = document.getElementById('recruit-log-content').value.trim();
+      const topic = document.getElementById('recruit-log-topic').value.trim();
+
+      if (!date || !content) {
+        showToast('請填寫日期與內容備忘！', 'error');
+        return;
+      }
+
+      if (type === 'coaching' && !topic) {
+        showToast('請輸入輔導主題！', 'error');
+        return;
+      }
+
+      loadRecruits();
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+
+      if (type === 'coaching') {
+        if (!r.coachingLogs) r.coachingLogs = [];
+        r.coachingLogs.push({ date, topic, content });
+      } else {
+        if (!r.interviewLogs) r.interviewLogs = [];
+        r.interviewLogs.push({ date, content });
+      }
+
+      saveRecruits();
+      closeAddRecruitLogModal();
+      renderRecruitLogsUI(r);
+      showToast('紀錄儲存成功！', 'success');
+    };
+
+    // 刪除紀錄
+    window.deleteRecruitLog = function(type, index) {
+      loadRecruits();
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+
+      showConfirm({
+        icon: '🗑️',
+        title: '確認刪除紀錄',
+        body: '確定要永久刪除此筆對話紀錄嗎？刪除後將無法復原。',
+        okText: '確定刪除',
+        okStyle: 'background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;',
+        onOk: () => {
+          if (type === 'coaching') {
+            r.coachingLogs.splice(index, 1);
+          } else {
+            r.interviewLogs.splice(index, 1);
+          }
+          saveRecruits();
+          renderRecruitLogsUI(r);
+          showToast('已刪除此紀錄。', 'success');
+        }
+      });
     };
