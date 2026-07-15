@@ -23,8 +23,8 @@
   <!-- Tablet Fix: Mobile Drag & Drop Polyfill -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/default.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/index.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.04.04">
-  <script src="app.js?v=1.04.04" defer></script>
+  <link rel="stylesheet" href="style.css?v=1.04.11">
+  <script src="app.js?v=1.04.11" defer></script>
 </head>
 
 <body>
@@ -44,7 +44,7 @@
   <header>
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
       <button class="btn" id="btn-sidebar-trigger" onclick="openLeftSidebar()" title="開啟快速跳轉側欄" style="font-size: 1.1rem; padding: 6px 10px;">☰</button>
-      <h1 ondblclick="toggleTodoPage()" style="cursor:default; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;">客戶案件管理系統</h1>
+      <h1 onclick="cycleViewMode()" style="cursor:pointer; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;" title="點擊切換視角 (案件 ➔ 待辦 ➔ 客戶)">客戶案件管理系統</h1>
     </div>
     <div style="display: flex; align-items: center; gap: 12px;">
       <!-- 搜尋欄位 -->
@@ -88,15 +88,7 @@
       <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
         ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
-      <!-- 三態視角切換組 (ADHD 網格對齊) -->
-      <div class="view-switcher-group" style="display: flex; gap: 4px; background: var(--bg-card); padding: 2px; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0; margin-right: 4px;">
-        <button class="btn view-tab active" id="tab-view-case" onclick="switchViewMode('case')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2;">📊 案件</button>
-        <button class="btn view-tab" id="tab-view-todo" onclick="switchViewMode('todo')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2; position: relative;">
-          📋 待辦
-          <span id="todo-global-badge" style="position: absolute; top: -2px; right: -2px; background: #f59e0b; color: #000; font-size: 0.6rem; font-weight: bold; min-width: 12px; height: 12px; border-radius: 50%; display: none; align-items: center; justify-content: center; line-height: 1; padding: 2px;">0</span>
-        </button>
-        <button class="btn view-tab" id="tab-view-customer" onclick="switchViewMode('customer')" style="padding: 4px 10px; font-size: 0.8rem; border: none; background: transparent; height: 28px; line-height: 1.2;">👥 客戶</button>
-      </div>
+
       <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
       <button class="btn" onclick="location.reload()" title="重新整理" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">🔄</button>
       <button class="btn" onclick="openTodoModal()" style="border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.05); margin-right: 4px;">＋待辦</button>
@@ -107,7 +99,7 @@
   <!-- ===== 待辦事項管理頁面 ===== -->
   <div id="todo-page">
     <div id="todo-page-header">
-      <button class="btn" onclick="toggleTodoPage()" style="padding: 5px 12px; font-size: 0.82rem;">← 返回</button>
+      
       <h2>📋 待辦事項管理</h2>
       <button class="btn btn-primary" onclick="openTodoModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增待辦</button>
     </div>

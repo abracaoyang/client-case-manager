@@ -171,6 +171,8 @@
     }
 
     // 模擬案件資料
+    let currentViewMode = "case";
+    let customers = [];
     let cases = [
       {
         id: "case-1",
@@ -339,6 +341,80 @@
         localStorage.setItem('crm_cases_order', JSON.stringify(order));
       }
     }
+
+
+    // --- 智慧自動歸戶：只要案件有出現姓名就自動整理匯入 ---
+    function autoSyncCustomersFromCases() {
+      let changed = false;
+      const twTime = new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+      
+      cases.forEach(c => {
+        if (!c.clientName) return;
+        let cust = customers.find(cust => cust.name === c.clientName);
+        if (!cust) {
+          customers.push({
+            id: 'cust_' + Math.random().toString(36).substr(2, 9),
+            name: c.clientName,
+            phone: c.phone || '',
+            family: '[]',
+            framework: '{}',
+            campaigns: '{}',
+            lastUpdated: twTime
+          });
+          changed = true;
+        }
+      });
+      
+      if (changed) {
+        saveCustomers();
+      }
+    }
+
+    // --- 客戶資料同步與儲存管理 ---
+    function loadCustomers() {
+      try {
+        const local = localStorage.getItem('crm_customers');
+        customers = local ? JSON.parse(local) : [];
+        if (!Array.isArray(customers)) customers = [];
+      } catch(e) {
+        customers = [];
+      }
+    }
+
+    function saveCustomers() {
+      localStorage.setItem('crm_customers', JSON.stringify(customers));
+      saveCustomersToCloud();
+    }
+
+    async function fetchCustomersFromCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=customers');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          customers = resObj.customers || [];
+          localStorage.setItem('crm_customers', JSON.stringify(customers));
+        }
+      } catch(e) {
+        console.error("載入客戶資料失敗：", e);
+      }
+    }
+
+    async function saveCustomersToCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'saveCustomers',
+            customers: customers
+          })
+        });
+      } catch(e) {
+        console.error("同步客戶資料失敗：", e);
+      }
+    }
+
     function loadCasesFromStorage() {
       const stored = localStorage.getItem('crm_cases');
       if (stored) {
@@ -1233,12 +1309,17 @@
         loadTodos();
         debugLog("待辦事項本機快取載入完畢");
 
-      // 點擊 modal-overlay 遮罩外部區域自動關閉彈窗
       const modalCloseMap = {
         'add-case-modal':   () => toggleAddCaseModal(false),
         'settings-modal':   () => toggleSettingsModal(false),
         'risk-lock-modal':  () => toggleRiskLockModal(false),
         'weekly-report-modal': () => toggleWeeklyReport(false),
+        'add-todo-modal':   () => closeTodoModal(),
+        'reminder-modal':   () => toggleReminderModal(false),
+        'todo-notify-modal':() => toggleTodoNotifyModal(false),
+        'add-customer-modal':() => closeAddCustomerModal(),
+        'add-family-modal': () => closeAddFamilyModal(),
+        'add-note-modal':   () => closeAddNoteModal(),
       };
       Object.entries(modalCloseMap).forEach(([id, closeFn]) => {
         const overlay = document.getElementById(id);
@@ -1518,9 +1599,11 @@
       debugLog("連線模式判定中... 離線模式: " + crmSettings.isOffline + ", API網址: " + crmSettings.apiUrl);
       if (!crmSettings.isOffline && crmSettings.apiUrl) {
         debugLog("啟動雲端同步載入 (fetchCases)...");
+        await fetchCustomersFromCloud();
         await fetchCases();
       } else {
         debugLog("啟動本機快取載入...");
+        loadCustomers();
         loadCasesFromStorage();
         debugLog("本機快取載入完畢，準備渲染 (renderCases)...");
         renderCases();
@@ -1989,6 +2072,7 @@
       renderWeeklyCalendar();
       checkTodayVisits();
 
+      autoSyncCustomersFromCases();
       // 根據 currentSortMode 對案件進行排序
       const sortMode = crmSettings.currentSortMode || 'manual';
       
@@ -2252,7 +2336,7 @@
               ${caseSourceBadge}
             </div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
-            <div class="client-name" onclick="openDrawer('${c.id}', 'client')">${(c.clientName || '').slice(0, 5)}</div>
+            <div class="client-name" onclick="openC360FromCaseRow('${c.clientName}')">${(c.clientName || '').slice(0, 5)}</div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
             <div class="issue-start" onclick="openDrawer('${c.id}', 'issue')">${(c.issueName || '').slice(0, 5)}</div>
           </div>
@@ -6614,31 +6698,17 @@
       const dd = String(twNow.getDate()).padStart(2, '0');
       const todayStr = `${yyyy}-${mm}-${dd}`;
 
-      // 掃描未封存案件中，今天有約訪的案件
+      // 掃描未封存案件中，今天有約訪的案件 (超強聯集判定，徹底解決跨階段排程漏算問題)
       const activeCases = cases.filter(c => !c.archived);
       const todayCases = activeCases.filter(c => {
-        let targetDate = '';
-        const phase = c.currentPhase || 'SA';
-        if (phase === 'OA') {
-          if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
-            targetDate = c.oaDetails.meetDate || '';
-          }
-        } else if (phase === 'PC') {
-          if (c.pcDetails && c.pcDetails.meetState === 'confirmed') {
-            targetDate = c.pcDetails.meetDate || '';
-          }
-        } else if (phase === 'C') {
-          if (c.cDetails && c.cDetails.meetState === 'confirmed') {
-            targetDate = c.cDetails.meetDate || '';
-          }
-        } else if (phase === 'S') {
-          if (c.sDetails && c.sDetails.meetState === 'confirmed') {
-            targetDate = c.sDetails.meetDate || '';
-          }
-        }
-        if (!targetDate) return false;
-        const normalized = targetDate.replace(/\//g, '-');
-        return normalized === todayStr;
+        const saDate = (c.saDetails && c.saDetails.agreeDate) || '';
+        const oaDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+        const pcDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+        const cDate = (c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '';
+        const sDate = (c.sDetails && c.sDetails.meetDate) || '';
+        
+        const allDates = [saDate, oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
+        return allDates.includes(todayStr);
       });
 
       if (todayCases.length > 0) {
@@ -6686,28 +6756,14 @@
 
       const activeCases = cases.filter(c => !c.archived);
       const todayCases = activeCases.filter(c => {
-        let targetDate = '';
-        const phase = c.currentPhase || 'SA';
-        if (phase === 'OA') {
-          if (c.oaDetails && c.oaDetails.meetState === 'confirmed') {
-            targetDate = c.oaDetails.meetDate || '';
-          }
-        } else if (phase === 'PC') {
-          if (c.pcDetails && c.pcDetails.meetState === 'confirmed') {
-            targetDate = c.pcDetails.meetDate || '';
-          }
-        } else if (phase === 'C') {
-          if (c.cDetails && c.cDetails.meetState === 'confirmed') {
-            targetDate = c.cDetails.meetDate || '';
-          }
-        } else if (phase === 'S') {
-          if (c.sDetails && c.sDetails.meetState === 'confirmed') {
-            targetDate = c.sDetails.meetDate || '';
-          }
-        }
-        if (!targetDate) return false;
-        const normalized = targetDate.replace(/\//g, '-');
-        return normalized === todayStr;
+        const saDate = (c.saDetails && c.saDetails.agreeDate) || '';
+        const oaDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+        const pcDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+        const cDate = (c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '';
+        const sDate = (c.sDetails && c.sDetails.meetDate) || '';
+        
+        const allDates = [saDate, oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
+        return allDates.includes(todayStr);
       });
 
       if (todayCases.length === 0) {
@@ -7308,3 +7364,658 @@
       
       debugLog("🧠 ADHD 啟動流全部完成！");
     }
+
+    // ==========================================================================
+    // 👥 三態視角切換器 & 客戶 360° 畫布控制核心
+    // ==========================================================================
+    
+    let activeC360CustomerId = null;
+
+    window.cycleViewMode = function() {
+      const modes = ['case', 'todo', 'customer'];
+      let nextIdx = (modes.indexOf(currentViewMode) + 1) % modes.length;
+      switchViewMode(modes[nextIdx]);
+      
+      const modeNames = { 'case': '📊 案件管理', 'todo': '📋 待辦事項', 'customer': '👥 客戶畫布' };
+      showToast(`已切換至：${modeNames[modes[nextIdx]]}`, 'success');
+    };
+
+    window.switchViewMode = function(mode) {
+      currentViewMode = mode;
+      
+      // 控制主頁面顯示隱藏
+      const weeklyCalendar = document.getElementById('weekly-calendar-bar');
+      const canvasContainer = document.getElementById('canvas-container');
+      const todoPage = document.getElementById('todo-page');
+      const customerPage = document.getElementById('customer-page');
+      
+      if (weeklyCalendar) weeklyCalendar.style.display = mode === 'case' ? '' : 'none';
+      if (canvasContainer) canvasContainer.style.display = mode === 'case' ? '' : 'none';
+      
+      if (todoPage) {
+        if (mode === 'todo') {
+          todoPage.style.display = 'block';
+          todoPage.classList.add('active');
+          loadTodos();
+          renderTodoPage();
+        } else {
+          todoPage.style.display = 'none';
+          todoPage.classList.remove('active');
+        }
+      }
+      
+      if (customerPage) {
+        if (mode === 'customer') {
+          customerPage.style.display = 'block';
+          loadCustomers();
+          renderCustomerPage();
+        } else {
+          customerPage.style.display = 'none';
+        }
+      }
+    };
+    
+    window.toggleTodoPage = function() {
+      if (currentViewMode === 'todo') {
+        switchViewMode('case');
+      } else {
+        switchViewMode('todo');
+      }
+    };
+
+    // 渲染客戶畫布卡片列表
+    window.renderCustomerPage = function() {
+      const grid = document.getElementById('customer-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      
+      if (customers.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-secondary); opacity:0.6;">（尚無客戶資料，點擊右上角新增）</div>';
+        return;
+      }
+      
+      customers.forEach(cust => {
+        const custCases = cases.filter(c => c.clientName === cust.name);
+        const activeCount = custCases.filter(c => !c.isArchived).length;
+        
+        let framework = {};
+        try {
+          framework = typeof cust.framework === 'string' ? JSON.parse(cust.framework) : (cust.framework || {});
+        } catch(e) { framework = {}; }
+        const checkedCount = Object.values(framework).filter(v => v === true).length;
+        
+        const card = document.createElement('div');
+        card.className = 'customer-card';
+        card.onclick = () => openCustomer360Drawer(cust.id);
+        
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:1.15rem; font-weight:800; color:#fff;">👤 ${cust.name}</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary); font-family:monospace;">${cust.phone || '無電話'}</span>
+          </div>
+          <div style="display:flex; gap:12px; font-size:0.8rem; color:var(--text-secondary);">
+            <span>📁 進行中案件: <strong style="color:var(--color-sa); font-weight:bold;">${activeCount}</strong></span>
+            <span>🛡️ 已檢核保障: <strong style="color:#10b981; font-weight:bold;">${checkedCount}項</strong></span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    };
+
+    // --- 新增 / 編輯客戶彈窗 ---
+    window.openAddCustomerModal = function(editId) {
+      const modal = document.getElementById('add-customer-modal');
+      const title = document.getElementById('customer-modal-title');
+      if (!modal) return;
+      
+      if (editId) {
+        const cust = customers.find(c => c.id === editId);
+        if (!cust) return;
+        title.textContent = '編輯客戶資料';
+        document.getElementById('customer-edit-id').value = cust.id;
+        document.getElementById('customer-input-name').value = cust.name || '';
+        document.getElementById('customer-input-phone').value = cust.phone || '';
+      } else {
+        title.textContent = '新增客戶資料';
+        document.getElementById('customer-edit-id').value = '';
+        document.getElementById('customer-input-name').value = '';
+        document.getElementById('customer-input-phone').value = '';
+      }
+      modal.classList.add('active');
+    };
+
+    window.closeAddCustomerModal = function() {
+      const modal = document.getElementById('add-customer-modal');
+      if (modal) modal.classList.remove('active');
+    };
+
+    window.saveCustomer = function() {
+      const name = (document.getElementById('customer-input-name').value || '').trim();
+      const phone = (document.getElementById('customer-input-phone').value || '').trim();
+      
+      if (!name) {
+        document.getElementById('customer-input-name').focus();
+        return;
+      }
+      
+      const editId = document.getElementById('customer-edit-id').value;
+      const twTime = new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+      
+      if (editId) {
+        const cust = customers.find(c => c.id === editId);
+        if (cust) {
+          cust.name = name;
+          cust.phone = phone;
+          cust.lastUpdated = twTime;
+        }
+      } else {
+        customers.push({
+          id: 'cust_' + Math.random().toString(36).substr(2, 9),
+          name: name,
+          phone: phone,
+          family: '[]',
+          framework: '{}',
+          campaigns: '{}',
+          lastUpdated: twTime
+        });
+      }
+      
+      saveCustomers();
+      closeAddCustomerModal();
+      renderCustomerPage();
+      showToast('客戶資料儲存成功！', 'success');
+    };
+
+    // --- 客戶 360° 畫布面板核心功能 ---
+    window.openCustomer360Drawer = function(customerId) {
+      activeC360CustomerId = customerId;
+      const cust = customers.find(c => c.id === customerId);
+      if (!cust) return;
+      
+      // 填充基本資料
+      document.getElementById('c360-client-name').textContent = cust.name;
+      document.getElementById('c360-client-phone').textContent = cust.phone || '無電話欄位';
+      
+      // 綁定編輯按鈕
+      document.getElementById('c360-edit-btn').onclick = () => {
+        openAddCustomerModal(cust.id);
+      };
+      
+      // 渲染三欄
+      renderC360Family(cust);
+      renderC360Framework(cust);
+      renderC360Campaigns(cust);
+      renderC360Timeline(cust);
+      renderC360Todos(cust);
+      renderC360Notes(cust);
+      
+      // 打開抽屜
+      document.getElementById('customer-360-overlay').classList.add('active');
+      document.getElementById('customer-360-drawer').classList.add('active');
+    };
+
+    window.closeCustomer360Drawer = function() {
+      document.getElementById('customer-360-overlay').classList.remove('active');
+      document.getElementById('customer-360-drawer').classList.remove('active');
+      activeC360CustomerId = null;
+    };
+
+    // --- 左欄：家人家庭關係與基本保障框架 ---
+    function renderC360Family(cust) {
+      const container = document.getElementById('c360-family-list');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      let family = [];
+      try {
+        family = typeof cust.family === 'string' ? JSON.parse(cust.family) : (cust.family || []);
+      } catch(e) { family = []; }
+      
+      if (family.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:10px;">（暫無關聯家人）</div>';
+        return;
+      }
+      
+      family.forEach(rel => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        
+        // 尋找此家人是否已存在於客戶庫中
+        const member = customers.find(c => c.name === rel.name);
+        if (member) {
+          item.innerHTML = `
+            <span style="font-weight:700; color:var(--accent); cursor:pointer;" onclick="openCustomer360Drawer('${member.id}')">👤 ${rel.name} (聯結跳轉)</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary);">${rel.relation}</span>
+          `;
+        } else {
+          item.innerHTML = `
+            <span>👤 ${rel.name}</span>
+            <span style="font-size:0.75rem; color:var(--text-secondary);">${rel.relation}</span>
+          `;
+        }
+        container.appendChild(item);
+      });
+    }
+
+    window.openAddFamilyModal = function() {
+      const select = document.getElementById('family-input-target-id');
+      if (!select) return;
+      
+      // 填充除了當前客戶以外的所有客戶下拉選單
+      select.innerHTML = '<option value="">— 請選擇客戶 —</option>' +
+        customers.filter(c => c.id !== activeC360CustomerId)
+          .map(c => `<option value="${c.name}">👤 ${c.name}</option>`).join('');
+      
+      document.getElementById('family-input-relation').value = '';
+      document.getElementById('add-family-modal').classList.add('active');
+    };
+
+    window.closeAddFamilyModal = function() {
+      document.getElementById('add-family-modal').classList.remove('active');
+    };
+
+    window.saveFamilyRelation = function() {
+      const targetName = document.getElementById('family-input-target-id').value;
+      const relation = (document.getElementById('family-input-relation').value || '').trim();
+      
+      if (!targetName || !relation) return;
+      
+      const cust = customers.find(c => c.id === activeC360CustomerId);
+      if (!cust) return;
+      
+      let family = [];
+      try {
+        family = typeof cust.family === 'string' ? JSON.parse(cust.family) : (cust.family || []);
+      } catch(e) { family = []; }
+      
+      family.push({ name: targetName, relation: relation });
+      cust.family = JSON.stringify(family);
+      
+      // 同時反向建立關聯 (A是B的配偶，B也是A的配偶)
+      const targetCust = customers.find(c => c.name === targetName);
+      if (targetCust) {
+        let targetFamily = [];
+        try {
+          targetFamily = typeof targetCust.family === 'string' ? JSON.parse(targetCust.family) : (targetCust.family || []);
+        } catch(e) { targetFamily = []; }
+        
+        let counterRelation = '家人';
+        if (relation === '配偶') counterRelation = '配偶';
+        else if (relation === '父親' || relation === '母親') counterRelation = '子女';
+        else if (relation.includes('子') || relation.includes('女')) counterRelation = '父母';
+        
+        targetFamily.push({ name: cust.name, relation: counterRelation });
+        targetCust.family = JSON.stringify(targetFamily);
+      }
+      
+      saveCustomers();
+      closeAddFamilyModal();
+      renderC360Family(cust);
+      showToast('建立家庭關聯成功！', 'success');
+    };
+
+    // --- 🛡️ 保險框架勾選 ---
+    const INSURANCE_TYPES = [
+      { key: 'life', label: '壽險保障' },
+      { key: 'accident', label: '意外防護' },
+      { key: 'cancer', label: '癌症保障' },
+      { key: 'illness', label: '重大傷病' },
+      { key: 'medical', label: '實支實付醫療' },
+      { key: 'ltc', label: '長期照顧險' },
+      { key: 'disability', label: '失能扶助險' },
+      { key: 'saving', label: '儲蓄/投資/年金' }
+    ];
+
+    function renderC360Framework(cust) {
+      const grid = document.getElementById('c360-framework-grid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      
+      let framework = {};
+      try {
+        framework = typeof cust.framework === 'string' ? JSON.parse(cust.framework) : (cust.framework || {});
+      } catch(e) { framework = {}; }
+      
+      INSURANCE_TYPES.forEach(item => {
+        const isChecked = framework[item.key] === true;
+        const el = document.createElement('div');
+        el.className = `c360-framework-item ${isChecked ? 'checked' : 'unchecked'}`;
+        el.innerHTML = `
+          <span>${isChecked ? '🟢' : '🔴'}</span>
+          <span>${item.label}</span>
+        `;
+        el.onclick = () => toggleFrameworkChecked(cust.id, item.key);
+        grid.appendChild(el);
+      });
+    }
+
+    window.toggleFrameworkChecked = function(customerId, key) {
+      const cust = customers.find(c => c.id === customerId);
+      if (!cust) return;
+      
+      let framework = {};
+      try {
+        framework = typeof cust.framework === 'string' ? JSON.parse(cust.framework) : (cust.framework || {});
+      } catch(e) { framework = {}; }
+      
+      framework[key] = !framework[key];
+      cust.framework = JSON.stringify(framework);
+      
+      saveCustomers();
+      renderC360Framework(cust);
+      renderCustomerPage(); // 同步重繪主卡片
+    };
+
+    // --- 中欄：行銷議題邀約矩陣 ---
+    function renderC360Campaigns(cust) {
+      const container = document.getElementById('c360-campaigns-list');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      // 同步取得維護中心所有常規議題名稱
+      let globalTopics = [];
+      try {
+        const _topicsRaw = localStorage.getItem('global_topics');
+        globalTopics = _topicsRaw ? JSON.parse(_topicsRaw) : [];
+        if (!Array.isArray(globalTopics)) globalTopics = [];
+      } catch(e) { globalTopics = []; }
+      
+      if (globalTopics.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:10px;">（請先到設定 ⚙️ 新增維護中心議題）</div>';
+        return;
+      }
+      
+      let campaigns = {};
+      try {
+        campaigns = typeof cust.campaigns === 'string' ? JSON.parse(cust.campaigns) : (cust.campaigns || {});
+      } catch(e) { campaigns = {}; }
+      
+      globalTopics.forEach(topic => {
+        const state = campaigns[topic] || '未接觸';
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        
+        let stateColor = 'var(--text-secondary)';
+        if (state === '已約訪') stateColor = 'var(--color-sa)';
+        else if (state === '已簽單') stateColor = '#10b981';
+        else if (state === '拒絕') stateColor = '#ef4444';
+        
+        item.innerHTML = `
+          <span style="font-weight:600;">${topic}</span>
+          <select class="c360-status-select" style="color:${stateColor}; border-color:${stateColor};" onchange="changeCampaignState('${cust.id}', '${topic}', this.value)">
+            <option value="未接觸" ${state === '未接觸' ? 'selected' : ''}>⚪ 未接觸</option>
+            <option value="已約訪" ${state === '已約訪' ? 'selected' : ''}>🟡 已約訪</option>
+            <option value="拒絕" ${state === '拒絕' ? 'selected' : ''}>🔴 拒絕</option>
+            <option value="已簽單" ${state === '已簽單' ? 'selected' : ''}>🟢 已簽單</option>
+          </select>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.changeCampaignState = function(customerId, topic, newState) {
+      const cust = customers.find(c => c.id === customerId);
+      if (!cust) return;
+      
+      let campaigns = {};
+      try {
+        campaigns = typeof cust.campaigns === 'string' ? JSON.parse(cust.campaigns) : (cust.campaigns || {});
+      } catch(e) { campaigns = {}; }
+      
+      campaigns[topic] = newState;
+      cust.campaigns = JSON.stringify(campaigns);
+      
+      saveCustomers();
+      
+      // 智慧連鎖防呆：如果選擇了「已約訪」或「已簽單」，提示是否自動建立案件
+      if (newState === '已約訪') {
+        showCustomConfirmDialog(
+          '智慧連鎖建案提示',
+          `要為客戶 ${cust.name} 建立一個「${topic}」的進行中案件，並加入案件管理嗎？`,
+          () => {
+            // 自動建立案件
+            const newCase = {
+              id: 'case_' + Math.random().toString(36).substr(2, 9),
+              clientName: cust.name,
+              issueName: topic,
+              type: 'life',
+              visitType: 'issue',
+              caseSource: 'outbound',
+              source: 'relative',
+              currentPhase: 'SA',
+              archived: false,
+              lastUpdated: new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19)
+            };
+            cases.push(newCase);
+            saveCases();
+            renderCases();
+            renderC360Timeline(cust);
+            showToast('案件自動建立成功！', 'success');
+          }
+        );
+      } else {
+        renderC360Campaigns(cust);
+      }
+    };
+
+    // --- 中欄：進行中案件時間軸 ---
+    function renderC360Timeline(cust) {
+      const container = document.getElementById('c360-timeline-container');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      // 過濾此客戶的案件
+      const custCases = cases.filter(c => c.clientName === cust.name);
+      
+      if (custCases.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:10px;">（暫無關聯案件，可從行銷邀約矩陣或主面板＋案件新增）</div>';
+        return;
+      }
+      
+      custCases.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'c360-timeline-item';
+        
+        let phaseText = c.currentPhase || 'SA';
+        let phaseColor = 'var(--accent)';
+        if (c.isArchived) {
+          phaseText = '📦 已封存';
+          phaseColor = 'var(--text-secondary)';
+        }
+        
+        item.innerHTML = `
+          <div class="c360-timeline-header">
+            <span style="color:#fff;">📂 ${c.issueName || '未命名議題'}</span>
+            <span style="background:rgba(99,102,241,0.15); color:${phaseColor}; border:1px solid ${phaseColor}; font-size:0.7rem; padding:2px 8px; border-radius:12px; font-weight:bold;">${phaseText}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+            <div style="font-size:0.72rem; color:var(--text-secondary);">進度軸: SA ➔ OA ➔ PC ➔ C ➔ S</div>
+            <button class="btn" style="font-size:0.7rem; padding:2px 8px; border-color:var(--color-sa); color:var(--color-sa); background:transparent;" onclick="jumpToCaseRow('${c.id}')">↩ 轉向案件管理</button>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // 雙向跳轉
+    window.jumpToCaseRow = function(caseId) {
+      closeCustomer360Drawer();
+      switchViewMode('case');
+      setTimeout(() => {
+        const row = document.getElementById(`case-row-${caseId}`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('neon-flash');
+          setTimeout(() => {
+            row.classList.remove('neon-flash');
+          }, 2000);
+        }
+      }, 500);
+    };
+
+    // --- 右欄：待辦事項 ---
+    function renderC360Todos(cust) {
+      const container = document.getElementById('c360-todos-list');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      const custTodos = todos.filter(t => !t.done && t.caseId && cases.find(c => c.id === t.caseId && c.clientName === cust.name));
+      
+      if (custTodos.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:10px;">（暫無未完成待辦）</div>';
+        return;
+      }
+      
+      custTodos.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.innerHTML = `
+          <span style="font-weight:600; text-decoration:${t.done ? 'line-through' : 'none'};">${t.title}</span>
+          <button class="btn" style="font-size:0.65rem; padding:2px 6px; border-color:#10b981; color:#10b981;" onclick="completeTodoFromC360('${t.id}')">✓ 完成</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.openAddTodoFromC360 = function() {
+      // 尋找該客戶名下的第一個案件 (如果有) 進行預填
+      const cust = customers.find(c => c.id === activeC360CustomerId);
+      if (!cust) return;
+      const firstCase = cases.find(c => c.clientName === cust.name);
+      const prefillId = firstCase ? firstCase.id : '';
+      
+      openTodoModal(null, prefillId, () => {
+        renderC360Todos(cust);
+      });
+    };
+
+    window.completeTodoFromC360 = function(todoId) {
+      const t = todos.find(x => x.id === todoId);
+      if (t) {
+        t.done = true;
+        saveTodos();
+        renderTodoPage();
+        updateTodoBadge();
+        const cust = customers.find(c => c.id === activeC360CustomerId);
+        if (cust) renderC360Todos(cust);
+        showToast('待辦任務已標記為完成！', 'success');
+      }
+    };
+
+    // --- 右欄：面談紀要備忘錄 ---
+    function renderC360Notes(cust) {
+      const container = document.getElementById('c360-notes-list');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      let notes = [];
+      try {
+        notes = localStorage.getItem('notes_' + cust.id);
+        notes = notes ? JSON.parse(notes) : [];
+      } catch(e) { notes = []; }
+      
+      if (notes.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:10px;">（暫無面談紀要，點擊下方新增）</div>';
+        return;
+      }
+      
+      notes.sort((a,b) => b.date.localeCompare(a.date));
+      
+      notes.forEach(n => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '4px';
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.75rem; color:var(--text-secondary); font-weight:bold;">
+            <span>📅 ${n.date}</span>
+            <span style="cursor:pointer; color:#ef4444;" onclick="deleteCustomerNote('${cust.id}', '${n.id}')">✕ 刪除</span>
+          </div>
+          <div style="font-size:0.8rem; color:#fff; white-space:pre-wrap; width:100%;">${n.content}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    window.openAddNoteModal = function() {
+      document.getElementById('note-input-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('note-input-content').value = '';
+      document.getElementById('add-note-modal').classList.add('active');
+    };
+
+    window.closeAddNoteModal = function() {
+      document.getElementById('add-note-modal').classList.remove('active');
+    };
+
+    window.saveCustomerNote = function() {
+      const date = document.getElementById('note-input-date').value;
+      const content = (document.getElementById('note-input-content').value || '').trim();
+      
+      if (!date || !content) return;
+      
+      let notes = [];
+      try {
+        notes = localStorage.getItem('notes_' + activeC360CustomerId);
+        notes = notes ? JSON.parse(notes) : [];
+      } catch(e) { notes = []; }
+      
+      notes.push({
+        id: 'note_' + Math.random().toString(36).substr(2, 9),
+        date: date,
+        content: content
+      });
+      
+      localStorage.setItem('notes_' + activeC360CustomerId, JSON.stringify(notes));
+      closeAddNoteModal();
+      
+      const cust = customers.find(c => c.id === activeC360CustomerId);
+      if (cust) renderC360Notes(cust);
+      showToast('儲存面談備忘成功！', 'success');
+    };
+
+    window.deleteCustomerNote = function(customerId, noteId) {
+      showCustomConfirmDialog(
+        '刪除確認',
+        '確定要刪除這筆面談紀要嗎？刪除後無法恢復。',
+        () => {
+          let notes = [];
+          try {
+            notes = localStorage.getItem('notes_' + customerId);
+            notes = notes ? JSON.parse(notes) : [];
+          } catch(e) { notes = []; }
+          
+          notes = notes.filter(n => n.id !== noteId);
+          localStorage.setItem('notes_' + customerId, JSON.stringify(notes));
+          
+          const cust = customers.find(c => c.id === customerId);
+          if (cust) renderC360Notes(cust);
+          showToast('面談紀要已成功刪除。', 'success');
+        }
+      );
+    };
+
+    // --- 點擊案件客戶姓名跳轉 360° 畫布 ---
+    // 這會在 app.js 重繪案件行時綁定
+    window.openC360FromCaseRow = function(clientName) {
+      // 尋找此客戶，如果不存在則先自動建立
+      loadCustomers();
+      let cust = customers.find(c => c.name === clientName);
+      if (!cust) {
+        cust = {
+          id: 'cust_' + Math.random().toString(36).substr(2, 9),
+          name: clientName,
+          phone: '',
+          family: '[]',
+          framework: '{}',
+          campaigns: '{}',
+          lastUpdated: new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19)
+        };
+        customers.push(cust);
+        saveCustomers();
+      }
+      
+      // 切換視角並打開 360 面板
+      switchViewMode('customer');
+      openCustomer360Drawer(cust.id);
+    };

@@ -1710,12 +1710,11 @@ html {
   /* ===== 待辦事項系統 ===== */
   #todo-page {
     display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 800;
     background: var(--bg-dark);
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 70px);
   }
   #todo-page.active {
     display: flex;
@@ -2013,11 +2012,16 @@ html {
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     color: #fff;
-    padding: 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.95rem;
     outline: none;
     transition: border-color 0.2s;
+  }
+  .todo-form-row select option {
+    font-size: 1rem;
+    background: #1e1e24;
+    color: #fff;
   }
   .todo-form-row .form-input:focus {
     border-color: var(--accent);
@@ -2878,4 +2882,13 @@ html {
     align-items: center;
     font-size: 0.82rem;
     font-weight: bold;
+  }
+
+  #customer-page {
+    display: none;
+    background: var(--bg-dark);
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 70px);
   }
