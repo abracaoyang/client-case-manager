@@ -4,6 +4,18 @@
 const SHEET_NAME = 'Sheet1';
 const TODOS_SHEET_NAME = 'Todos';
 const CUSTOMERS_SHEET_NAME = 'Customers';
+const ACTIVITIES_SHEET_NAME = 'Activities';
+const PRODUCTS_SHEET_NAME = 'Products';
+const FIXED_MESSAGES_SHEET_NAME = 'FixedMessages';
+const SALES_PROCESSES_SHEET_NAME = 'SalesProcesses';
+const ISSUES_SHEET_NAME = 'Issues';
+const GROUPS_SHEET_NAME = 'Groups';
+const CANVASSING_SHEET_NAME = 'Canvassing';
+
+// 觸發雲端硬碟權限授權的輔助函式 (請在編輯器中點選執行以開啟權限)
+function triggerDriveAuth() {
+  DriveApp.getRootFolder();
+}
 
 // 取得或初始化試算表與表頭
 function getOrCreateSheet() {
@@ -103,6 +115,111 @@ function getOrCreateTodosSheet() {
   return sheet;
 }
 
+// 取得或建立「近期活動」Sheet
+function getOrCreateActivitiesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ACTIVITIES_SHEET_NAME);
+  const headers = ["id", "title", "date", "imageUrl", "content", "status"];
+  if (!sheet) {
+    sheet = ss.insertSheet(ACTIVITIES_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「保險產品」Sheet
+function getOrCreateProductsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(PRODUCTS_SHEET_NAME);
+  const headers = ["id", "category", "name", "gender", "age", "period", "sumAssured", "premium", "note", "status"];
+  if (!sheet) {
+    sheet = ss.insertSheet(PRODUCTS_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「固定訊息」Sheet
+function getOrCreateFixedMessagesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(FIXED_MESSAGES_SHEET_NAME);
+  const headers = ["id", "title", "content"];
+  if (!sheet) {
+    sheet = ss.insertSheet(FIXED_MESSAGES_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「銷售流程定義」Sheet
+function getOrCreateSalesProcessesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SALES_PROCESSES_SHEET_NAME);
+  const headers = ["id", "stage", "task", "intent", "document"];
+  if (!sheet) {
+    sheet = ss.insertSheet(SALES_PROCESSES_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「常規議題」Sheet
+function getOrCreateIssuesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ISSUES_SHEET_NAME);
+  const headers = ["name", "group"];
+  if (!sheet) {
+    sheet = ss.insertSheet(ISSUES_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「自訂分群」Sheet
+function getOrCreateGroupsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(GROUPS_SHEET_NAME);
+  const headers = ["key", "label", "emoji"];
+  if (!sheet) {
+    sheet = ss.insertSheet(GROUPS_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
+// 取得或建立「店家陌生開發」Sheet
+function getOrCreateCanvassingSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CANVASSING_SHEET_NAME);
+  const headers = ["id", "storeName", "address", "contactName", "phone", "status", "issues", "visitCount", "notes", "reminderDate", "latitude", "longitude", "lastUpdated"];
+  if (!sheet) {
+    sheet = ss.insertSheet(CANVASSING_SHEET_NAME);
+    sheet.appendRow(headers);
+    sheet.setFrozenRows(1);
+  } else {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  return sheet;
+}
+
 // 處理 GET 請求：讀取資料並以 JSON 回傳
 function doGet(e) {
   try {
@@ -145,21 +262,186 @@ function doGet(e) {
           if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
           item[h] = v;
         });
-        // 類型轉回布林
+        // 類型轉回布林與狀態
         if (typeof item.done === 'string') item.done = item.done === 'true';
         if (item.urgent !== undefined && item.urgent !== '') {
-          item.urgent = (item.urgent === true || item.urgent === 'true');
+          if (item.urgent === 'immediate') item.urgent = 'immediate';
+          else item.urgent = (item.urgent === true || item.urgent === 'true');
         } else {
           item.urgent = undefined;
         }
         if (item.important !== undefined && item.important !== '') {
-          item.important = (item.important === true || item.important === 'true');
+          if (item.important === 'immediate') item.important = 'immediate';
+          else item.important = (item.important === true || item.important === 'true');
         } else {
           item.important = undefined;
         }
         todosList.push(item);
       }
       return jsonResponse({ status: 'success', todos: todosList });
+    }
+
+    // === 近期活動讀取 ===
+    if (e && e.parameter && e.parameter.type === 'activities') {
+      const activitiesSheet = getOrCreateActivitiesSheet();
+      const aValues = activitiesSheet.getDataRange().getValues();
+      if (aValues.length <= 1) {
+        return jsonResponse({ status: 'success', activities: [] });
+      }
+      const aHeaders = aValues[0];
+      const activitiesList = [];
+      for (let i = 1; i < aValues.length; i++) {
+        const row = aValues[i];
+        const item = {};
+        aHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        activitiesList.push(item);
+      }
+      return jsonResponse({ status: 'success', activities: activitiesList });
+    }
+
+    // === 保險產品讀取 ===
+    if (e && e.parameter && e.parameter.type === 'products') {
+      const productsSheet = getOrCreateProductsSheet();
+      const pValues = productsSheet.getDataRange().getValues();
+      if (pValues.length <= 1) {
+        return jsonResponse({ status: 'success', products: [] });
+      }
+      const pHeaders = pValues[0];
+      const productsList = [];
+      for (let i = 1; i < pValues.length; i++) {
+        const row = pValues[i];
+        const item = {};
+        pHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        productsList.push(item);
+      }
+      return jsonResponse({ status: 'success', products: productsList });
+    }
+
+    // === 固定訊息讀取 ===
+    if (e && e.parameter && e.parameter.type === 'fixed_messages') {
+      const fixedMessagesSheet = getOrCreateFixedMessagesSheet();
+      const fValues = fixedMessagesSheet.getDataRange().getValues();
+      if (fValues.length <= 1) {
+        return jsonResponse({ status: 'success', fixed_messages: [] });
+      }
+      const fHeaders = fValues[0];
+      const fixedMessagesList = [];
+      for (let i = 1; i < fValues.length; i++) {
+        const row = fValues[i];
+        const item = {};
+        fHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        fixedMessagesList.push(item);
+      }
+      return jsonResponse({ status: 'success', fixed_messages: fixedMessagesList });
+    }
+
+    // === 銷售流程定義讀取 ===
+    if (e && e.parameter && e.parameter.type === 'sales_processes') {
+      const salesProcessesSheet = getOrCreateSalesProcessesSheet();
+      const sValues = salesProcessesSheet.getDataRange().getValues();
+      if (sValues.length <= 1) {
+        return jsonResponse({ status: 'success', sales_processes: [] });
+      }
+      const sHeaders = sValues[0];
+      const salesProcessesList = [];
+      for (let i = 1; i < sValues.length; i++) {
+        const row = sValues[i];
+        const item = {};
+        sHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        salesProcessesList.push(item);
+      }
+      return jsonResponse({ status: 'success', sales_processes: salesProcessesList });
+    }
+
+    // === 常規議題讀取 ===
+    if (e && e.parameter && e.parameter.type === 'issues') {
+      const issuesSheet = getOrCreateIssuesSheet();
+      const iValues = issuesSheet.getDataRange().getValues();
+      if (iValues.length <= 1) {
+        return jsonResponse({ status: 'success', issues: [] });
+      }
+      const iHeaders = iValues[0];
+      const issuesList = [];
+      for (let i = 1; i < iValues.length; i++) {
+        const row = iValues[i];
+        const item = {};
+        iHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        issuesList.push(item);
+      }
+      return jsonResponse({ status: 'success', issues: issuesList });
+    }
+
+    // === 自訂分群讀取 ===
+    if (e && e.parameter && e.parameter.type === 'groups') {
+      const groupsSheet = getOrCreateGroupsSheet();
+      const gValues = groupsSheet.getDataRange().getValues();
+      if (gValues.length <= 1) {
+        return jsonResponse({ status: 'success', groups: [] });
+      }
+      const gHeaders = gValues[0];
+      const groupsList = [];
+      for (let i = 1; i < gValues.length; i++) {
+        const row = gValues[i];
+        const item = {};
+        gHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+          item[h] = v;
+        });
+        groupsList.push(item);
+      }
+      return jsonResponse({ status: 'success', groups: groupsList });
+    }
+
+    // === 店家陌生開發讀取 ===
+    if (e && e.parameter && e.parameter.type === 'canvassing') {
+      const canvassingSheet = getOrCreateCanvassingSheet();
+      const canvValues = canvassingSheet.getDataRange().getValues();
+      if (canvValues.length <= 1) {
+        return jsonResponse({ status: 'success', canvassing: [] });
+      }
+      const canvHeaders = canvValues[0];
+      const canvassingList = [];
+      for (let i = 1; i < canvValues.length; i++) {
+        const row = canvValues[i];
+        const item = {};
+        canvHeaders.forEach((h, ci) => {
+          let v = row[ci];
+          if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+          item[h] = v;
+        });
+        if (item.visitCount !== undefined) {
+          item.visitCount = parseInt(item.visitCount) || 0;
+        }
+        if (item.latitude !== undefined) {
+          item.latitude = parseFloat(item.latitude) || null;
+        }
+        if (item.longitude !== undefined) {
+          item.longitude = parseFloat(item.longitude) || null;
+        }
+        canvassingList.push(item);
+      }
+      return jsonResponse({ status: 'success', canvassing: canvassingList });
     }
 
     // === 案件資料讀取（原有邏輯）===
@@ -229,7 +511,7 @@ function doPost(e) {
       
       const lastRow = customersSheet.getLastRow();
       if (lastRow > 1) {
-        customersSheet.deleteRows(2, lastRow - 1);
+        customersSheet.getRange(2, 1, lastRow - 1, customersSheet.getLastColumn()).clearContent();
       }
       
       if (customersList.length > 0) {
@@ -241,6 +523,177 @@ function doPost(e) {
       return jsonResponse({ status: 'success', message: '客戶基本資料已同步 (' + customersList.length + ' 筆)' });
     }
 
+    // === 近期活動覆蓋式同步 ===
+    if (action === 'saveActivities') {
+      const activitiesSheet = getOrCreateActivitiesSheet();
+      const activitiesList = payload.activities || [];
+      const headers = ["id", "title", "date", "imageUrl", "content", "status"];
+      
+      const lastRow = activitiesSheet.getLastRow();
+      if (lastRow > 1) {
+        activitiesSheet.getRange(2, 1, lastRow - 1, activitiesSheet.getLastColumn()).clearContent();
+      }
+      
+      if (activitiesList.length > 0) {
+        const rows = activitiesList.map(a => headers.map(h => {
+          return a[h] !== undefined && a[h] !== null ? a[h] : '';
+        }));
+        activitiesSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '近期活動資料已同步 (' + activitiesList.length + ' 筆)' });
+    }
+
+    // === 保險產品覆蓋式同步 ===
+    if (action === 'saveProducts') {
+      const productsSheet = getOrCreateProductsSheet();
+      const productsList = payload.products || [];
+      const headers = ["id", "category", "name", "gender", "age", "period", "sumAssured", "premium", "note", "status"];
+      
+      const lastRow = productsSheet.getLastRow();
+      if (lastRow > 1) {
+        productsSheet.getRange(2, 1, lastRow - 1, productsSheet.getLastColumn()).clearContent();
+      }
+      
+      if (productsList.length > 0) {
+        const rows = productsList.map(p => headers.map(h => {
+          return p[h] !== undefined && p[h] !== null ? p[h] : '';
+        }));
+        productsSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '產品資料已同步 (' + productsList.length + ' 筆)' });
+    }
+
+    // === 固定訊息覆蓋式同步 ===
+    if (action === 'saveFixedMessages') {
+      const fixedMessagesSheet = getOrCreateFixedMessagesSheet();
+      const fixedMessagesList = payload.fixedMessages || [];
+      const headers = ["id", "title", "content"];
+      
+      const lastRow = fixedMessagesSheet.getLastRow();
+      if (lastRow > 1) {
+        fixedMessagesSheet.getRange(2, 1, lastRow - 1, fixedMessagesSheet.getLastColumn()).clearContent();
+      }
+      
+      if (fixedMessagesList.length > 0) {
+        const rows = fixedMessagesList.map(m => headers.map(h => {
+          return m[h] !== undefined && m[h] !== null ? m[h] : '';
+        }));
+        fixedMessagesSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '固定訊息資料已同步 (' + fixedMessagesList.length + ' 筆)' });
+    }
+
+    // === 銷售流程定義覆蓋式同步 ===
+    if (action === 'saveSalesProcesses') {
+      const salesProcessesSheet = getOrCreateSalesProcessesSheet();
+      const salesProcessesList = payload.salesProcesses || [];
+      const headers = ["id", "stage", "task", "intent", "document"];
+      
+      const lastRow = salesProcessesSheet.getLastRow();
+      if (lastRow > 1) {
+        salesProcessesSheet.getRange(2, 1, lastRow - 1, salesProcessesSheet.getLastColumn()).clearContent();
+      }
+      
+      if (salesProcessesList.length > 0) {
+        const rows = salesProcessesList.map(m => headers.map(h => {
+          return m[h] !== undefined && m[h] !== null ? m[h] : '';
+        }));
+        salesProcessesSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '銷售流程定義資料已同步 (' + salesProcessesList.length + ' 筆)' });
+    }
+
+    // === 常規議題覆蓋式同步 ===
+    if (action === 'saveIssues') {
+      const issuesSheet = getOrCreateIssuesSheet();
+      const issuesList = payload.issues || [];
+      const headers = ["name", "group"];
+      
+      const lastRow = issuesSheet.getLastRow();
+      if (lastRow > 1) {
+        issuesSheet.getRange(2, 1, lastRow - 1, issuesSheet.getLastColumn()).clearContent();
+      }
+      
+      if (issuesList.length > 0) {
+        const rows = issuesList.map(i => headers.map(h => {
+          return i[h] !== undefined && i[h] !== null ? i[h] : '';
+        }));
+        issuesSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '常規議題資料已同步 (' + issuesList.length + ' 筆)' });
+    }
+
+    // === 自訂分群覆蓋式同步 ===
+    if (action === 'saveGroups') {
+      const groupsSheet = getOrCreateGroupsSheet();
+      const groupsList = payload.groups || [];
+      const headers = ["key", "label", "emoji"];
+      
+      const lastRow = groupsSheet.getLastRow();
+      if (lastRow > 1) {
+        groupsSheet.getRange(2, 1, lastRow - 1, groupsSheet.getLastColumn()).clearContent();
+      }
+      
+      if (groupsList.length > 0) {
+        const rows = groupsList.map(g => headers.map(h => {
+          return g[h] !== undefined && g[h] !== null ? g[h] : '';
+        }));
+        groupsSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '自訂分群資料已同步 (' + groupsList.length + ' 筆)' });
+    }
+
+    // === 店家陌生開發覆蓋式同步 ===
+    if (action === 'saveCanvassing') {
+      const canvassingSheet = getOrCreateCanvassingSheet();
+      const canvassingList = payload.canvassing || [];
+      const headers = ["id", "storeName", "address", "contactName", "phone", "status", "issues", "visitCount", "notes", "reminderDate", "latitude", "longitude", "lastUpdated"];
+      
+      const lastRow = canvassingSheet.getLastRow();
+      if (lastRow > 1) {
+        canvassingSheet.getRange(2, 1, lastRow - 1, canvassingSheet.getLastColumn()).clearContent();
+      }
+      
+      if (canvassingList.length > 0) {
+        const rows = canvassingList.map(c => headers.map(h => {
+          return c[h] !== undefined && c[h] !== null ? c[h] : '';
+        }));
+        canvassingSheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+      return jsonResponse({ status: 'success', message: '店家陌生開發資料已同步 (' + canvassingList.length + ' 筆)' });
+    }
+
+    // === 上傳活動圖片至雲端硬碟 ===
+    if (action === 'uploadActivityImage') {
+      const fileName = payload.fileName || 'activity_image.png';
+      const mimeType = payload.mimeType || 'image/png';
+      const base64Data = payload.base64Data;
+      
+      var cleanBase64 = base64Data;
+      if (base64Data.indexOf(';base64,') > -1) {
+        cleanBase64 = base64Data.split(';base64,')[1];
+      }
+      
+      const decoded = Utilities.base64Decode(cleanBase64);
+      const blob = Utilities.newBlob(decoded, mimeType, fileName);
+      
+      var folder;
+      const folders = DriveApp.getFoldersByName("ClientCaseManager_Assets");
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder("ClientCaseManager_Assets");
+      }
+      
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      
+      const fileId = file.getId();
+      const downloadUrl = "https://lh3.googleusercontent.com/d/" + fileId;
+      
+      return jsonResponse({ status: 'success', url: downloadUrl, fileId: fileId });
+    }
+
     // === 待辦事項覆蓋式同步 ===
     if (action === 'saveTodos') {
       const todosSheet = getOrCreateTodosSheet();
@@ -250,15 +703,16 @@ function doPost(e) {
       // 清除舊資料（保留第一列表頭）
       const lastRow = todosSheet.getLastRow();
       if (lastRow > 1) {
-        todosSheet.deleteRows(2, lastRow - 1);
+        todosSheet.getRange(2, 1, lastRow - 1, todosSheet.getLastColumn()).clearContent();
       }
       
       // 整批寫入新資料
       if (todosList.length > 0) {
         const rows = todosList.map(t => headers.map(h => {
           const v = t[h];
-          // done, urgent, important 布林轉為字串儲存
+          // done, urgent, important 布林與狀態轉為字串儲存
           if (h === 'done' || h === 'urgent' || h === 'important') {
+            if (v === 'immediate') return 'immediate';
             if (v === true || v === 'true') return 'true';
             if (v === false || v === 'false') return 'false';
             return '';

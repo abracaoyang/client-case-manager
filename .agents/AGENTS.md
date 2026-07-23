@@ -29,3 +29,9 @@
 5. **GS 程式碼更新提示原則 (GS Update Guard)**：
    - 每一次的開發任務，若本機的 `code.gs` 檔案有被修改，在提交工作成果時，**必須強制、主動且顯眼地提醒使用者**：「Google Apps Script 程式碼已變更，請務必將最新 `code.gs` 貼回編輯器並重新發佈為新版本部署。」
    - AI 助理在規劃 Implementation Plan 時，亦必須在「驗證計畫 ＞ 手動驗證」區塊中，第一點主動標註此 GS 部署檢查指示。
+
+6. **Google Sheets 同步與排錯防呆規範 [核心架構守則]**：
+   - **資料庫清空防呆 (Google Sheets API 限制)**：在任何設有「凍結列 (Frozen Rows)」的工作表上，**嚴禁**使用 `deleteRows(2, lastRow - 1)` 來清除資料。清空非凍結資料列時，必須一律使用 `getRange(2, 1, lastRow - 1, colCount).clearContent()`。這能 100% 避免 Google Sheets 限制所引發的 "你無法刪除所有非凍結的列" 系統異常。
+   - **異步請求防範「沉默的成功」(Silent Success)**：網頁端發送 `fetch` 異步請求同步至雲端後端時，**絕對禁止**在未檢查伺服器回傳狀態的情況下直接印出成功日誌。必須嚴格解析 Response JSON，檢查並判定 `status === 'success'`。若為失敗，必須在網頁控制台或畫面上以醒目的警告提示顯示 `resJson.message`。
+   - **雙向資料流一致性**：當系統引入新的狀態值或字串型態資料（例如優先度的 `'immediate'`）時，必須同時修正**後端寫入 (doPost)** 與 **後端讀取 (doGet)** 兩端的過濾與轉化邏輯，防止字串在讀寫過程中被強制轉為布林值或被過濾成空白。
+   - **排錯管道診斷法 (Debugging Pipeline)**：遇到資料同步異常時，AI 助理應引導使用者按照「管道切片」進行診斷：1. 前端 UI 輸入狀態 -> 2. 前端 Fetch Payload -> 3. 後端 PostData 接收 -> 4. 試算表儲存格內容 -> 5. 後端 Get 讀取輸出。應優先請使用者提供網路請求的 Response，以實現快速定位，避免盲目修改程式碼。

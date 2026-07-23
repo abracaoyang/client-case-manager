@@ -458,6 +458,12 @@ html {
       font-size: 0.75rem;
       font-weight: 700;
       text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+    .type-badge:hover {
+      transform: scale(1.1);
+      filter: brightness(1.2);
     }
     .type-badge.life {
       background: rgba(56, 189, 248, 0.15); /* 壽險：亮藍色 */
@@ -526,6 +532,11 @@ html {
       background: rgba(244, 63, 94, 0.15); /* 咖啡：玫瑰紅 */
       color: #fb7185;
       border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+    .source-badge.call-visit {
+      background: rgba(168, 85, 247, 0.15); /* 電訪：亮紫色 */
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
     }
 
     /* 客戶姓名 (可點擊維護) */
@@ -1148,15 +1159,15 @@ html {
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      z-index: 1000;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(12px) saturate(120%);
+      z-index: 10005;
       display: flex;
       align-items: center;
       justify-content: center;
       opacity: 0;
       pointer-events: none;
-      transition: var(--transition-smooth);
+      transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .modal-overlay.active {
       opacity: 1;
@@ -1164,17 +1175,26 @@ html {
     }
     .modal-box {
       background: var(--bg-card);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
       padding: 1.5rem;
       width: 400px;
+      transform: scale(0.96);
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    }
+    .modal-overlay.active .modal-box {
+      transform: scale(1);
     }
     .modal-header {
-      font-size: 1.1rem;
+      font-size: 0.9rem;
       font-weight: 700;
       margin-bottom: 1rem;
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 8px;
     }
     .topic-list-item {
       display: flex;
@@ -1191,6 +1211,63 @@ html {
       font-size: 0.8rem;
     }
 
+
+
+/* 近期活動相關樣式 */
+.activity-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+.activity-item.active {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.25);
+}
+.activity-item-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-item-date {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+/* 產品表格列專屬樣式 */
+.product-table-row {
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.product-table-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.product-table-row.active {
+  background: rgba(99, 102, 241, 0.12) !important;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.product-table-row.active td {
+  color: #fff !important;
+}
+.product-table-row td {
+  transition: color 0.2s ease;
+}
 
 
     /* 📱 響應式 RWD 介面設計 - 平板專屬微調 (769px ~ 1024px) */
@@ -1893,35 +1970,56 @@ html {
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 1100;
-    background: rgba(0,0,0,0.65);
-    backdrop-filter: blur(5px);
+    z-index: 10010;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(12px) saturate(120%);
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  #add-todo-modal.active { display: flex; }
+  #add-todo-modal.active {
+    display: flex;
+    opacity: 1;
+  }
+  #add-todo-modal .modal-box {
+    transform: scale(0.96);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #add-todo-modal.active .modal-box {
+    transform: scale(1);
+  }
 
   /* 待辦計時 Modal */
   #todo-timer-modal {
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 1100;
-    background: rgba(0,0,0,0.65);
-    backdrop-filter: blur(5px);
+    z-index: 10010;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(12px) saturate(120%);
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  #todo-timer-modal.active { display: flex; }
+  #todo-timer-modal.active {
+    display: flex;
+    opacity: 1;
+  }
   #todo-timer-box {
     background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
     padding: 1.5rem;
     width: 680px;
     max-width: 95vw;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    animation: modal-fade 0.25s ease-out;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    transform: scale(0.96);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #todo-timer-modal.active #todo-timer-box {
+    transform: scale(1);
   }
   
   /* 碼表字體與發光 */
@@ -1953,12 +2051,12 @@ html {
     box-shadow: 0 0 15px rgba(239, 68, 68, 0.35);
   }
 
-  /* 子 Modal 樣式 (權重高於計時 Modal，z-index: 1200) */
+  /* 子 Modal 樣式 (權重高於計時 Modal，z-index: 10020) */
   #edit-log-modal, #timer-confirm-modal {
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 1200;
+    z-index: 10020;
     background: rgba(0,0,0,0.75);
     backdrop-filter: blur(4px);
     align-items: center;
@@ -1980,8 +2078,8 @@ html {
 
   #add-todo-box {
     background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
     padding: 1.5rem;
     width: 720px;
     max-width: 95vw;
@@ -1990,6 +2088,12 @@ html {
     display: flex;
     flex-direction: column;
     gap: 14px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+    transform: scale(0.96);
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #add-todo-modal.active #add-todo-box {
+    transform: scale(1);
   }
   #add-todo-box h3 {
     font-size: 1rem;
@@ -2048,7 +2152,7 @@ html {
     position: fixed;
     bottom: 24px;
     right: 24px;
-    z-index: 1200;
+    z-index: 10100;
     background: #1e1e2e;
     border: 1px solid rgba(245,158,11,0.4);
     border-radius: 12px;
@@ -2120,6 +2224,13 @@ html {
     transform: scale(1.05);
     box-shadow: 0 0 0 2px currentColor;
   }
+  .priority-cell[data-q="0"].active  { 
+    border-color: #ff3b30 !important; 
+    color: #ffffff !important; 
+    background: #ff3b30 !important; 
+    box-shadow: 0 0 12px rgba(255, 59, 48, 0.5) !important;
+  }
+  .priority-cell[data-q="0"].active .priority-cell-label { color: #ffffff !important; }
   .priority-cell[data-q="1"].active  { border-color:#ef4444; color:#ef4444; background: rgba(239,68,68,0.12); }
   .priority-cell[data-q="2"].active  { border-color:#f97316; color:#f97316; background: rgba(249,115,22,0.12); }
   .priority-cell[data-q="3"].active  { border-color:#eab308; color:#eab308; background: rgba(234,179,8,0.12); }
@@ -2139,6 +2250,16 @@ html {
     border-radius: 4px;
     flex-shrink: 0;
     letter-spacing: 0.02em;
+  }
+  .priority-badge.q0 { 
+    background: #ff3b30 !important; 
+    color: #ffffff !important; 
+    border: 1px solid #ff453a !important;
+    font-weight: 800 !important;
+    padding: 3px 8px !important;
+    font-size: 0.72rem !important;
+    border-radius: 4px !important;
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.45) !important;
   }
   .priority-badge.q1 { background: rgba(239,68,68,0.18); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
   .priority-badge.q2 { background: rgba(249,115,22,0.18); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
@@ -2342,6 +2463,49 @@ html {
     animation: ongoing-c-pulse 1.8s infinite ease-in-out !important;
     color: var(--color-c) !important;
     border-style: solid !important;
+  }
+
+  /* 送件預警亮燈：未來預告綠燈 (呼吸發光) */
+  .sub-tag-btn.submit-light-future, .sub-tag-btn.ongoing-magenta {
+    transition: none !important;
+    background: rgba(34, 197, 94, 0.18) !important;
+    border-color: rgba(34, 197, 94, 0.8) !important;
+    color: #4ade80 !important;
+    border-style: solid !important;
+    font-weight: 700 !important;
+    animation: ongoing-c-pulse 1.8s infinite ease-in-out !important;
+  }
+
+  /* 送件預警亮燈：當天提醒黃燈 (黃光脈衝) */
+  @keyframes submit-today-pulse {
+    0% { background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); box-shadow: 0 0 3px rgba(234, 179, 8, 0.2); }
+    50% { background: rgba(234, 179, 8, 0.45); border-color: rgba(234, 179, 8, 1); box-shadow: 0 0 12px rgba(234, 179, 8, 0.7); }
+    100% { background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.4); box-shadow: 0 0 3px rgba(234, 179, 8, 0.2); }
+  }
+  .sub-tag-btn.submit-light-today {
+    transition: none !important;
+    background: rgba(234, 179, 8, 0.25) !important;
+    border-color: #eab308 !important;
+    color: #fde047 !important;
+    border-style: solid !important;
+    font-weight: 700 !important;
+    animation: submit-today-pulse 1.5s infinite ease-in-out !important;
+  }
+
+  /* 送件預警亮燈：過期警示紅燈 (紅光急閃) */
+  @keyframes submit-expired-pulse {
+    0% { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 3px rgba(239, 68, 68, 0.2); }
+    50% { background: rgba(239, 68, 68, 0.55); border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 14px rgba(239, 68, 68, 0.85); }
+    100% { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 3px rgba(239, 68, 68, 0.2); }
+  }
+  .sub-tag-btn.submit-light-expired {
+    transition: none !important;
+    background: rgba(239, 68, 68, 0.3) !important;
+    border-color: #ef4444 !important;
+    color: #fca5a5 !important;
+    border-style: solid !important;
+    font-weight: 700 !important;
+    animation: submit-expired-pulse 1.2s infinite ease-in-out !important;
   }
 
   /* S 階段次標籤呼吸發光 (藍色) */
@@ -2930,3 +3094,241 @@ html {
     border: 1px solid #10b981;
     color: #10b981;
   }
+
+  /* 統一輸入框聚焦發光樣式 */
+  .modal-box input:focus,
+  .modal-box select:focus,
+  .modal-box textarea:focus,
+  #add-todo-modal input:focus,
+  #add-todo-modal select:focus,
+  #add-todo-modal textarea:focus {
+    outline: none !important;
+    border-color: #fb923c !important;
+    box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.25) !important;
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* 產品與固定訊息頁籤樣式 */
+  .product-tab-btn {
+    padding: 6px 16px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    transition: all 0.2s ease;
+  }
+  .product-tab-btn.active {
+    color: var(--accent) !important;
+    border-bottom-color: var(--accent) !important;
+  }
+  .product-tab-btn:hover {
+    color: #fff;
+  }
+  
+  /* 固定訊息卡片樣式 */
+  /* 固定訊息清單項目樣式 */
+  .fixed-msg-list-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: grab;
+    user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.2s ease;
+  }
+  .fixed-msg-list-item:active {
+    cursor: grabbing;
+  }
+  .fixed-msg-list-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border-color: rgba(255,255,255,0.1);
+  }
+  .fixed-msg-list-item.active {
+    background: rgba(99,102,241,0.15) !important;
+    color: var(--accent) !important;
+    border-color: rgba(99,102,241,0.3) !important;
+  }
+
+  /* 右側一鍵複製預覽區聚焦發光 */
+  #fixed-msg-detail-text {
+    border: 1px dashed var(--border-color) !important;
+  }
+  #fixed-msg-detail-text:hover {
+    background: rgba(99, 102, 241, 0.05) !important;
+    border-color: var(--accent) !important;
+    color: #fff !important;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2) !important;
+  }
+
+  /* 團體成員搜尋自動完成浮動選單 */
+  .search-autocomplete-box {
+    position: absolute;
+    background: #1e1e2e;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+    width: calc(100% - 60px);
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    margin-top: 26px;
+  }
+  .search-autocomplete-item {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .search-autocomplete-item:hover {
+    background: var(--accent);
+    color: #000;
+    font-weight: bold;
+  }
+
+  /* === 店家陌生開發專屬樣式 === */
+  #canvassing-page {
+    display: none;
+    background: var(--bg-dark);
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: calc(100vh - 70px);
+  }
+
+  /* 調整 Leaflet 地圖容器暗黑模式配色，符合 ADHD 高對比極深色主題 */
+  #canvassing-map {
+    background: #111b27 !important;
+  }
+  
+  .leaflet-tile-container {
+    filter: invert(90%) hue-rotate(180deg) brightness(85%) contrast(110%);
+  }
+
+  .leaflet-bar a, .leaflet-control-zoom-in, .leaflet-control-zoom-out {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 8px;
+    font-family: inherit;
+  }
+
+  .leaflet-popup-tip {
+    background: var(--bg-card) !important;
+  }
+
+  /* 店家項目樣式 */
+  .canvassing-store-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .canvassing-store-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .canvassing-store-item.active {
+    background: rgba(99, 102, 241, 0.12) !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+  }
+
+  .canvassing-store-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .canvassing-store-address {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .canvassing-store-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  /* 陌生開發狀態標籤 */
+  .canvassing-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .canvassing-badge.status-grey { background: rgba(156,163,175,0.15); border: 1px solid #9ca3af; color: #9ca3af; }
+  .canvassing-badge.status-blue { background: rgba(56,189,248,0.15); border: 1px solid #38bdf8; color: #38bdf8; }
+  .canvassing-badge.status-yellow { background: rgba(234,179,8,0.15); border: 1px solid #eab308; color: #eab308; }
+  .canvassing-badge.status-orange { background: rgba(249,115,22,0.15); border: 1px solid #f97316; color: #f97316; }
+  .canvassing-badge.status-green { background: rgba(16,185,129,0.15); border: 1px solid #10b981; color: #10b981; }
+  .canvassing-badge.status-red { background: rgba(239,68,68,0.15); border: 1px solid #ef4444; color: #f87171; }
+  .canvassing-badge.status-purple { background: rgba(168,85,247,0.15); border: 1px solid #a855f7; color: #c084fc; }
+
+  /* 地圖客製化標記 (DivIcon) 配色 */
+  .custom-map-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    transition: transform 0.2s;
+  }
+  
+  .custom-map-pin:hover {
+    transform: scale(1.2);
+    z-index: 1000 !important;
+  }
+
+  .custom-map-pin.pin-grey { background-color: #6b7280; }
+  .custom-map-pin.pin-blue { background-color: #0284c7; }
+  .custom-map-pin.pin-yellow { background-color: #ca8a04; }
+  .custom-map-pin.pin-orange { background-color: #ea580c; }
+  .custom-map-pin.pin-green { background-color: #16a34a; }
+  .custom-map-pin.pin-red { background-color: #dc2626; }
+  .custom-map-pin.pin-purple { background-color: #7c3aed; }

@@ -23,8 +23,10 @@
   <!-- Tablet Fix: Mobile Drag & Drop Polyfill -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/default.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mobile-drag-drop/2.3.0/index.min.js"></script>
-  <link rel="stylesheet" href="style.css?v=1.04.11">
-  <script src="app.js?v=1.04.11" defer></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="style.css?v=1.07.22">
+  <script src="app.js?v=1.07.22" defer></script>
 </head>
 
 <body>
@@ -42,6 +44,9 @@
   </div>
 
   <header>
+    <!-- 🤫 左上角隱藏雙擊按鈕 (雙擊進入店家陌生開發，防止誤觸與保持 ADHD 畫面極致淨空) -->
+    <div id="hidden-canvassing-trigger" ondblclick="switchViewMode('canvassing')" style="position: absolute; top: 0; left: 0; width: 24px; height: 24px; z-index: 10000; cursor: default; background: transparent;" title="隱藏入口"></div>
+
     <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
       <button class="btn" id="btn-sidebar-trigger" onclick="openLeftSidebar()" title="開啟快速跳轉側欄" style="font-size: 1.1rem; padding: 6px 10px;">☰</button>
       <h1 onclick="cycleViewMode()" style="cursor:pointer; user-select:none; white-space:nowrap; flex-shrink:0; margin: 0;" title="點擊切換視角 (案件 ➔ 待辦 ➔ 客戶 ➔ 增員)">客戶案件管理系統</h1>
@@ -85,8 +90,11 @@
       <button class="btn btn-visit-today-pulsing" id="btn-visit-today" onclick="toggleVisitDrawer(true)" title="🚗 今日到訪備忘提醒" style="font-size: 0.85rem; padding: 6px 12px; display: none; transition: all 0.3s; margin-right: 4px;">
         🚗 今日到訪
       </button>
-      <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none; transition: all 0.3s; position: relative; margin-right: 4px;">
+      <button class="btn" id="btn-open-reminder" title="查看送件提醒時程" style="font-size: 1.1rem; padding: 6px 10px; display: none !important; transition: all 0.3s; position: relative; margin-right: 4px;">
         ⚠️ <span id="reminder-global-badge" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
+      </button>
+      <button class="btn" id="btn-open-activities" title="查看近期活動通知" style="font-size: 1.1rem; padding: 6px 10px; display: none !important; transition: all 0.3s; position: relative; margin-right: 4px;">
+        📅 <span id="activity-global-badge" style="position: absolute; top: -4px; right: -4px; background: #3b82f6; color: #fff; font-size: 0.65rem; font-weight: bold; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; line-height: 1;">0</span>
       </button>
 
       <button class="btn" id="btn-settings" title="系統設定與議題維護" style="font-size: 1.1rem; padding: 6px 10px; margin-right: 4px;">⚙️</button>
@@ -128,9 +136,279 @@
       </div>
       <button class="btn btn-primary" onclick="openAddRecruitModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增增員對象</button>
     </div>
-    <div id="recruit-body" style="padding: 20px; overflow-y: auto; height: calc(100vh - 120px);">
-      <div id="recruit-grid" class="customer-grid">
-        <!-- 增員卡片動態生成 -->
+    <div id="recruit-body" style="display: grid; grid-template-columns: 300px 1fr; gap: 20px; padding: 20px; height: calc(100vh - 80px); overflow: hidden; box-sizing: border-box; text-align: left;">
+      <!-- 左版面 (Left Column) -->
+      <div id="recruit-left-panel" style="display: flex; flex-direction: column; gap: 15px; border-right: 1px solid var(--border-color); padding-right: 15px; height: 100%; overflow: hidden; box-sizing: border-box;">
+        
+        <!-- 三大方塊按鈕 (都先寫準備工作) -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex-shrink: 0;">
+          <button class="btn btn-prepare-work active" onclick="switchRecruitLeftTab('prepare1')" id="btn-recruit-prep1" style="height: 60px; font-size: 0.72rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.3); color: #38bdf8; border-radius: 8px; cursor: pointer; transition: all 0.2s; padding: 4px; box-sizing: border-box; width: 100%;">
+            <span style="font-size: 1rem;">📁</span>
+            <span style="margin-top: 4px; white-space: nowrap;">準備工作一</span>
+          </button>
+          <button class="btn btn-prepare-work" onclick="switchRecruitLeftTab('prepare2')" id="btn-recruit-prep2" style="height: 60px; font-size: 0.72rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); color: #fff; border-radius: 8px; cursor: pointer; transition: all 0.2s; padding: 4px; box-sizing: border-box; width: 100%;">
+            <span style="font-size: 1rem;">📁</span>
+            <span style="margin-top: 4px; white-space: nowrap;">準備工作二</span>
+          </button>
+          <button class="btn btn-prepare-work" onclick="switchRecruitLeftTab('prepare3')" id="btn-recruit-prep3" style="height: 60px; font-size: 0.72rem; font-weight: 700; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); color: #fff; border-radius: 8px; cursor: pointer; transition: all 0.2s; padding: 4px; box-sizing: border-box; width: 100%;">
+            <span style="font-size: 1rem;">📁</span>
+            <span style="margin-top: 4px; white-space: nowrap;">準備工作三</span>
+          </button>
+        </div>
+        
+        <!-- 增員清單標題 -->
+        <div style="font-size: 0.82rem; font-weight: bold; color: var(--accent); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; flex-shrink: 0; margin-top: 5px;">
+          <span>👥 增員名單</span>
+        </div>
+        
+        <!-- 增員清單列表 (左側清單) -->
+        <div id="recruit-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+          <!-- 增員清單將動態生成於此 -->
+        </div>
+      </div>
+      
+      <!-- 右版面 (Right Column) -->
+      <div id="recruit-right-panel" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 12px; height: 100%; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box;">
+        <div id="recruit-right-content" style="flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; box-sizing: border-box;">
+          
+          <!-- 預設顯示準備工作一 -->
+          <div id="recruit-prep-content-prepare1" class="recruit-detail-view" style="display: flex; flex-direction: column; height: 100%; padding: 20px; box-sizing: border-box;">
+            <h3 style="margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; color: #fff;">📁 準備工作一 (五大工作動力)</h3>
+            <textarea id="recruit-prep-text-prepare1" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 12px; border-radius: 8px; font-size: 0.85rem; line-height: 1.6; resize: none; margin-bottom: 12px;" placeholder="請輸入準備工作一的內容，例如五大工作動力與思維架構..."></textarea>
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary" onclick="saveRecruitPrepText('prepare1')" style="padding: 6px 20px; font-size: 0.8rem;">儲存內容</button>
+            </div>
+          </div>
+          
+          <div id="recruit-prep-content-prepare2" class="recruit-detail-view" style="display: none; flex-direction: column; height: 100%; padding: 20px; box-sizing: border-box;">
+            <h3 style="margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; color: #fff;">📁 準備工作二 (工作思維)</h3>
+            <textarea id="recruit-prep-text-prepare2" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 12px; border-radius: 8px; font-size: 0.85rem; line-height: 1.6; resize: none; margin-bottom: 12px;" placeholder="請輸入準備工作二的內容..."></textarea>
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary" onclick="saveRecruitPrepText('prepare2')" style="padding: 6px 20px; font-size: 0.8rem;">儲存內容</button>
+            </div>
+          </div>
+          
+          <div id="recruit-prep-content-prepare3" class="recruit-detail-view" style="display: none; flex-direction: column; height: 100%; padding: 20px; box-sizing: border-box;">
+            <h3 style="margin-top: 0; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; color: #fff;">📁 準備工作三</h3>
+            <textarea id="recruit-prep-text-prepare3" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 12px; border-radius: 8px; font-size: 0.85rem; line-height: 1.6; resize: none; margin-bottom: 12px;" placeholder="請輸入準備工作三的內容..."></textarea>
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary" onclick="saveRecruitPrepText('prepare3')" style="padding: 6px 20px; font-size: 0.8rem;">儲存內容</button>
+            </div>
+          </div>
+          
+          <!-- 增員對象詳細資料 (當點選左側清單中的人時顯示) -->
+          <div id="recruit-person-content" class="recruit-detail-view" style="display: none; flex-direction: column; height: 100%; overflow: hidden; box-sizing: border-box;">
+            <!-- 頁籤控制區 -->
+            <div style="display: flex; background: rgba(0,0,0,0.15); border-bottom: 1px solid var(--border-color); padding: 5px 15px 0; gap: 8px; flex-shrink: 0;">
+              <button class="tab-btn active" onclick="switchRecruitRightTab('path')" id="tab-recruit-path" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 700; border: none; background: none; color: #fff; border-bottom: 3px solid var(--accent); cursor: pointer; transition: all 0.2s;">
+                🧭 增員路徑
+              </button>
+              <button class="tab-btn" onclick="switchRecruitRightTab('records')" id="tab-recruit-records" style="padding: 8px 16px; font-size: 0.85rem; font-weight: 700; border: none; background: none; color: var(--text-secondary); border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s;">
+                📝 輔導紀錄
+              </button>
+            </div>
+            
+            <!-- 頁籤內容一：增員路徑 -->
+            <div id="recruit-tab-content-path" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="todo-form-row">
+                  <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">增員對象姓名</label>
+                  <input type="text" id="recruit-main-name" onchange="updateRecruitMainField('name', this.value)" style="height: 28px; font-size: 0.82rem; width: 100%; padding: 4px 8px; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                </div>
+                <div class="todo-form-row">
+                  <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">電話號碼</label>
+                  <input type="text" id="recruit-main-phone" onchange="updateRecruitMainField('phone', this.value)" style="height: 28px; font-size: 0.82rem; width: 100%; padding: 4px 8px; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="todo-form-row">
+                  <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">目前工作 / 現職</label>
+                  <input type="text" id="recruit-main-job" onchange="updateRecruitMainField('currentJob', this.value)" style="height: 28px; font-size: 0.82rem; width: 100%; padding: 4px 8px; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px;">
+                </div>
+                <div class="todo-form-row">
+                  <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; display: block;">增員當前階段</label>
+                  <select id="recruit-main-stage" onchange="updateRecruitMainField('stage', this.value)" style="height: 28px; font-size: 0.82rem; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; padding: 0 8px; width: 100%; box-sizing: border-box;">
+                    <option value="contacting">接觸中</option>
+                    <option value="interviewing">面談中</option>
+                    <option value="examining">考核中</option>
+                    <option value="joined">已登錄下屬</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- 面談進度紀錄區 -->
+              <div style="margin-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; margin-bottom: 10px;">
+                  <h4 style="margin: 0; color: #fff;">📅 增員面談進度紀錄</h4>
+                  <button class="btn btn-primary" onclick="openAddRecruitMainLog()" style="padding: 2px 10px; font-size: 0.72rem; height: 22px;">＋ 新增紀錄</button>
+                </div>
+                <div id="recruit-main-logs-container" style="display: flex; flex-direction: column; gap: 8px;">
+                  <!-- 面談進度紀錄 -->
+                </div>
+              </div>
+              
+              <!-- 刪除按鈕置底 -->
+              <div style="margin-top: auto; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <button type="button" class="btn" onclick="deleteRecruitFromMain()" style="width: 100%; height: 32px; justify-content: center; font-size: 0.78rem; color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.05); cursor: pointer;">🗑️ 刪除此增員對象</button>
+              </div>
+            </div>
+            
+            <!-- 頁籤內容二：輔導紀錄 (先開好畫面) -->
+            <div id="recruit-tab-content-records" style="flex: 1; overflow-y: auto; padding: 20px; display: none; flex-direction: column; gap: 15px; box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #fff;">📝 增員日常輔導與陪伴紀錄</h4>
+                <button class="btn btn-primary" onclick="openAddCoachingLog()" style="padding: 2px 10px; font-size: 0.72rem; height: 22px;">＋ 新增輔導</button>
+              </div>
+              <div id="coaching-logs-container" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="text-align: center; padding: 30px; color: var(--text-secondary); opacity: 0.6; font-size: 0.78rem;">（暫無輔導陪伴紀錄，點擊右上方新增）</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 店家陌生開發管理頁面 ===== -->
+  <div id="canvassing-page" style="display: none;">
+    <div id="canvassing-page-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <h2 style="margin: 0;">📍 店家陌生開發管理</h2>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-primary" onclick="openAddCanvassingModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增店家</button>
+      </div>
+    </div>
+    <div id="canvassing-body" style="display: grid; grid-template-columns: 340px 1fr; gap: 20px; padding: 20px; height: calc(100vh - 120px); overflow: hidden; box-sizing: border-box; text-align: left;">
+      
+      <!-- 左欄：店家清單、搜尋與過濾 -->
+      <div id="canvassing-left-panel" style="display: flex; flex-direction: column; gap: 15px; border-right: 1px solid var(--border-color); padding-right: 15px; height: 100%; overflow: hidden; box-sizing: border-box;">
+        
+        <!-- 搜尋與過濾 -->
+        <div style="display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
+          <input type="text" class="search-input" id="canvassing-search-input" placeholder="搜尋店名、地址..." oninput="filterCanvassingList()" style="width: 100%; height: 32px; padding: 6px 12px; box-sizing: border-box; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 8px; font-size: 0.8rem;">
+          <select id="canvassing-filter-status" onchange="filterCanvassingList()" style="width: 100%; height: 32px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 8px; padding: 0 8px; font-size: 0.8rem;">
+            <option value="">— 所有開發進度 —</option>
+            <option value="⚪ 未拜訪">⚪ 未拜訪</option>
+            <option value="🔵 初次接觸">🔵 初次接觸</option>
+            <option value="🟡 議題探討">🟡 議題探討</option>
+            <option value="🟠 方案評估">🟠 方案評估</option>
+            <option value="🟢 合作簽約">🟢 合作簽約</option>
+            <option value="🔴 暫拒 (再戰)">🔴 暫拒 (再戰)</option>
+            <option value="✖ 永久拒絕">✖ 永久拒絕</option>
+          </select>
+        </div>
+
+        <!-- 店家清單列表 -->
+        <div id="canvassing-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+          <!-- 店家項目將動態生成 -->
+        </div>
+      </div>
+
+      <!-- 右欄：地圖區塊 -->
+      <div id="canvassing-right-panel" style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 12px; height: 100%; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; position: relative;">
+        <!-- Leaflet 地圖容器 -->
+        <div id="canvassing-map" style="width: 100%; height: 100%; z-index: 1;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 新增/編輯店家陌生開發 Modal ===== -->
+  <div id="add-canvassing-modal" class="modal-overlay" style="z-index: 10007;">
+    <div class="modal-box" style="width: 520px; text-align: left; padding: 1.25rem;">
+      <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+        <h3 id="canvassing-modal-title" style="margin:0; font-weight:700; color:#fff;">新增店家開發記錄</h3>
+        <span style="cursor:pointer; font-size:1.2rem; color:var(--text-secondary);" onclick="closeCanvassingModal()">✕</span>
+      </div>
+      
+      <input type="hidden" id="canvassing-edit-id" value="">
+      
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        
+        <div class="todo-form-row">
+          <label>店家名稱 *</label>
+          <input type="text" class="form-input" id="canvassing-input-storeName" placeholder="例如：好食早餐店、咖啡工坊..." autocomplete="off">
+        </div>
+        
+        <div class="todo-form-row">
+          <label>店家地址 *</label>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" class="form-input" id="canvassing-input-address" placeholder="例如：台北市信義區信義路五段7號..." autocomplete="off" oninput="checkDuplicateAddress(this.value)" style="flex:1;">
+          </div>
+          <!-- 防重複警告區 -->
+          <div id="canvassing-duplicate-alert" style="display:none; color: #f59e0b; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); padding: 8px; border-radius: 6px; font-size: 0.72rem; margin-top: 5px; font-weight: 600;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="todo-form-row">
+            <label>聯絡人名稱</label>
+            <input type="text" class="form-input" id="canvassing-input-contactName" placeholder="例如：張老闆、李經理..." autocomplete="off">
+          </div>
+          <div class="todo-form-row">
+            <label>聯絡電話</label>
+            <input type="text" class="form-input" id="canvassing-input-phone" placeholder="例如：0912-345678..." autocomplete="off">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="todo-form-row">
+            <label>開發進度狀態</label>
+            <select class="form-input" id="canvassing-input-status" style="background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 6px; padding: 0 8px; height: 32px;">
+              <option value="⚪ 未拜訪">⚪ 未拜訪</option>
+              <option value="🔵 初次接觸">🔵 初次接觸</option>
+              <option value="🟡 議題探討">🟡 議題探討</option>
+              <option value="🟠 方案評估">🟠 方案評估</option>
+              <option value="🟢 合作簽約">🟢 合作簽約</option>
+              <option value="🔴 暫拒 (再戰)">🔴 暫拒 (再戰)</option>
+              <option value="✖ 永久拒絕">✖ 永久拒絕</option>
+            </select>
+          </div>
+          <div class="todo-form-row">
+            <label>已拜訪次數</label>
+            <input type="number" class="form-input" id="canvassing-input-visitCount" min="0" value="0">
+          </div>
+        </div>
+
+        <div class="todo-form-row">
+          <label>商談議題（可複選）</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="員工團險"> 員工團險</label>
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="勞資法遵風險"> 勞資法遵風險</label>
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="企業主資產保護"> 企業主資產保護</label>
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="公共意外險"> 公共意外責任險</label>
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="商業綜合險"> 商業綜合保險</label>
+            <label class="checkbox-tag-label" style="display:inline-flex; align-items:center; gap:4px; font-size:0.76rem; background:rgba(255,255,255,0.03); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.06); cursor:pointer;"><input type="checkbox" name="canvassing-issues" value="個人壽險/儲蓄"> 店主個人規劃</label>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="todo-form-row">
+            <label>下次跟進提醒日期</label>
+            <input type="date" class="form-input" id="canvassing-input-reminderDate" onclick="this.showPicker()" style="cursor:pointer;">
+          </div>
+          <div class="todo-form-row" style="display:none;">
+            <!-- 地理座標隱藏欄位，由地理編碼自動生成 -->
+            <input type="hidden" id="canvassing-input-latitude" value="">
+            <input type="hidden" id="canvassing-input-longitude" value="">
+          </div>
+        </div>
+
+        <div class="todo-form-row">
+          <label>拜訪商談備忘錄</label>
+          <textarea class="form-input" id="canvassing-input-notes" rows="3" placeholder="請記錄每次拜訪的細節、反饋與下一步規劃..." style="resize: vertical; min-height: 70px;"></textarea>
+        </div>
+
+      </div>
+
+      <div class="todo-form-actions" style="margin-top: 15px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <button type="button" class="btn" id="btn-delete-canvassing" onclick="deleteCanvassingStore()" style="background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3); color:#ef4444; display:none; font-size:0.8rem; padding:6px 14px;">🗑️ 刪除紀錄</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="closeCanvassingModal()">取消</button>
+          <button class="btn btn-primary" onclick="saveCanvassingStore()">儲存</button>
+        </div>
       </div>
     </div>
   </div>
@@ -161,6 +439,10 @@
             <input type="hidden" id="todo-input-urgent" value="">
             <input type="hidden" id="todo-input-important" value="">
             <div class="priority-matrix">
+              <div class="priority-cell" data-q="0" onclick="selectPriorityCell(this, 'immediate', 'immediate')" style="grid-column: span 2; flex-direction: row; gap: 8px; padding: 7px 10px;">
+                <span class="priority-cell-icon">🔥</span>
+                <span class="priority-cell-label" style="font-weight: 800;">立即處理 (最優先)</span>
+              </div>
               <div class="priority-cell" data-q="1" onclick="selectPriorityCell(this, true, true)">
                 <span class="priority-cell-icon">🔴</span>
                 <span class="priority-cell-label">緊急重要</span>
@@ -348,7 +630,7 @@
   <!-- 送件提醒對話框 -->
 <!-- 待辦送件時程提醒對話框 -->
   <div class="modal-overlay" id="reminder-modal">
-    <div class="modal-box" style="width: 820px; max-width: 95vw; max-height: 85vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+    <div class="modal-box" style="width: 820px; max-width: 95vw; max-height: 85vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden;">
       
       <!-- 頂部 Header -->
       <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; flex-shrink: 0;">
@@ -398,7 +680,7 @@
 
   <!-- 待辦任務通知看板 -->
   <div class="modal-overlay" id="todo-notify-modal">
-    <div class="modal-box" style="width: 680px; max-width: 96vw; max-height: 88vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden; background: #1e1e24; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+    <div class="modal-box" style="width: 680px; max-width: 96vw; max-height: 88vh; padding: 1.25rem; display: flex; flex-direction: column; overflow: hidden;">
 
       <!-- 頂部 Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-shrink: 0;">
@@ -427,6 +709,100 @@
   </div>
 
 
+  <!-- 近期活動對話框 (activities-modal) -->
+  <div class="modal-overlay" id="activities-modal">
+    <div class="modal-box" style="width: 800px; height: 500px; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+      <!-- 頂部標題與控制項 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.1); flex-shrink: 0;">
+        <div style="font-size: 0.95rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px;">
+          📅 近期活動通知與維護
+        </div>
+        <button class="btn btn-primary" onclick="openActivityEditor()" style="font-size: 0.75rem; padding: 4px 10px;">＋ 新增活動</button>
+      </div>
+
+      <!-- 分割版面 -->
+      <div style="display: flex; flex: 1; overflow: hidden;">
+        <!-- 左側：活動列表 -->
+        <div style="width: 240px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; background: rgba(0,0,0,0.05);">
+          <div id="activities-list-container" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- 由 JS 動態生成 -->
+          </div>
+        </div>
+
+        <!-- 右側：內容展示 / 編輯器 -->
+        <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: rgba(255,255,255,0.01);">
+          <!-- 1. 預設空狀態 -->
+          <div id="activity-detail-empty" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary); font-size: 0.85rem; gap: 8px;">
+            <div style="font-size: 2rem; filter: grayscale(0.5);">📅</div>
+            請點選左側活動以查看詳細內容，或點擊「新增活動」。
+          </div>
+
+          <!-- 2. 活動詳細內容展示 -->
+          <div id="activity-detail-content" style="flex: 1; display: none; flex-direction: column; padding: 16px; overflow-y: auto;">
+            <div id="activity-detail-title" style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 1.3;"></div>
+            <div id="activity-detail-date" style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px;"></div>
+            
+            <div id="activity-detail-image-box" style="margin-bottom: 12px; display: none; text-align: center; border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color);">
+              <img id="activity-detail-img" src="" alt="活動圖片" onclick="zoomActivityImage(this.src)" style="max-width: 100%; max-height: 200px; object-fit: contain; display: block; margin: 0 auto; cursor: zoom-in;" title="點擊放大圖片">
+            </div>
+            
+            <div id="activity-detail-text" style="font-size: 0.85rem; line-height: 1.5; color: rgba(255,255,255,0.85); white-space: pre-wrap; word-break: break-all; flex: 1;"></div>
+          </div>
+
+          <!-- 3. 活動編輯器 (與 detail 互斥) -->
+          <div id="activity-editor-box" style="flex: 1; display: none; flex-direction: column; padding: 10px; overflow-y: hidden;">
+            <div id="activity-editor-title-label" style="font-size: 0.88rem; font-weight: 700; color: var(--accent); margin-bottom: 8px;">＋ 新增活動項目</div>
+            <input type="hidden" id="edit-activity-id">
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 8px; flex-shrink: 0;">
+              <div class="form-group" style="flex: 1; margin: 0;">
+                <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 3px;">活動標題</label>
+                <input type="text" id="edit-activity-title" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+              <div class="form-group" style="width: 180px; margin: 0;">
+                <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 3px;">活動期間 / 日期</label>
+                <input type="text" id="edit-activity-date" placeholder="例如：2026-07-20" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 8px; flex-shrink: 0;">
+              <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 3px;">活動圖片來源</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="text" id="edit-activity-imageurl" placeholder="輸入圖片網址 (支援 Google Drive)" style="flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+                <label class="btn" style="font-size: 0.72rem; padding: 5px 8px; cursor: pointer; background: var(--bg-card); display: inline-block; border: 1px solid var(--border-color); margin: 0; white-space: nowrap;">
+                  上傳 📁
+                  <input type="file" id="edit-activity-file" accept="image/*" onchange="uploadActivityFile(this)" style="display: none;">
+                </label>
+              </div>
+              <span id="activity-upload-status" style="font-size: 0.7rem; color: var(--color-sa); display: none; margin-top: 2px;">圖片上傳中...</span>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 8px; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+              <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 3px;">詳細內容</label>
+              <textarea id="edit-activity-content" style="width: 100%; flex: 1; min-height: 80px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem; resize: none;"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 8px; flex-shrink: 0;">
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; cursor: pointer; color: var(--text-secondary); margin: 0;">
+                <input type="checkbox" id="edit-activity-status" checked> 啟用此活動提醒
+              </label>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn" onclick="closeActivityEditor()" style="font-size: 0.72rem; padding: 4px 10px;">取消</button>
+                <button class="btn btn-primary" onclick="saveActivityItem()" style="font-size: 0.72rem; padding: 4px 10px;">儲存此活動</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部控制列 -->
+      <div style="padding: 10px 16px; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.1); display: flex; justify-content: flex-end; flex-shrink: 0;">
+        <button class="btn" onclick="toggleActivitiesModal(false)" style="font-size: 0.8rem; padding: 6px 16px;">關閉</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- 新增案件對話框 -->
   <div class="modal-overlay" id="add-case-modal">
     <div class="modal-box" style="width: 520px;">
@@ -436,8 +812,24 @@
       </div>
       <form id="add-case-form" onsubmit="submitAddCase(event)">
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--text-secondary);">客戶姓名</label>
-          <input type="text" id="add-client-name" required placeholder="例如：林智強" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">客戶姓名</label>
+            <label style="display: flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--color-sa); cursor: pointer; user-select: none; margin: 0;">
+              <input type="checkbox" id="add-is-group" onchange="
+                const nameInput = document.getElementById('add-client-name');
+                if (this.checked) {
+                  if (!nameInput.value.startsWith('[團體] ')) {
+                    nameInput.value = '[團體] ' + nameInput.value;
+                  }
+                } else {
+                  if (nameInput.value.startsWith('[團體] ')) {
+                    nameInput.value = nameInput.value.replace('[團體] ', '');
+                  }
+                }
+              " style="cursor: pointer; margin: 0;"> 這是團體/家庭約訪
+            </label>
+          </div>
+          <input type="text" id="add-client-name" required placeholder="例如：科林研發團抽" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 8px; border-radius: 4px;">
         </div>
         <!-- 訪談類型與險種分類 (次標籤按鈕) -->
         <div class="form-group" style="margin-bottom: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -448,6 +840,7 @@
               <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'life', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">生活訪</button>
               <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'service', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">服務訪</button>
               <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'coffee', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">咖啡訪</button>
+              <button type="button" class="btn btn-tab" onclick="selectFormTab('add-visit-type', 'call', this)" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 6px 0; min-width: max-content; white-space: nowrap;">電訪</button>
             </div>
             <input type="hidden" id="add-visit-type" value="issue">
           </div>
@@ -563,6 +956,7 @@
           <button class="btn btn-tab" id="settings-tab-issues" onclick="switchSettingsTab('issues')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">💬 常規議題維護</button>
           <button class="btn btn-tab" id="settings-tab-groups" onclick="switchSettingsTab('groups')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">📂 分群管理維護</button>
           <button class="btn btn-tab" id="settings-tab-rules" onclick="switchSettingsTab('rules')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🔧 推進規則自訂</button>
+          <button class="btn btn-tab" id="settings-tab-products" onclick="switchSettingsTab('products')" style="width: 100%; text-align: left; font-size: 0.8rem; padding: 8px 12px; border-radius: 4px;">🛡️ 保險產品維護</button>
         </div>
 
         <!-- 右側：設定內容區 -->
@@ -679,6 +1073,18 @@
                       <input type="checkbox" id="rules-notify-stuck" checked> ⚠️ 訂閱「卡關提醒」：前置規劃/討論超過 5 天未更新時警示
                     </label>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 保險產品維護 Tab -->
+            <div id="settings-pane-products" style="display:none;">
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; color: var(--text-secondary); gap: 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px;">
+                <div style="font-size: 3rem;">🛡️</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: #fff;">保險產品進階欄位擴充區</div>
+                <div style="font-size: 0.8rem; line-height: 1.6; max-width: 480px;">
+                  此處已被保留供未來擴充保險產品欄位、進行自訂分類、或進階推進設定時使用。<br>
+                  目前的保險產品新增、修改與刪除，請直接於 <span style="color: var(--accent); font-weight: bold;">「第六通知 (開工產品複習面板)」</span> 中進行操作即可。
                 </div>
               </div>
             </div>
@@ -1040,6 +1446,18 @@
       <h3 style="margin: 0; font-size: 1rem; color: var(--accent); font-weight: 700;">🔍 案件快速跳轉</h3>
       <span class="close-sidebar-btn" onclick="closeLeftSidebar()" style="cursor: pointer; font-size: 1.2rem; color: var(--text-secondary);">✕</span>
     </div>
+    
+    <!-- 🧭 系統導覽快速切換區 (ADHD 減法快捷設計) -->
+    <div style="padding: 12px 15px; border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">🧭 視角切換</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+        <button class="btn btn-sm" onclick="switchViewMode('case'); closeLeftSidebar();" style="font-size:0.75rem; text-align:left; justify-content:flex-start; padding: 6px 8px; width: 100%; border:1px solid var(--border-color); background:transparent; color:#fff; cursor:pointer;">📊 案件管理</button>
+        <button class="btn btn-sm" onclick="switchViewMode('todo'); closeLeftSidebar();" style="font-size:0.75rem; text-align:left; justify-content:flex-start; padding: 6px 8px; width: 100%; border:1px solid var(--border-color); background:transparent; color:#fff; cursor:pointer;">📋 待辦事項</button>
+        <button class="btn btn-sm" onclick="switchViewMode('customer'); closeLeftSidebar();" style="font-size:0.75rem; text-align:left; justify-content:flex-start; padding: 6px 8px; width: 100%; border:1px solid var(--border-color); background:transparent; color:#fff; cursor:pointer;">👥 客戶畫布</button>
+        <button class="btn btn-sm" onclick="switchViewMode('recruit'); closeLeftSidebar();" style="font-size:0.75rem; text-align:left; justify-content:flex-start; padding: 6px 8px; width: 100%; border:1px solid var(--border-color); background:transparent; color:#fff; cursor:pointer;">👥 增員輔導</button>
+      </div>
+    </div>
+
     <div class="sidebar-list" id="sidebar-list">
       <!-- 案件清單動態生成 -->
     </div>
@@ -1059,6 +1477,281 @@
       <div style="display: flex; gap: 10px; justify-content: center; width: 100%;">
         <button class="btn" onclick="closePomodoroSuccessModal()" style="padding: 8px 18px; font-size: 0.82rem; font-weight: 700; flex: 1;">休息 5 分鐘 ☕</button>
         <button class="btn" onclick="startNextPomodoro()" style="padding: 8px 18px; font-size: 0.82rem; font-weight: 700; background: #ef4444; border-color: #ef4444; color: #fff; flex: 1;">再專注一次 🍅</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔍 圖片放大檢視對話框 (image-lightbox-modal) -->
+  <div class="modal-overlay" id="image-lightbox-modal" style="z-index: 10008; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);" onclick="closeImageLightbox()">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation()">
+      <span style="position: absolute; top: -40px; right: 0; font-size: 2rem; color: #fff; cursor: pointer; text-shadow: 0 0 8px rgba(0,0,0,0.8);" onclick="closeImageLightbox()">✕</span>
+      <img id="lightbox-img" src="" alt="放大圖片" style="max-width: 100%; max-height: 90vh; object-fit: contain; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+    </div>
+  </div>
+
+  <!-- 🛡️ 保險產品專業知識複習對話框 (products-review-modal) -->
+  <div class="modal-overlay" id="products-review-modal" style="z-index: 10006;">
+    <div class="modal-box" style="width: 820px; height: 500px; max-width: 95vw; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <!-- 頂部標題與控制項 -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.1); flex-shrink: 0; margin: 0;">
+        <div style="font-size: 0.95rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 6px;">
+          專業準備與工具
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn" id="btn-prod-toggle-view" onclick="toggleProductViewMode()" style="font-size: 0.72rem; padding: 4px 10px; background: transparent; border-color: var(--border-color); color: var(--text-secondary);">切換為表格</button>
+          <button class="btn btn-primary" id="btn-add-product" onclick="openProductEditor()" style="font-size: 0.72rem; padding: 4px 10px;">＋ 新增產品</button>
+          <button class="btn btn-primary" id="btn-add-fixed-msg" onclick="openFixedMsgEditor()" style="font-size: 0.72rem; padding: 4px 10px; display: none;">＋ 新增訊息</button>
+          <button class="btn btn-primary" id="btn-add-sales-proc" onclick="openSalesProcEditor()" style="font-size: 0.72rem; padding: 4px 10px; display: none;">＋ 新增流程</button>
+          <button class="btn btn-primary" id="btn-save-sales-proc" onclick="saveSalesProcItem()" style="font-size: 0.72rem; padding: 4px 10px; display: none;">儲存定義</button>
+          <button class="btn" id="btn-cancel-sales-proc" onclick="closeSalesProcEditor()" style="font-size: 0.72rem; padding: 4px 10px; display: none; background: transparent; border-color: var(--border-color); color: var(--text-secondary);">取消</button>
+          <span style="cursor: pointer; font-size: 1.2rem; color: var(--text-secondary); margin-left: 8px;" onclick="toggleProductsReviewModal(false)">✕</span>
+        </div>
+      </div>
+
+      <!-- 頁籤選擇器 -->
+      <div style="display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color); padding: 4px 16px; gap: 8px; flex-shrink: 0;">
+        <div class="product-tab-btn active" id="prod-tab-review" onclick="switchProductReviewTab('review')" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700; color: var(--accent); border-bottom: 2px solid var(--accent); cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+          產品知識複習
+        </div>
+        <div class="product-tab-btn" id="prod-tab-fixed" onclick="switchProductReviewTab('fixed')" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+          固定訊息
+        </div>
+        <div class="product-tab-btn" id="prod-tab-sales" onclick="switchProductReviewTab('sales')" style="padding: 6px 12px; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); border-bottom: 2px solid transparent; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none;">
+          銷售流程定義
+        </div>
+      </div>
+
+      <!-- 分割版面 (頁籤內容 A: 產品複習) -->
+      <div id="product-review-tab-content-review" style="display: flex; flex: 1; overflow: hidden;">
+        <!-- 左側：產品清單 -->
+        <div style="width: 480px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; background: rgba(0,0,0,0.05);">
+          <div id="products-review-list-container" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- 由 JS 動態生成 (卡牌或表格形式) -->
+          </div>
+        </div>
+
+        <!-- 右側：內容展示 / 編輯器 -->
+        <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: rgba(255,255,255,0.01);">
+          <!-- 1. 預設空狀態 -->
+          <div id="product-detail-empty" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary); font-size: 0.85rem; gap: 8px;">
+            <div style="font-size: 2rem; filter: grayscale(0.5);">🛡️</div>
+            請點選左側產品以複習詳細內容，或點擊「新增產品」。
+          </div>
+
+          <!-- 2. 產品詳細內容展示 -->
+          <div id="product-detail-content" style="flex: 1; display: none; flex-direction: column; padding: 16px; overflow-y: auto;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span id="product-detail-category" style="background: rgba(99,102,241,0.15); color: var(--accent); font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 12px;"></span>
+              <span id="product-detail-name" style="font-size: 1.1rem; font-weight: 700; color: #fff;"></span>
+            </div>
+            
+            <div id="product-detail-params" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;">
+              <!-- 參數 Badge -->
+            </div>
+            
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">專業特點與備註：</div>
+            <div id="product-detail-note" style="background: rgba(0,0,0,0.15); border-left: 3px solid var(--accent); padding: 10px 12px; border-radius: 0 4px 4px 0; font-size: 0.82rem; color: rgba(255,255,255,0.85); line-height: 1.5; white-space: pre-wrap; word-break: break-all; flex: 1; overflow-y: auto;"></div>
+          </div>
+
+          <!-- 3. 產品編輯器 -->
+          <div id="product-editor-box" style="flex: 1; display: none; flex-direction: column; padding: 10px; overflow-y: hidden;">
+            <div id="product-editor-title-label" style="font-size: 0.88rem; font-weight: 700; color: var(--accent); margin-bottom: 8px;">＋ 新增產品項目</div>
+            <input type="hidden" id="prod-edit-id">
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 8px; flex-shrink: 0;">
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">產品名稱 *</label>
+                <input type="text" id="prod-input-name" placeholder="例如：新守護一生" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">產品別 *</label>
+                <select id="prod-input-category" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+                  <option value="壽險">壽險</option>
+                  <option value="產險">產險</option>
+                </select>
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">性別</label>
+                <select id="prod-input-gender" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+                  <option value="皆可">皆可</option>
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                </select>
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 8px; flex-shrink: 0;">
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">投保年齡</label>
+                <input type="text" id="prod-input-age" placeholder="例如：0-65歲" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">繳費年期</label>
+                <input type="text" id="prod-input-period" placeholder="例如：20年" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">保額</label>
+                <input type="text" id="prod-input-sum-assured" placeholder="例如：100萬" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">保費</label>
+                <input type="text" id="prod-input-premium" placeholder="例如：3.5萬/年" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem;">
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 8px; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+              <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">專業特點與複習備註</label>
+              <textarea id="prod-input-note" placeholder="輸入此產品的特色、話術或展現專業的關鍵要點..." style="width: 100%; flex: 1; min-height: 80px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 5px; border-radius: 4px; font-size: 0.78rem; resize: none;"></textarea>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 8px; flex-shrink: 0;">
+              <label style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; cursor: pointer; color: var(--text-secondary); margin: 0;">
+                <input type="checkbox" id="prod-input-status" checked> 啟用此產品提示
+              </label>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn" onclick="closeProductEditor()" style="font-size: 0.72rem; padding: 4px 10px;">取消</button>
+                <button class="btn btn-primary" onclick="addProductItem()" style="font-size: 0.72rem; padding: 4px 10px;">儲存此產品</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div> <!-- 關閉 product-review-tab-content-review -->
+
+      <!-- 頁籤內容 B: 固定訊息複製 -->
+      <div id="product-review-tab-content-fixed" style="display: none; flex: 1; overflow: hidden;">
+        <!-- 左側：訊息標題清單 -->
+        <div style="width: 250px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; background: rgba(0,0,0,0.05);">
+          <!-- 頂部按鈕 -->
+          <div style="padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: bold;">固定訊息清單</span>
+          </div>
+          <!-- 列表 -->
+          <div id="fixed-msgs-list-container" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+            <!-- 由 JS 動態生成 -->
+          </div>
+        </div>
+
+        <!-- 右側：內容展示與一鍵複製 / 編輯器 -->
+        <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: rgba(255,255,255,0.01);">
+          <!-- 1. 預設空狀態 -->
+          <div id="fixed-msg-detail-empty" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary); font-size: 0.82rem; gap: 8px;">
+            <div style="font-size: 2rem; filter: grayscale(0.5);">📋</div>
+            請點選左側項目以查看內容，或點擊上方「＋ 新增訊息」。
+          </div>
+
+          <!-- 2. 內容展示與點擊複製 -->
+          <div id="fixed-msg-detail-content" style="flex: 1; display: none; flex-direction: column; padding: 16px; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0;">
+              <span id="fixed-msg-detail-title" style="font-size: 0.95rem; font-weight: 700; color: #fff;"></span>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn" id="btn-edit-fixed-msg" style="font-size: 0.68rem; padding: 4px 10px; background: transparent; border-color: var(--border-color); color: var(--text-secondary);">✏️ 編輯訊息</button>
+                <button class="btn" id="btn-delete-fixed-msg" style="font-size: 0.68rem; padding: 4px 10px; background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #ef4444;">🗑️ 刪除</button>
+              </div>
+            </div>
+            
+            <div style="font-size: 0.72rem; color: var(--accent); margin-bottom: 6px; font-weight: bold; display: flex; align-items: center; gap: 4px;">
+              💡 點擊下方區塊即可一鍵複製全部內容：
+            </div>
+
+            <!-- 可點擊複製的區塊 -->
+            <div id="fixed-msg-detail-text" onclick="copyCurrentFixedMsgText()" style="flex: 1; background: rgba(255,255,255,0.02); border: 1px dashed var(--accent); padding: 12px; border-radius: 6px; font-size: 0.8rem; color: rgba(255,255,255,0.9); line-height: 1.5; white-space: pre-wrap; word-break: break-all; overflow-y: auto; cursor: pointer; transition: all 0.2s ease; user-select: none;" title="點選此區塊一鍵複製">
+            </div>
+          </div>
+
+          <!-- 3. 固定訊息編輯器 -->
+          <div id="fixed-msg-editor" style="display: none; flex: 1; flex-direction: column; padding: 16px; overflow-y: auto; gap: 10px;">
+            <div style="font-weight: bold; font-size: 0.88rem; color: var(--accent);" id="fixed-msg-editor-title">新增固定訊息項目</div>
+            <input type="hidden" id="fixed-msg-edit-id">
+            <div>
+              <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">訊息名稱/標題 *</label>
+              <input type="text" id="fixed-msg-input-title" placeholder="例如：旅平卡FAB" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem;">
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; min-height: 120px;">
+              <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">訊息內文 (一鍵複製內容) *</label>
+              <textarea id="fixed-msg-input-content" placeholder="請輸入需要一鍵複製的文字內容..." style="width: 100%; flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem; resize: none; font-family: inherit;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid var(--border-color); padding-top: 10px; flex-shrink: 0;">
+              <button class="btn" onclick="closeFixedMsgEditor()" style="font-size: 0.72rem; padding: 4px 10px;">取消</button>
+              <button class="btn btn-primary" onclick="saveFixedMsgItem()" style="font-size: 0.72rem; padding: 4px 10px;">儲存訊息</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 頁籤內容 C: 銷售流程定義 -->
+      <div id="product-review-tab-content-sales" style="display: none; flex: 1; overflow: hidden; text-align: left;">
+        <!-- 左側：流程清單 -->
+        <div style="width: 250px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0; background: rgba(0,0,0,0.05);">
+          <div style="padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: bold;">流程定義列表</span>
+          </div>
+          <!-- 列表 -->
+          <div id="sales-proc-list-container" style="flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+            <!-- 由 JS 動態生成 -->
+          </div>
+        </div>
+
+        <!-- 右側：展示與編輯器 -->
+        <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; background: rgba(255,255,255,0.01); box-sizing: border-box;">
+          <!-- 1. 預設空狀態 -->
+          <div id="sales-proc-empty" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-secondary); font-size: 0.82rem; gap: 8px;">
+            請點選左側流程以查看定義，或點擊上方「＋ 新增流程」。
+          </div>
+
+          <!-- 2. 展示內容 -->
+          <div id="sales-proc-detail" style="flex: 1; display: none; flex-direction: column; padding: 16px; overflow-y: auto; box-sizing: border-box; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <span id="sales-proc-detail-title" style="font-size: 1rem; font-weight: 700; color: #fff;"></span>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn" id="btn-edit-sales-proc" onclick="editSalesProcItem()" style="font-size: 0.68rem; padding: 4px 10px; background: transparent; border-color: var(--border-color); color: var(--text-secondary);">編輯流程</button>
+                <button class="btn" id="btn-delete-sales-proc" onclick="deleteSalesProcItem()" style="font-size: 0.68rem; padding: 4px 10px; background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.2); color: #ef4444;">刪除</button>
+              </div>
+            </div>
+            
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 4px; font-weight: bold;">【階段】</div>
+              <div id="sales-proc-detail-stage" style="font-size: 0.82rem; color: #fff; padding-left: 6px;"></div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 4px; font-weight: bold;">【用意】</div>
+              <div id="sales-proc-detail-intent" style="font-size: 0.82rem; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.02); padding: 8px 10px; border-radius: 6px; border-left: 3px solid var(--accent); line-height: 1.5; white-space: pre-wrap; word-break: break-all;"></div>
+            </div>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 4px; font-weight: bold;">【文件】</div>
+              <div id="sales-proc-detail-document" style="font-size: 0.82rem; color: rgba(255,255,255,0.9); line-height: 1.5; white-space: pre-wrap; word-break: break-all; padding-left: 6px;"></div>
+            </div>
+          </div>
+
+          <!-- 3. 編輯器 -->
+          <div id="sales-proc-editor" style="display: none; flex: 1; flex-direction: column; padding: 16px; overflow-y: auto; gap: 10px; box-sizing: border-box;">
+            <div style="font-weight: bold; font-size: 0.88rem; color: var(--accent);" id="sales-proc-editor-title">新增銷售流程定義</div>
+            <input type="hidden" id="sales-proc-edit-id">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">階段名稱 *</label>
+                <input type="text" id="sales-proc-input-stage" placeholder="例如：接觸階段" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem; box-sizing: border-box;">
+              </div>
+              <div>
+                <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">任務名稱 *</label>
+                <input type="text" id="sales-proc-input-task" placeholder="例如：設計問卷" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem; box-sizing: border-box;">
+              </div>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; min-height: 80px;">
+              <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">用意描述</label>
+              <textarea id="sales-proc-input-intent" placeholder="請描述此任務的用意與核心目的..." style="width: 100%; flex: 1; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem; resize: none; font-family: inherit; box-sizing: border-box;"></textarea>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 3px;">對應文件</label>
+              <input type="text" id="sales-proc-input-document" placeholder="例如：生活問卷.pdf" style="width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px; border-radius: 4px; font-size: 0.78rem; box-sizing: border-box;">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 底部控制項 -->
+      <div style="padding: 10px 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; flex-shrink: 0; background: rgba(0,0,0,0.1);">
+        <button class="btn btn-primary" onclick="toggleProductsReviewModal(false)" style="font-size: 0.8rem; font-weight: 700; padding: 6px 16px;">完成複習，開始工作！</button>
       </div>
     </div>
   </div>

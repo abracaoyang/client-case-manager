@@ -2,13 +2,8 @@
     function getSubmitBtnClass(c) {
       let baseClass = 'sub-tag-btn';
       if (!c || !c.cDetails) return baseClass;
-      if (c.cDetails.submitState === 'active') {
-        baseClass += ' active c-submit';
-      } else if (c.cDetails.submitState === 'ongoing') {
-        baseClass += ' ongoing-magenta';
-      }
-      
-      // 若已送件處理，回傳預設樣式
+
+      // 若已設定送件日期且尚未完成處理，優先亮起對應燈號
       if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
         const d = new Date();
         const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -18,7 +13,6 @@
         const dd = String(twDate.getDate()).padStart(2, '0');
         const todayStr = yyyy + "-" + mm + "-" + dd;
         
-        // 取得預告天數限制
         const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
         const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
         const ly = limitDate.getFullYear();
@@ -26,7 +20,6 @@
         const ld = String(limitDate.getDate()).padStart(2, '0');
         const limitDateStr = ly + "-" + lm + "-" + ld;
         
-        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
         const sDate = c.cDetails.submitDate.replace(/\//g, '-');
         if (sDate < todayStr) {
           return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
@@ -36,6 +29,13 @@
           return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
         }
       }
+
+      if (c.cDetails.submitState === 'active') {
+        baseClass += ' active c-submit';
+      } else if (c.cDetails.submitState === 'ongoing') {
+        baseClass += ' ongoing-c';
+      }
+
       return baseClass;
     }
 
@@ -590,6 +590,11 @@
               return row["聯絡資訊"] ? (JSON.parse(row["聯絡資訊"]).details || {}) : {};
             } catch (e) { return {}; }
           })(),
+          groupMembers: (() => {
+            try {
+              return row["聯絡資訊"] ? (JSON.parse(row["聯絡資訊"]).groupMembers || []) : [];
+            } catch (e) { return []; }
+          })(),
           saDetails: {
             sendState: row["是否已讀"] === '已讀' ? 'active' : 'dim',
             sendDate: row["ＳＡ"] || '',
@@ -635,7 +640,7 @@
           },
           cDetails: {
             meetDate: row["Ｃ"] || '',
-            meetState: row["Ｃ已成交"] === '已成交' ? 'confirmed' : '',
+            meetState: row["Ｃ已成交"] === '已成交' ? 'confirmed' : (row["Ｃ已成交"] === '簽單處理中' ? 'pending' : ''),
             meetTimeSlot: row["Ｃ時段"] || '',
             planState: row["Ｃ文件準備狀態"] || 'dim',
             planDate: row["Ｃ文件準備日期"] || '',
@@ -720,7 +725,7 @@
         "ＰＣ講解演練日期": pc.practiceDate || '',
         "ＰＣ已傳建議日期": pc.discussDate || '',
         "Ｃ": cc.meetDate || '',
-        "Ｃ已成交": cc.meetState === 'confirmed' ? '已成交' : '未成交',
+        "Ｃ已成交": cc.meetState === 'confirmed' ? '已成交' : (cc.meetState === 'pending' ? '簽單處理中' : '未成交'),
         "Ｃ文件準備狀態": cc.planState || 'dim',
         "Ｃ文件準備備忘": cc.planNotes || '',
         "Ｃ文件準備日期": cc.planDate || '',
@@ -750,7 +755,7 @@
         "緣故標籤": c.relativeTags ? c.relativeTags.join(',') : '',
         "ＳＡ備忘": sa.notes || '',
         "是否封存": c.archived ? '已封存' : '未封存',
-        "聯絡資訊": JSON.stringify({ methods: c.contactMethods || [], details: c.contactDetails || {} }),
+        "聯絡資訊": JSON.stringify({ methods: c.contactMethods || [], details: c.contactDetails || {}, groupMembers: c.groupMembers || [] }),
         "備註": c.note || '',
         "議題發想備忘": c.issueNote || '',
         "Ｃ時段": (c.cDetails ? c.cDetails.meetTimeSlot : '') || '',
@@ -1010,21 +1015,24 @@
       document.getElementById('settings-pane-issues').style.display = tab === 'issues' ? 'block' : 'none';
       document.getElementById('settings-pane-groups').style.display = tab === 'groups' ? 'block' : 'none';
       document.getElementById('settings-pane-rules').style.display = tab === 'rules' ? 'block' : 'none';
+      document.getElementById('settings-pane-products').style.display = tab === 'products' ? 'block' : 'none';
       
       document.getElementById('settings-tab-sync').classList.toggle('active', tab === 'sync');
       document.getElementById('settings-tab-reminder').classList.toggle('active', tab === 'reminder');
       document.getElementById('settings-tab-issues').classList.toggle('active', tab === 'issues');
       document.getElementById('settings-tab-groups').classList.toggle('active', tab === 'groups');
       document.getElementById('settings-tab-rules').classList.toggle('active', tab === 'rules');
+      document.getElementById('settings-tab-products').classList.toggle('active', tab === 'products');
       
       const actionBox = document.getElementById('settings-global-actions');
       if (actionBox) {
-        actionBox.style.display = (tab === 'sync' || tab === 'reminder' || tab === 'rules') ? 'flex' : 'none';
+        actionBox.style.display = (tab === 'sync' || tab === 'reminder' || tab === 'rules' || tab === 'products') ? 'flex' : 'none';
       }
       
       if (tab === 'issues') renderIssueList();
       if (tab === 'groups') renderGroupList();
       if (tab === 'rules') renderRulesPriorityList();
+      if (tab === 'products') renderSettingsProductsList();
     }
 
     function toggleSettingsModal(show) {
@@ -1309,6 +1317,32 @@
         loadTodos();
         debugLog("待辦事項本機快取載入完畢");
 
+        loadActivities();
+        if (!crmSettings.isOffline && crmSettings.apiUrl) {
+          pullActivitiesFromCloud();
+        }
+        debugLog("近期活動快取與雲端載入完畢");
+
+        loadProducts();
+        if (!crmSettings.isOffline && crmSettings.apiUrl) {
+          pullProductsFromCloud();
+        }
+        debugLog("保險產品快取與雲端載入完畢");
+
+        loadCanvassing();
+        if (!crmSettings.isOffline && crmSettings.apiUrl) {
+          pullCanvassingFromCloud();
+        }
+        debugLog("店家陌生開發本機與雲端載入完畢");
+
+        const btnOpenActivities = document.getElementById('btn-open-activities');
+        if (btnOpenActivities) {
+          btnOpenActivities.addEventListener('click', () => {
+            toggleActivitiesModal(true);
+          });
+        }
+        initActivitiesDragAndDrop();
+
       const modalCloseMap = {
         'add-case-modal':   () => toggleAddCaseModal(false),
         'settings-modal':   () => toggleSettingsModal(false),
@@ -1317,9 +1351,12 @@
         'add-todo-modal':   () => closeTodoModal(),
         'reminder-modal':   () => toggleReminderModal(false),
         'todo-notify-modal':() => toggleTodoNotifyModal(false),
+        'activities-modal': () => toggleActivitiesModal(false),
+        'products-review-modal': () => toggleProductsReviewModal(false),
         'add-customer-modal':() => closeAddCustomerModal(),
         'add-family-modal': () => closeAddFamilyModal(),
         'add-note-modal':   () => closeAddNoteModal(),
+        'add-canvassing-modal': () => closeCanvassingModal(),
       };
       Object.entries(modalCloseMap).forEach(([id, closeFn]) => {
         const overlay = document.getElementById(id);
@@ -1600,10 +1637,18 @@
       if (!crmSettings.isOffline && crmSettings.apiUrl) {
         debugLog("啟動雲端同步載入 (fetchCases)...");
         await fetchCustomersFromCloud();
+        await fetchProductsFromCloud();
+        await fetchFixedMessagesFromCloud();
+        await fetchSalesProcessesFromCloud();
+        await fetchIssuesFromCloud();
+        await fetchGroupsFromCloud();
         await fetchCases();
       } else {
         debugLog("啟動本機快取載入...");
         loadCustomers();
+        loadProducts();
+        loadFixedMessages();
+        loadSalesProcesses();
         loadCasesFromStorage();
         debugLog("本機快取載入完畢，準備渲染 (renderCases)...");
         renderCases();
@@ -1932,7 +1977,7 @@
         if (c.pcDetails && c.pcDetails.meetState === 'confirmed') {
           if (c.pcDetails.meetDate) targetDates.push(c.pcDetails.meetDate);
         }
-        if (c.cDetails && c.cDetails.meetState === 'confirmed') {
+        if (c.cDetails && (c.cDetails.meetState === 'confirmed' || c.cDetails.meetState === 'pending')) {
           if (c.cDetails.meetDate) targetDates.push(c.cDetails.meetDate);
         }
         if (c.sDetails && c.sDetails.meetState === 'confirmed') {
@@ -2006,7 +2051,7 @@
       } else if (phase === 'PC') {
         if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
       } else if (phase === 'C') {
-        if (c.cDetails && c.cDetails.meetState === 'confirmed') targetDate = c.cDetails.meetDate || '';
+        if (c.cDetails && (c.cDetails.meetState === 'confirmed' || c.cDetails.meetState === 'pending')) targetDate = c.cDetails.meetDate || '';
       } else if (phase === 'S') {
         if (c.sDetails && c.sDetails.meetState === 'confirmed') targetDate = c.sDetails.meetDate || '';
       }
@@ -2027,7 +2072,7 @@
         } else if (phase === 'PC') {
           if (c.pcDetails && c.pcDetails.meetState === 'confirmed') targetDate = c.pcDetails.meetDate || '';
         } else if (phase === 'C') {
-          if (c.cDetails && c.cDetails.meetState === 'confirmed') targetDate = c.cDetails.meetDate || '';
+          if (c.cDetails && (c.cDetails.meetState === 'confirmed' || c.cDetails.meetState === 'pending')) targetDate = c.cDetails.meetDate || '';
         } else if (phase === 'S') {
           if (c.sDetails && c.sDetails.meetState === 'confirmed') targetDate = c.sDetails.meetDate || '';
         }
@@ -2062,6 +2107,123 @@
     window.clearWeeklyDateFilter = function() {
       filterWeeklyDate = '';
       renderCases();
+    };
+
+    // ==========================================================================
+    // 🔒 個資去識別化與快捷鍵切換模組 (PII Anonymization & Option+H Toggle)
+    // ==========================================================================
+
+    let isAnonymized = true;
+    try {
+      const storedVal = localStorage.getItem('crm_is_anonymized');
+      if (storedVal !== null) {
+        isAnonymized = storedVal === 'true';
+      }
+    } catch(e) {
+      isAnonymized = true;
+    }
+
+    // 姓名去識別化演算法
+    window.maskName = function(str) {
+      if (!str || typeof str !== 'string' || !isAnonymized) return str || '';
+      
+      let prefix = '';
+      let realName = str;
+      if (str.startsWith('[團體] ')) {
+        prefix = '[團體] ';
+        realName = str.substring(5);
+      }
+      if (!realName) return str;
+
+      // 檢查是否包含中文字 (Unicode CJK 範圍)
+      const hasChinese = /[\u4e00-\u9fa5\u3400-\u4dbf]/.test(realName);
+      const chars = Array.from(realName);
+
+      if (hasChinese) {
+        // 中文去識別化規則
+        if (chars.length === 2) {
+          // 兩個中文字：只留第一個字，第二個字用大寫 O 代替 (例：王明 ➔ 王O)
+          return prefix + chars[0] + 'O';
+        } else if (chars.length >= 3) {
+          // 三個字（含）以上：留第一個與最後一個字，中間用大寫 O 代替 (例：陳小明 ➔ 陳O明，歐陽相如 ➔ 歐OO如)
+          const middleO = 'O'.repeat(chars.length - 2);
+          return prefix + chars[0] + middleO + chars[chars.length - 1];
+        } else {
+          return prefix + realName;
+        }
+      } else {
+        // 英文 / 非中文 去識別化規則：留第一個與最後一個字元，中間用 * 代替
+        if (chars.length === 2) {
+          return prefix + chars[0] + '*';
+        } else if (chars.length >= 3) {
+          const middleStar = '*'.repeat(chars.length - 2);
+          return prefix + chars[0] + middleStar + chars[chars.length - 1];
+        } else {
+          return prefix + realName;
+        }
+      }
+    };
+
+    window.getClientDisplayName = function(clientName) {
+      if (!clientName) return '';
+      const clean = clientName.startsWith('[團體] ') ? clientName.replace('[團體] ', '') : clientName;
+      return window.maskName(clean);
+    };
+
+    // 切換去識別化狀態 (Option + H 觸發)
+    window.toggleAnonymization = function(forceState) {
+      if (typeof forceState === 'boolean') {
+        isAnonymized = forceState;
+      } else {
+        isAnonymized = !isAnonymized;
+      }
+      try {
+        localStorage.setItem('crm_is_anonymized', isAnonymized ? 'true' : 'false');
+      } catch(e){}
+
+      if (isAnonymized) {
+        showToast('🔒 已啟用個資去識別化 (隱藏真實姓名)', 'info');
+      } else {
+        showToast('🔓 已停用個資去識別化 (顯示真實姓名)', 'success');
+      }
+
+      // 刷新 UI
+      if (typeof renderSidebarList === 'function') renderSidebarList();
+      if (typeof renderCases === 'function') renderCases();
+      if (typeof renderTodoPage === 'function') renderTodoPage();
+      if (typeof renderCustomerPage === 'function') renderCustomerPage();
+      if (typeof renderRecruitPage === 'function') renderRecruitPage();
+      if (typeof renderCanvassingPage === 'function') renderCanvassingPage();
+    };
+
+    window.moveCaseToFront = function(caseId, event) {
+      if (event) event.stopPropagation();
+      
+      const idx = cases.findIndex(c => c.id === caseId);
+      if (idx === -1) return;
+      
+      const c = cases[idx];
+      // 1. 從 cases 中取出
+      cases.splice(idx, 1);
+      // 2. 塞到最前面
+      cases.unshift(c);
+      
+      // 3. 儲存順序快取
+      saveCasesToStorage(true);
+      
+      // 4. 自動將排序模式設定為 manual（手動）
+      if (crmSettings.currentSortMode !== 'manual') {
+        crmSettings.currentSortMode = 'manual';
+        if (typeof saveSettings === 'function') {
+          saveSettings();
+        }
+      }
+      
+      // 5. 重新渲染
+      renderCases();
+      
+      // 6. 溫馨 Toast 提示
+      showToast(`已將 ${c.clientName} 移至手動排序最前端！🖐️`, 'success');
     };
 
     function renderCases() {
@@ -2104,7 +2266,7 @@
           if (c.pcDetails && c.pcDetails.meetState === 'confirmed') {
             if (c.pcDetails.meetDate) targetDates.push(c.pcDetails.meetDate);
           }
-          if (c.cDetails && c.cDetails.meetState === 'confirmed') {
+          if (c.cDetails && (c.cDetails.meetState === 'confirmed' || c.cDetails.meetState === 'pending')) {
             if (c.cDetails.meetDate) targetDates.push(c.cDetails.meetDate);
           }
           if (c.sDetails && c.sDetails.meetState === 'confirmed') {
@@ -2219,10 +2381,10 @@
           row.title = '拖曳即可調整案件先後順序';
         }
 
-        // 1. 險種 (壽/產)
+        // 1. 險種 (壽/產) - 點擊即可移至手動排序最前端，並自動切換為手動排序模式
         const typeText = c.type === 'life' ? '壽' : '產';
         const typeClass = c.type === 'life' ? 'life' : 'property';
-        const typeBadge = `<span class="type-badge ${typeClass}">${typeText}</span>`;
+        const typeBadge = `<span class="type-badge ${typeClass}" onclick="moveCaseToFront('${c.id}', event)" title="點選此符號即可將案件移至手動排序最前端">${typeText}</span>`;
 
         // 2. 案源 (自/開)
         const caseSourceText = c.caseSource === 'inbound' ? '自' : '開';
@@ -2295,6 +2457,10 @@
           visitTypeText = '咖';
           visitTypeClass = 'coffee-visit';
           visitTypeTitle = '咖啡訪';
+        } else if (c.visitType === 'call') {
+          visitTypeText = '電';
+          visitTypeClass = 'call-visit';
+          visitTypeTitle = '電訪';
         }
         const visitTypeBadge = `<span class="source-badge ${visitTypeClass}" title="訪談類型: ${visitTypeTitle}">${visitTypeText}</span>`;
 
@@ -2336,7 +2502,7 @@
               ${caseSourceBadge}
             </div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
-            <div class="client-name" onclick="openDrawer('${c.id}', 'client')">${(c.clientName || '').slice(0, 5)}</div>
+            <div class="client-name" onclick="openDrawer('${c.id}', 'client')" style="${(c.clientName || '').startsWith('[團體] ') ? 'text-decoration: underline dashed var(--color-sa); text-underline-offset: 3px;' : ''}">${(window.getClientDisplayName(c.clientName) || '').slice(0, 5)}</div>
             <span style="color:rgba(255,255,255,0.2); margin: 0 4px; font-size:0.75rem; font-weight:bold; flex-shrink:0;">｜</span>
             <div class="issue-start" onclick="openDrawer('${c.id}', 'issue')">${(c.issueName || '').slice(0, 5)}</div>
           </div>
@@ -3026,6 +3192,7 @@
                   <button type="button" class="btn btn-tab ${c.visitType === 'life' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'life')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">生活訪</button>
                   <button type="button" class="btn btn-tab ${c.visitType === 'service' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'service')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">服務訪</button>
                   <button type="button" class="btn btn-tab ${c.visitType === 'coffee' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'coffee')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">咖啡訪</button>
+                  <button type="button" class="btn btn-tab ${c.visitType === 'call' ? 'active' : ''}" onclick="updateCaseField('${c.id}', 'visitType', 'call')" style="flex: 1; justify-content: center; font-size: 0.75rem; padding: 4px 6px; min-width: max-content; white-space: nowrap;">電訪</button>
                 </div>
               </div>
               <div>
@@ -3055,6 +3222,29 @@
               <label style="font-size: 0.75rem;">介紹人姓名</label>
               <input type="text" value="${c.referrerName || ''}" placeholder="是誰介紹來的？" onchange="updateCaseField('${c.id}', 'referrerName', this.value)" style="height: 24px; font-size: 0.78rem; padding: 4px 6px;">
             </div>
+            ${c.clientName.startsWith('[團體]') ? `
+            <div style="margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+              <label style="display: block; font-size: 0.75rem; margin-bottom: 6px; color: var(--text-secondary); font-weight: 600;">參與成員名單</label>
+              <div id="group-members-container-${c.id}" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+                ${(c.groupMembers || []).map(mId => {
+                  const member = cases.find(x => x.id === mId);
+                  if (!member) return '';
+                  return `
+                    <span class="source-badge" style="background: rgba(56,189,248,0.12); border-color: rgba(56,189,248,0.3); color: #38bdf8; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; font-size: 0.72rem; border-radius: 4px;">
+                      <span style="cursor: pointer;" onclick="openDrawer('${member.id}', 'client', true)">${member.clientName}</span>
+                      <span onclick="event.stopPropagation(); removeGroupMember('${c.id}', '${member.id}')" style="color: var(--text-secondary); font-weight: bold; margin-left: 2px; cursor: pointer;" title="移除成員">✕</span>
+                    </span>
+                  `;
+                }).join('') || '<span style="font-size:0.72rem; color:var(--text-secondary);">尚未新增成員</span>'}
+              </div>
+              <div style="display: flex; gap: 4px; position: relative; width: 100%;">
+                <input type="text" id="group-member-search-${c.id}" placeholder="🔍 輸入姓名關鍵字搜尋..." oninput="filterGroupMembers('${c.id}')" onfocus="filterGroupMembers('${c.id}')" onblur="setTimeout(() => { const box = document.getElementById('group-member-autocomplete-${c.id}'); if(box) box.style.display = 'none'; }, 200)" style="flex: 1; height: 24px; font-size: 0.75rem; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; border-radius: 4px; padding: 4px 6px;" autocomplete="off">
+                <input type="hidden" id="group-member-val-${c.id}">
+                <button type="button" class="btn btn-primary" onclick="addGroupMember('${c.id}')" style="height: 24px; padding: 0 8px; font-size: 0.72rem; line-height: 24px; display: flex; align-items: center;">加入</button>
+                <div id="group-member-autocomplete-${c.id}" class="search-autocomplete-box" style="display: none;"></div>
+              </div>
+            </div>
+            ` : ''}
           </div>
 
           <!-- 右面版：備忘備註 -->
@@ -3072,6 +3262,92 @@
         </div>
       `;
     }
+
+    window.filterGroupMembers = function(caseId) {
+      const input = document.getElementById(`group-member-search-${caseId}`);
+      const box = document.getElementById(`group-member-autocomplete-${caseId}`);
+      if (!input || !box) return;
+
+      const q = input.value.trim().toLowerCase();
+      const currentCase = cases.find(x => x.id === caseId);
+      const curMembers = currentCase ? (currentCase.groupMembers || []) : [];
+      
+      const filtered = cases.filter(x => {
+        return x.id !== caseId && 
+               !x.clientName.startsWith('[團體]') && 
+               !curMembers.includes(x.id) &&
+               x.clientName.toLowerCase().includes(q);
+      });
+
+      if (filtered.length === 0) {
+        box.style.display = 'none';
+        return;
+      }
+
+      box.innerHTML = filtered.map(x => `
+        <div class="search-autocomplete-item" onclick="selectGroupMemberSearch('${caseId}', '${x.id}', '${x.clientName}')">${x.clientName}</div>
+      `).join('');
+      box.style.display = 'block';
+    };
+
+    window.selectGroupMemberSearch = function(caseId, memberId, memberName) {
+      const input = document.getElementById(`group-member-search-${caseId}`);
+      const valInput = document.getElementById(`group-member-val-${caseId}`);
+      const box = document.getElementById(`group-member-autocomplete-${caseId}`);
+      if (input) input.value = memberName;
+      if (valInput) valInput.value = memberId;
+      if (box) box.style.display = 'none';
+    };
+
+    window.addGroupMember = function(caseId) {
+      const valInput = document.getElementById(`group-member-val-${caseId}`);
+      if (!valInput) return;
+      let memberId = valInput.value;
+      
+      // 防呆：若使用者直接打字沒有點選選單，嘗試進行模糊匹配
+      if (!memberId) {
+        const input = document.getElementById(`group-member-search-${caseId}`);
+        const name = input ? input.value.trim() : '';
+        if (name) {
+          const matched = cases.find(x => x.clientName === name && !x.clientName.startsWith('[團體]'));
+          if (matched) {
+            memberId = matched.id;
+          }
+        }
+      }
+
+      if (!memberId) {
+        showToast('請輸入或選擇有效的成員姓名！', 'error');
+        return;
+      }
+
+      updateCase(caseId, item => {
+        if (!item.groupMembers) item.groupMembers = [];
+        if (!item.groupMembers.includes(memberId)) {
+          item.groupMembers.push(memberId);
+        }
+      });
+      // 重新整理抽屜內容
+      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+      if (drawerContent) {
+        const activeSection = document.getElementById(`drawer-row-${caseId}`).dataset.activeSection;
+        openDrawer(caseId, activeSection, true);
+      }
+    };
+
+    window.removeGroupMember = function(caseId, memberId) {
+      updateCase(caseId, item => {
+        if (item.groupMembers) {
+          item.groupMembers = item.groupMembers.filter(id => id !== memberId);
+        }
+      });
+      // 重新整理抽屜內容
+      const drawerContent = document.getElementById(`drawer-content-${caseId}`);
+      if (drawerContent) {
+        const activeSection = document.getElementById(`drawer-row-${caseId}`).dataset.activeSection;
+        openDrawer(caseId, activeSection, true);
+      }
+    };
 
 
 
@@ -3636,7 +3912,7 @@
                           </button>
                         </div>
                         <input type="text" readonly id="date-input-${c.id}-planState" value="${oa.planDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'planDate', 'oa')" placeholder="規劃日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
-                        <textarea style="height:150px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:4px; width:100%; box-sizing:border-box;" placeholder="備忘或討論要點..." onchange="updateOAField('${c.id}', 'planNotes', this.value)">${oa.planNotes || ''}</textarea>
+                        <textarea style="height:150px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:4px; width:100%; box-sizing:border-box;" placeholder="激發興趣與提問設計..." onchange="updateOAField('${c.id}', 'planNotes', this.value)">${oa.planNotes || ''}</textarea>
                       </div>
                     </div>
                   </div>
@@ -3870,6 +4146,17 @@
               <div style="display:flex; gap:4px;">
                 <button class="status-badge-btn ${cc.meetState === 'pending' ? 'active' : ''}" data-type="intent-pending" onclick="updateCField('${c.id}', 'meetState', 'pending')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">簽單處理中</button>
                 <button class="status-badge-btn ${cc.meetState === 'confirmed' ? 'active' : ''}" data-type="agree" onclick="updateCField('${c.id}', 'meetState', 'confirmed')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">已送件簽署</button>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <span style="font-size:0.7rem; color:var(--text-secondary);">約定時間時段</span>
+              <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:3px;">
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'before_lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'before_lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐前</button>
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐</button>
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'afternoon_1' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'afternoon_1')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午一</button>
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'afternoon_2' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'afternoon_2')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午二</button>
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐</button>
+                <button type="button" class="status-badge-btn ${cc.meetTimeSlot === 'after_dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 'c', 'after_dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐後</button>
               </div>
             </div>
           </div>
@@ -4236,6 +4523,7 @@
     }
     function saveCustomGroups(groups) {
       localStorage.setItem('crm_groups', JSON.stringify(groups));
+      saveGroupsToCloud();
     }
 
     // 議題資料存取
@@ -4244,6 +4532,7 @@
     }
     function saveCustomIssues(issues) {
       localStorage.setItem('crm_issues', JSON.stringify(issues));
+      saveIssuesToCloud();
     }
 
     // 取得分群完整 label（含 emoji）
@@ -4424,152 +4713,61 @@
       const urgentCount = expiredCount + todayCount;
       const totalCount = urgentCount + futureCount;
 
-      if (totalCount > 0) {
-        btn.style.display = 'inline-block';
-        badge.innerText = totalCount;
-        
-        // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
-        if (urgentCount > 0) {
-          btn.classList.add('reminder-active-glow');
-          btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
-        } else {
-          btn.classList.remove('reminder-active-glow');
-          btn.title = "💡 有 " + futureCount + " 筆未來送件預告。點擊查看看板";
-        }
-      } else {
-        btn.style.display = 'none';
-      }
-    }
-
-// Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
-    function getSubmitBtnClass(c) {
-      let baseClass = 'sub-tag-btn';
-      if (!c || !c.cDetails) return baseClass;
-      if (c.cDetails.submitState === 'active') {
-        baseClass += ' active c-submit';
-      } else if (c.cDetails.submitState === 'ongoing') {
-        baseClass += ' ongoing-magenta';
-      }
-      
-      // 若已送件處理，回傳預設樣式
-      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
-        const d = new Date();
-        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-        const twDate = new Date(utc + (3600000 * 8));
-        const yyyy = twDate.getFullYear();
-        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(twDate.getDate()).padStart(2, '0');
-        const todayStr = yyyy + "-" + mm + "-" + dd;
-        
-        // 取得預告天數限制
-        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
-        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
-        const ly = limitDate.getFullYear();
-        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
-        const ld = String(limitDate.getDate()).padStart(2, '0');
-        const limitDateStr = ly + "-" + lm + "-" + ld;
-        
-        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
-        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
-        if (sDate < todayStr) {
-          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
-        } else if (sDate === todayStr) {
-          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
-        } else if (sDate > todayStr && sDate <= limitDateStr) {
-          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
-        }
-      }
-      return baseClass;
-    }
-
-    // 計算與更新全域提醒喚醒按鈕狀態
-    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
-      const btn = document.getElementById('btn-open-reminder');
-      const badge = document.getElementById('reminder-global-badge');
-      if (!btn || !badge) return;
-
-      const urgentCount = expiredCount + todayCount;
-      const totalCount = urgentCount + futureCount;
-
-      if (totalCount > 0) {
-        btn.style.display = 'inline-block';
-        badge.innerText = totalCount;
-        
-        // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
-        if (urgentCount > 0) {
-          btn.classList.add('reminder-active-glow');
-          btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
-        } else {
-          btn.classList.remove('reminder-active-glow');
-          btn.title = "💡 有 " + futureCount + " 筆未來送件預告。點擊查看看板";
-        }
-      } else {
-        btn.style.display = 'none';
-      }
-    }
-
-// Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
-    function getSubmitBtnClass(c) {
-      let baseClass = 'sub-tag-btn';
-      if (!c || !c.cDetails) return baseClass;
-      if (c.cDetails.submitState === 'active') {
-        baseClass += ' active c-submit';
-      } else if (c.cDetails.submitState === 'ongoing') {
-        baseClass += ' ongoing-magenta';
-      }
-      
-      // 若已送件處理，回傳預設樣式
-      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
-        const d = new Date();
-        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-        const twDate = new Date(utc + (3600000 * 8));
-        const yyyy = twDate.getFullYear();
-        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(twDate.getDate()).padStart(2, '0');
-        const todayStr = yyyy + "-" + mm + "-" + dd;
-        
-        // 取得預告天數限制
-        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
-        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
-        const ly = limitDate.getFullYear();
-        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
-        const ld = String(limitDate.getDate()).padStart(2, '0');
-        const limitDateStr = ly + "-" + lm + "-" + ld;
-        
-        // 核心修正：將日期的斜線 / 統一轉換為橫線 -，防範 ASCII 字串大小判定錯亂
-        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
-        if (sDate < todayStr) {
-          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
-        } else if (sDate === todayStr) {
-          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
-        } else if (sDate > todayStr && sDate <= limitDateStr) {
-          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
-        }
-      }
-      return baseClass;
-    }
-
-    // 計算與更新全域提醒喚醒按鈕狀態
-    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
-      const btn = document.getElementById('btn-open-reminder');
-      const badge = document.getElementById('reminder-global-badge');
-      if (!btn || !badge) return;
-
-      const urgentCount = expiredCount + todayCount;
-      const totalCount = urgentCount + futureCount;
-
-      // 即使 totalCount 為 0，按鈕也要常駐顯示以供使用者點選叫出通知畫面
-      btn.style.display = 'inline-block';
+      btn.style.display = 'none';
       badge.innerText = totalCount;
-      
-      // 如果有「已過期」或「今天」等需要立刻被解決的案件，按鈕變更為呼吸發光
-      if (urgentCount > 0) {
-        btn.classList.add('reminder-active-glow');
-        btn.title = "⚠️ 有 " + urgentCount + " 筆送件已過期或今天到期！點擊查看看板";
-      } else {
-        btn.classList.remove('reminder-active-glow');
-        btn.title = "💡 時程提醒看板。點擊查看看板";
+    }
+
+// Ｃ送件階段專屬紅黃綠亮燈邏輯與未來呼吸預警樣式輔助
+    function getSubmitBtnClass(c) {
+      let baseClass = 'sub-tag-btn';
+      if (!c || !c.cDetails) return baseClass;
+
+      if (c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const yyyy = twDate.getFullYear();
+        const mm = String(twDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(twDate.getDate()).padStart(2, '0');
+        const todayStr = yyyy + "-" + mm + "-" + dd;
+        
+        const limitDays = (window.crmSettings && window.crmSettings.reminderDaysLimit) ? window.crmSettings.reminderDaysLimit : 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const ly = limitDate.getFullYear();
+        const lm = String(limitDate.getMonth() + 1).padStart(2, '0');
+        const ld = String(limitDate.getDate()).padStart(2, '0');
+        const limitDateStr = ly + "-" + lm + "-" + ld;
+        
+        const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+        if (sDate < todayStr) {
+          return baseClass + ' submit-light-expired'; // 🔴 過期紅燈
+        } else if (sDate === todayStr) {
+          return baseClass + ' submit-light-today'; // 🟡 當天黃燈
+        } else if (sDate > todayStr && sDate <= limitDateStr) {
+          return baseClass + ' submit-light-future'; // 🟢 未來綠燈（呼吸發光）
+        }
       }
+
+      if (c.cDetails.submitState === 'active') {
+        baseClass += ' active c-submit';
+      } else if (c.cDetails.submitState === 'ongoing') {
+        baseClass += ' ongoing-c';
+      }
+
+      return baseClass;
+    }
+
+    // 計算與更新全域提醒喚醒按鈕狀態
+    function updateGlobalReminderIcon(expiredCount, todayCount, futureCount, expiredList, todayList, futureList) {
+      const btn = document.getElementById('btn-open-reminder');
+      const badge = document.getElementById('reminder-global-badge');
+      if (!btn || !badge) return;
+
+      const urgentCount = expiredCount + todayCount;
+      const totalCount = urgentCount + futureCount;
+
+      btn.style.display = 'none';
+      badge.innerText = totalCount;
     }
 
     function checkAndShowDailyReminders() {
@@ -4661,7 +4859,7 @@
             <div style="display:flex; flex-direction:column; gap:4px; min-width: 0; flex: 1;">
               <div style="display:flex; align-items:center; gap:6px;">
                 <span class="type-badge ${typeClass}">${typeText}</span>
-                <span style="font-weight:700; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.clientName}</span>
+                <span style="font-weight:700; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${window.getClientDisplayName(c.clientName)}</span>
               </div>
               <div style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 議題：${issueText}
@@ -5486,6 +5684,7 @@
 
     // --- 資料存取 ---
     let todos = [];
+    let canvassing = [];
 
     function loadTodos() {
       try {
@@ -5508,21 +5707,1606 @@
     async function syncTodosToCloud() {
       if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
       try {
-        await fetch(crmSettings.apiUrl, {
+        const resp = await fetch(crmSettings.apiUrl, {
           method: 'POST',
           mode: 'cors',
           headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: 'saveTodos', todos: todos }),
         });
-        debugLog('☁️ 待辦事項已同步至雲端：' + todos.length + ' 筆');
+        const resJson = await resp.json();
+        if (resJson && resJson.status === 'success') {
+          debugLog('☁️ 待辦事項已同步至雲端：' + todos.length + ' 筆 | ' + (resJson.message || ''));
+        } else {
+          debugLog('⚠️ 待辦事項雲端同步回應失敗：' + (resJson ? resJson.message : '無回應訊息'));
+        }
       } catch(err) {
-        debugLog('⚠️ 待辦事項雲端同步失敗：' + err.message);
+        debugLog('⚠️ 待辦事項網路傳送失敗：' + err.message);
       }
     }
 
     function genTodoId() {
       return 'todo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     }
+
+    // --- 近期活動相關邏輯 ---
+    let activities = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function loadActivities() {
+      try {
+        const raw = localStorage.getItem('crm_activities');
+        activities = raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        activities = [];
+      }
+      updateActivitiesBadge();
+    }
+
+    function saveActivities() {
+      localStorage.setItem('crm_activities', JSON.stringify(activities));
+      syncActivitiesToCloud();
+      updateActivitiesBadge();
+    }
+
+    async function syncActivitiesToCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveActivities', activities: activities }),
+        });
+        debugLog('☁️ 近期活動已同步至雲端：' + activities.length + ' 筆');
+      } catch(err) {
+        debugLog('⚠️ 近期活動雲端同步失敗：' + err.message);
+      }
+    }
+
+    async function pullActivitiesFromCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const res = await fetch(crmSettings.apiUrl + '?type=activities');
+        const json = await res.json();
+        if (json.status === 'success' && Array.isArray(json.activities)) {
+          activities = json.activities;
+          localStorage.setItem('crm_activities', JSON.stringify(activities));
+          updateActivitiesBadge();
+          debugLog('☁️ 近期活動自雲端拉取成功：' + activities.length + ' 筆');
+        }
+      } catch(err) {
+        debugLog('⚠️ 載入雲端活動資料失敗：' + err.message);
+      }
+    }
+
+    function updateActivitiesBadge() {
+      const activeCount = activities.filter(a => a.status === 'active' || a.status === true || a.status === 'true').length;
+      const badge = document.getElementById('activity-global-badge');
+      const btn = document.getElementById('btn-open-activities');
+      if (badge && btn) {
+        badge.innerText = activeCount;
+        btn.style.display = 'none';
+      }
+    }
+
+    let activitiesModalCallback = null;
+    function toggleActivitiesModal(show, callback) {
+      const modal = document.getElementById('activities-modal');
+      if (!modal) return;
+      if (show) {
+        activitiesModalCallback = callback || null;
+        modal.classList.add('active');
+        renderActivitiesList();
+        
+        // 自動顯示第一個啟用中的活動，若無則顯示第一個活動
+        const firstAct = activities.find(a => a.status === 'active' || a.status === true || a.status === 'true') || activities[0];
+        if (firstAct) {
+          setTimeout(() => {
+            const firstItemDiv = document.querySelector(`.activity-item[data-id="${firstAct.id}"]`);
+            if (firstItemDiv) {
+              document.querySelectorAll('.activity-item').forEach(item => item.classList.remove('active'));
+              firstItemDiv.classList.add('active');
+            }
+            showActivityDetail(firstAct);
+          }, 50);
+        }
+      } else {
+        modal.classList.remove('active');
+        if (activitiesModalCallback) {
+          const cb = activitiesModalCallback;
+          activitiesModalCallback = null;
+          cb();
+        }
+      }
+    }
+
+    function renderActivitiesList() {
+      const container = document.getElementById('activities-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+      
+      if (activities.length === 0) {
+        container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:20px 0;">目前無活動項目</div>';
+        document.getElementById('activity-detail-empty').style.display = 'flex';
+        document.getElementById('activity-detail-content').style.display = 'none';
+        document.getElementById('activity-editor-box').style.display = 'none';
+        return;
+      }
+      
+      activities.forEach((a, idx) => {
+        const div = document.createElement('div');
+        div.className = 'activity-item';
+        div.setAttribute('data-id', a.id);
+        div.setAttribute('draggable', 'true');
+        div.style.cursor = 'grab';
+        div.title = '拖曳即可調整活動通知順序';
+        
+        const isAct = a.status === 'active' || a.status === true || a.status === 'true';
+        if (!isAct) {
+          div.style.opacity = '0.5';
+        }
+        div.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; width: 100%;">
+            <div class="activity-item-title" style="flex: 1;">${escapeHtml(a.title)}${!isAct ? ' <span style="font-size:0.7rem; color:var(--text-secondary);">[已停用]</span>' : ''}</div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;" onclick="event.stopPropagation();">
+              <span onclick="openActivityEditor('${a.id}')" style="cursor: pointer; font-size: 0.8rem;" title="編輯">✏️</span>
+              <span onclick="deleteActivityItem('${a.id}')" style="cursor: pointer; font-size: 0.8rem;" title="刪除">🗑️</span>
+            </div>
+          </div>
+          <div class="activity-item-date">📅 ${escapeHtml(a.date)}</div>
+        `;
+        div.addEventListener('click', () => {
+          document.querySelectorAll('.activity-item').forEach(item => item.classList.remove('active'));
+          div.classList.add('active');
+          showActivityDetail(a);
+        });
+        container.appendChild(div);
+      });
+    }
+
+    function showActivityDetail(activity) {
+      document.getElementById('activity-detail-empty').style.display = 'none';
+      document.getElementById('activity-editor-box').style.display = 'none';
+      const content = document.getElementById('activity-detail-content');
+      content.style.display = 'flex';
+      
+      document.getElementById('activity-detail-title').innerText = activity.title;
+      document.getElementById('activity-detail-date').innerText = '活動期間/日期：' + activity.date;
+      
+      const imgBox = document.getElementById('activity-detail-image-box');
+      const img = document.getElementById('activity-detail-img');
+      if (activity.imageUrl && activity.imageUrl.trim() !== '') {
+        img.src = activity.imageUrl.trim();
+        imgBox.style.display = 'block';
+      } else {
+        imgBox.style.display = 'none';
+      }
+      
+      document.getElementById('activity-detail-text').innerText = activity.content;
+    }
+
+    window.openActivityEditor = function(id = '') {
+      document.getElementById('activity-detail-empty').style.display = 'none';
+      document.getElementById('activity-detail-content').style.display = 'none';
+      document.getElementById('activity-editor-box').style.display = 'flex';
+      
+      if (id) {
+        document.getElementById('activity-editor-title-label').innerText = '✏️ 編輯活動項目';
+        const a = activities.find(item => item.id === id);
+        if (a) {
+          document.getElementById('edit-activity-id').value = a.id;
+          document.getElementById('edit-activity-title').value = a.title;
+          document.getElementById('edit-activity-date').value = a.date;
+          document.getElementById('edit-activity-imageurl').value = a.imageUrl;
+          document.getElementById('edit-activity-content').value = a.content;
+          document.getElementById('edit-activity-status').checked = a.status === 'active' || a.status === true || a.status === 'true';
+        }
+      } else {
+        document.getElementById('activity-editor-title-label').innerText = '＋ 新增活動項目';
+        document.getElementById('edit-activity-id').value = '';
+        document.getElementById('edit-activity-title').value = '';
+        document.getElementById('edit-activity-date').value = '';
+        document.getElementById('edit-activity-imageurl').value = '';
+        document.getElementById('edit-activity-content').value = '';
+        document.getElementById('edit-activity-status').checked = true;
+        
+        document.querySelectorAll('.activity-item').forEach(item => item.classList.remove('active'));
+      }
+    };
+
+    window.closeActivityEditor = function() {
+      document.getElementById('activity-editor-box').style.display = 'none';
+      document.getElementById('edit-activity-file').value = '';
+      
+      const activeItem = document.querySelector('.activity-item.active');
+      if (activeItem) {
+        const id = activeItem.getAttribute('data-id');
+        const a = activities.find(item => item.id === id);
+        if (a) {
+          showActivityDetail(a);
+          return;
+        }
+      }
+      document.getElementById('activity-detail-empty').style.display = 'flex';
+    };
+
+    window.saveActivityItem = function() {
+      const id = document.getElementById('edit-activity-id').value;
+      const title = document.getElementById('edit-activity-title').value.trim();
+      const date = document.getElementById('edit-activity-date').value.trim();
+      const imageUrl = document.getElementById('edit-activity-imageurl').value.trim();
+      const content = document.getElementById('edit-activity-content').value.trim();
+      const status = document.getElementById('edit-activity-status').checked ? 'active' : 'inactive';
+      
+      if (!title) {
+        showToast('活動標題為必填欄位！', 'error');
+        return;
+      }
+      
+      let targetActivity = null;
+      if (id) {
+        const a = activities.find(item => item.id === id);
+        if (a) {
+          a.title = title;
+          a.date = date;
+          a.imageUrl = imageUrl;
+          a.content = content;
+          a.status = status;
+          targetActivity = a;
+        }
+      } else {
+        targetActivity = {
+          id: 'act_' + Date.now(),
+          title: title,
+          date: date,
+          imageUrl: imageUrl,
+          content: content,
+          status: status
+        };
+        activities.push(targetActivity);
+      }
+      
+      saveActivities();
+      renderActivitiesList();
+      
+      if (targetActivity) {
+        const itemDiv = document.querySelector(`.activity-item[data-id="${targetActivity.id}"]`);
+        if (itemDiv) {
+          document.querySelectorAll('.activity-item').forEach(item => item.classList.remove('active'));
+          itemDiv.classList.add('active');
+        }
+        showActivityDetail(targetActivity);
+      } else {
+        closeActivityEditor();
+      }
+      showToast('活動儲存成功 💾', 'success');
+    };
+
+    window.deleteActivityItem = function(id) {
+      if (confirm('確定要刪除此活動項目嗎？此動作將立即同步！')) {
+        activities = activities.filter(item => item.id !== id);
+        saveActivities();
+        renderActivitiesList();
+        
+        document.getElementById('activity-editor-box').style.display = 'none';
+        document.getElementById('activity-detail-content').style.display = 'none';
+        document.getElementById('activity-detail-empty').style.display = 'flex';
+        showToast('活動已刪除 🗑️', 'success');
+      }
+    };
+
+    window.uploadActivityFile = async function(input) {
+      const file = input.files[0];
+      if (!file) return;
+      
+      const statusLabel = document.getElementById('activity-upload-status');
+      if (statusLabel) {
+        statusLabel.style.display = 'inline-block';
+        statusLabel.innerText = '圖片上傳中...';
+      }
+      
+      try {
+        if (crmSettings.isOffline || !crmSettings.apiUrl) {
+          throw new Error('目前處於離線模式，上傳檔案功能僅支援雲端同步模式下使用！');
+        }
+        
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          const base64Data = e.target.result;
+          try {
+            const response = await fetch(crmSettings.apiUrl, {
+              method: 'POST',
+              mode: 'cors',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({
+                action: 'uploadActivityImage',
+                fileName: file.name,
+                mimeType: file.type,
+                base64Data: base64Data
+              })
+            });
+            const result = await response.json();
+            if (result.status === 'success' && result.url) {
+              document.getElementById('edit-activity-imageurl').value = result.url;
+              showToast('圖片上傳成功，已帶入 Google Drive 網址！', 'success');
+              if (statusLabel) statusLabel.style.display = 'none';
+            } else {
+              throw new Error(result.message || '上傳失敗，請檢查 API 回應');
+            }
+          } catch(err) {
+            console.error(err);
+            showToast(err.message, 'error');
+            if (statusLabel) {
+              statusLabel.innerText = '⚠️ 上傳失敗';
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      } catch(err) {
+        showToast(err.message, 'error');
+        if (statusLabel) statusLabel.style.display = 'none';
+        input.value = '';
+      }
+    };
+
+    window.toggleActivitiesModal = toggleActivitiesModal;
+
+    window.zoomActivityImage = function(src) {
+      if (!src) return;
+      const lightbox = document.getElementById('image-lightbox-modal');
+      const img = document.getElementById('lightbox-img');
+      if (lightbox && img) {
+        img.src = src;
+        lightbox.classList.add('active');
+      }
+    };
+
+    window.closeImageLightbox = function() {
+      const lightbox = document.getElementById('image-lightbox-modal');
+      if (lightbox) {
+        lightbox.classList.remove('active');
+      }
+    };
+
+    function initActivitiesDragAndDrop() {
+      const container = document.getElementById('activities-list-container');
+      if (!container) return;
+      
+      container.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.activity-item');
+        if (!item) return;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      
+      container.addEventListener('dragend', (e) => {
+        const item = e.target.closest('.activity-item');
+        if (!item) return;
+        item.classList.remove('dragging');
+        
+        const items = Array.from(container.querySelectorAll('.activity-item'));
+        const newOrderIds = items.map(el => el.getAttribute('data-id'));
+        
+        const newActivities = [];
+        newOrderIds.forEach(id => {
+          const act = activities.find(a => a.id === id);
+          if (act) newActivities.push(act);
+        });
+        activities = newActivities;
+        saveActivities();
+      });
+      
+      container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const dragging = container.querySelector('.activity-item.dragging');
+        if (!dragging) return;
+        
+        const target = e.target.closest('.activity-item');
+        if (!target || target === dragging) return;
+        
+        const bounding = target.getBoundingClientRect();
+        const offset = e.clientY - bounding.top;
+        const isAfter = offset > bounding.height / 2;
+        
+        if (isAfter) {
+          if (target.nextSibling) {
+            container.insertBefore(dragging, target.nextSibling);
+          } else {
+            container.appendChild(dragging);
+          }
+        } else {
+          container.insertBefore(dragging, target);
+        }
+      });
+    }
+
+    // ==========================================================================
+    // 🛡️ 保險產品資料庫 & 專業知識複習核心 (Products Step 6)
+    // ==========================================================================
+    let products = [];
+
+    function loadProducts() {
+      try {
+        const raw = localStorage.getItem('crm_products');
+        products = raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        products = [];
+      }
+    }
+
+    function saveProducts() {
+      localStorage.setItem('crm_products', JSON.stringify(products));
+      syncProductsToCloud();
+    }
+
+    async function syncProductsToCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveProducts', products: products }),
+        });
+        debugLog('☁️ 保險產品已同步至雲端：' + products.length + ' 筆');
+      } catch(err) {
+        debugLog('⚠️ 保險產品雲端同步失敗：' + err.message);
+      }
+    }
+
+    async function pullProductsFromCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const res = await fetch(crmSettings.apiUrl + '?type=products');
+        const json = await res.json();
+        if (json.status === 'success' && Array.isArray(json.products)) {
+          products = json.products;
+          localStorage.setItem('crm_products', JSON.stringify(products));
+          debugLog('☁️ 保險產品自雲端拉取成功：' + products.length + ' 筆');
+        }
+      } catch(err) {
+        debugLog('⚠️ 載入雲端產品資料失敗：' + err.message);
+      }
+    }
+
+    // === 產品管理與設定維護 (新增與刪除均移至第六通知面板) ===
+    let productViewMode = 'card'; // 'card' or 'table'
+
+    window.toggleProductViewMode = function() {
+      productViewMode = productViewMode === 'card' ? 'table' : 'card';
+      const btn = document.getElementById('btn-prod-toggle-view');
+      if (btn) {
+        btn.textContent = productViewMode === 'card' ? '🎴 切換為表格' : '📋 切換為卡片';
+      }
+      renderProductsReviewList();
+    };
+
+    window.clearProductForm = function() {
+      document.getElementById('prod-edit-id').value = '';
+      document.getElementById('prod-input-name').value = '';
+      document.getElementById('prod-input-category').value = '壽險';
+      document.getElementById('prod-input-gender').value = '皆可';
+      document.getElementById('prod-input-age').value = '';
+      document.getElementById('prod-input-period').value = '';
+      document.getElementById('prod-input-sum-assured').value = '';
+      document.getElementById('prod-input-premium').value = '';
+      document.getElementById('prod-input-note').value = '';
+      document.getElementById('prod-input-status').checked = true;
+    };
+
+    window.openProductEditor = function(id = null) {
+      document.getElementById('product-detail-empty').style.display = 'none';
+      document.getElementById('product-detail-content').style.display = 'none';
+      document.getElementById('product-editor-box').style.display = 'flex';
+      
+      clearProductForm();
+      
+      const titleLabel = document.getElementById('product-editor-title-label');
+      if (id) {
+        // 編輯模式
+        loadProducts();
+        const p = products.find(prod => prod.id === id);
+        if (p) {
+          if (titleLabel) titleLabel.textContent = '✏️ 編輯產品項目';
+          document.getElementById('prod-edit-id').value = p.id;
+          document.getElementById('prod-input-name').value = p.name;
+          document.getElementById('prod-input-category').value = p.category;
+          document.getElementById('prod-input-gender').value = p.gender;
+          document.getElementById('prod-input-age').value = p.age || '';
+          document.getElementById('prod-input-period').value = p.period || '';
+          document.getElementById('prod-input-sum-assured').value = p.sumAssured || '';
+          document.getElementById('prod-input-premium').value = p.premium || '';
+          document.getElementById('prod-input-note').value = p.note;
+          document.getElementById('prod-input-status').checked = p.status === 'active' || p.status === true || p.status === 'true';
+        }
+      } else {
+        if (titleLabel) titleLabel.textContent = '＋ 新增產品項目';
+      }
+    };
+
+    window.closeProductEditor = function() {
+      document.getElementById('product-editor-box').style.display = 'none';
+      
+      // 自動回到對應選中的產品詳情，或空狀態
+      const activeItem = document.querySelector('#products-review-list-container [data-id].active');
+      const activeId = activeItem ? activeItem.getAttribute('data-id') : null;
+      
+      if (activeId) {
+        const p = products.find(prod => prod.id === activeId);
+        if (p) {
+          showProductDetail(p);
+          return;
+        }
+      }
+      document.getElementById('product-detail-empty').style.display = 'flex';
+    };
+
+    window.showProductDetail = function(p) {
+      document.getElementById('product-detail-empty').style.display = 'none';
+      document.getElementById('product-editor-box').style.display = 'none';
+      const detailBox = document.getElementById('product-detail-content');
+      detailBox.style.display = 'flex';
+
+      document.getElementById('product-detail-category').textContent = p.category;
+      document.getElementById('product-detail-name').textContent = p.name;
+
+      const paramsDiv = document.getElementById('product-detail-params');
+      paramsDiv.innerHTML = '';
+      
+      const paramBadges = [];
+      if (p.gender && p.gender !== '皆可') paramBadges.push(`<span style="background:rgba(255,255,255,0.05); padding:2.5px 7px; border-radius:4px; font-size:0.75rem;">性別: ${escapeHtml(p.gender)}</span>`);
+      if (p.age) paramBadges.push(`<span style="background:rgba(255,255,255,0.05); padding:2.5px 7px; border-radius:4px; font-size:0.75rem;">年齡: ${escapeHtml(p.age)}</span>`);
+      if (p.period) paramBadges.push(`<span style="background:rgba(255,255,255,0.05); padding:2.5px 7px; border-radius:4px; font-size:0.75rem;">年期: ${escapeHtml(p.period)}</span>`);
+      if (p.sumAssured) paramBadges.push(`<span style="background:rgba(255,255,255,0.05); padding:2.5px 7px; border-radius:4px; font-size:0.75rem;">保額: ${escapeHtml(p.sumAssured)}</span>`);
+      if (p.premium) paramBadges.push(`<span style="background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.2); color:var(--accent); padding:2.5px 7px; border-radius:4px; font-size:0.75rem; font-weight:700;">保費: ${escapeHtml(p.premium)}</span>`);
+      
+      paramsDiv.innerHTML = paramBadges.join('');
+      document.getElementById('product-detail-note').textContent = p.note;
+    };
+
+    window.addProductItem = function() {
+      const id = document.getElementById('prod-edit-id').value;
+      const name = document.getElementById('prod-input-name').value.trim();
+      const category = document.getElementById('prod-input-category').value;
+      const gender = document.getElementById('prod-input-gender').value;
+      const age = document.getElementById('prod-input-age').value.trim();
+      const period = document.getElementById('prod-input-period').value.trim();
+      const sumAssured = document.getElementById('prod-input-sum-assured').value.trim();
+      const premium = document.getElementById('prod-input-premium').value.trim();
+      const note = document.getElementById('prod-input-note').value.trim();
+      const status = document.getElementById('prod-input-status').checked ? 'active' : 'inactive';
+
+      if (!name) {
+        showToast('請填寫產品名稱！', 'error');
+        return;
+      }
+
+      loadProducts();
+      if (id) {
+        const idx = products.findIndex(p => p.id === id);
+        if (idx !== -1) {
+          products[idx] = { ...products[idx], category, name, gender, age, period, sumAssured, premium, note, status };
+          showToast('產品項目已修改！', 'success');
+        }
+      } else {
+        const newProd = {
+          id: 'prod_' + Date.now(),
+          category,
+          name,
+          gender,
+          age,
+          period,
+          sumAssured,
+          premium,
+          note,
+          status,
+          createdAt: new Date().toISOString()
+        };
+        products.push(newProd);
+        showToast('產品項目已新增！', 'success');
+      }
+
+      saveProducts();
+      clearProductForm();
+      
+      // 重新整理左側列表，並切換回詳情
+      renderProductsReviewList();
+      
+      // 自動點選第一個以顯示
+      if (products.length > 0) {
+        setTimeout(() => {
+          const firstItem = document.querySelector('#products-review-list-container [data-id]');
+          if (firstItem) firstItem.click();
+        }, 50);
+      } else {
+        document.getElementById('product-detail-empty').style.display = 'flex';
+        document.getElementById('product-editor-box').style.display = 'none';
+      }
+    };
+
+    window.deleteProductItem = function(id) {
+      showConfirm({
+        icon: '🗑️',
+        title: '確認刪除產品項目',
+        body: '確定要永久刪除此保險產品資訊嗎？',
+        okText: '確認刪除',
+        okStyle: 'background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;',
+        onOk: () => {
+          loadProducts();
+          products = products.filter(p => p.id !== id);
+          saveProducts();
+          renderProductsReviewList();
+          
+          document.getElementById('product-detail-empty').style.display = 'flex';
+          document.getElementById('product-detail-content').style.display = 'none';
+          document.getElementById('product-editor-box').style.display = 'none';
+          
+          showToast('產品項目已刪除！', 'success');
+        }
+      });
+    };
+
+    // 保留此空函式防範設定頁面呼叫出錯
+    window.renderSettingsProductsList = function() {};
+
+    // --- 固定訊息複製功能與頁籤切換實作 ---
+    const DEFAULT_FIXED_MESSAGES = [
+      {
+        id: 'fixed_1',
+        title: '📝 簽約應備資料',
+        content: `您好，簽約需要準備的資料如下：
+1. 身分證正反面影本
+2. 第二證件（健保卡或駕照）影本
+3. 扣款帳戶存摺影本
+4. 印章`
+      },
+      {
+        id: 'fixed_2',
+        title: '✈️ 旅平卡 FAB 核心優勢',
+        content: `【旅平卡 - 核心優勢與保障】
+- Features (特點)：出發前一小時線上/電話即可快速生效，海外突發疾病住院醫療保障額度高。
+- Advantages (優勢)：免去每次填寫繁瑣資料，首年免年費，享有專屬24小時海外急難救助。
+- Benefits (利益)：用最便宜的保費，買到最安心的海外全程保障，讓您全家出國旅遊無後顧之憂！`
+      },
+      {
+        id: 'fixed_3',
+        title: '📊 財務規劃的十個好處',
+        content: `【財務規劃的十個好處】
+1. 清晰掌握收支，避免盲目消費
+2. 提早做好退休準備，享受無憂晚年
+3. 建立緊急預備金，抵禦未知風險
+4. 合理配置資產，抗通膨與資產增值
+5. 優化稅務規劃，合法省稅
+6. 規劃子女教育基金，支持未來發展
+7. 釐清人生階段目標，逐步實現夢想
+8. 透過保險轉嫁重大風險，守護家庭
+9. 減少金錢焦慮，提升心靈自由度
+10. 實現傳承規劃，讓愛與財富代代延續`
+      }
+    ];
+
+    let fixedMessages = [];
+    
+    function loadFixedMessages() {
+      try {
+        const raw = localStorage.getItem('crm_fixed_messages');
+        fixedMessages = raw ? JSON.parse(raw) : [...DEFAULT_FIXED_MESSAGES];
+      } catch(e) {
+        fixedMessages = [...DEFAULT_FIXED_MESSAGES];
+      }
+    }
+    
+    function saveFixedMessages() {
+      localStorage.setItem('crm_fixed_messages', JSON.stringify(fixedMessages));
+      saveFixedMessagesToCloud();
+    }
+
+    async function fetchProductsFromCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=products');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          products = resObj.products || [];
+          localStorage.setItem('crm_products', JSON.stringify(products));
+        }
+      } catch(e) {
+        console.error("載入產品資料失敗：", e);
+      }
+    }
+
+    async function saveFixedMessagesToCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveFixedMessages', fixedMessages: fixedMessages }),
+        });
+        debugLog('☁️ 固定訊息已同步至雲端：' + fixedMessages.length + ' 筆');
+      } catch(e) {
+        console.error("同步固定訊息失敗：", e);
+      }
+    }
+
+    async function fetchFixedMessagesFromCloud() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=fixed_messages');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          fixedMessages = resObj.fixed_messages || [];
+          localStorage.setItem('crm_fixed_messages', JSON.stringify(fixedMessages));
+        }
+      } catch(e) {
+        console.error("載入固定訊息失敗：", e);
+      }
+    }
+    
+    window.switchProductReviewTab = function(tab) {
+      const reviewTab = document.getElementById('prod-tab-review');
+      const fixedTab = document.getElementById('prod-tab-fixed');
+      const salesTab = document.getElementById('prod-tab-sales');
+      
+      const reviewContent = document.getElementById('product-review-tab-content-review');
+      const fixedContent = document.getElementById('product-review-tab-content-fixed');
+      const salesContent = document.getElementById('product-review-tab-content-sales');
+      
+      const btnToggle = document.getElementById('btn-prod-toggle-view');
+      const btnAddProd = document.getElementById('btn-add-product');
+      const btnAddFixed = document.getElementById('btn-add-fixed-msg');
+      const btnAddSales = document.getElementById('btn-add-sales-proc');
+      const btnSaveSales = document.getElementById('btn-save-sales-proc');
+      const btnCancelSales = document.getElementById('btn-cancel-sales-proc');
+      
+      // 重置頁籤狀態
+      [reviewTab, fixedTab, salesTab].forEach(t => {
+        if (t) {
+          t.classList.remove('active');
+          t.style.color = 'var(--text-secondary)';
+          t.style.borderBottomColor = 'transparent';
+        }
+      });
+      [reviewContent, fixedContent, salesContent].forEach(c => {
+        if (c) c.style.display = 'none';
+      });
+      [btnToggle, btnAddProd, btnAddFixed, btnAddSales, btnSaveSales, btnCancelSales].forEach(b => {
+        if (b) b.style.display = 'none';
+      });
+      
+      if (tab === 'review') {
+        if (reviewTab) {
+          reviewTab.classList.add('active');
+          reviewTab.style.color = 'var(--accent)';
+          reviewTab.style.borderBottomColor = 'var(--accent)';
+        }
+        if (reviewContent) reviewContent.style.display = 'flex';
+        if (btnToggle) btnToggle.style.display = 'inline-block';
+        if (btnAddProd) btnAddProd.style.display = 'inline-block';
+        renderProductsReviewList();
+      } else if (tab === 'fixed') {
+        if (fixedTab) {
+          fixedTab.classList.add('active');
+          fixedTab.style.color = 'var(--accent)';
+          fixedTab.style.borderBottomColor = 'var(--accent)';
+        }
+        if (fixedContent) fixedContent.style.display = 'flex';
+        if (btnAddFixed) btnAddFixed.style.display = 'inline-block';
+        renderFixedMessagesList();
+      } else if (tab === 'sales') {
+        if (salesTab) {
+          salesTab.classList.add('active');
+          salesTab.style.color = 'var(--accent)';
+          salesTab.style.borderBottomColor = 'var(--accent)';
+        }
+        if (salesContent) salesContent.style.display = 'flex';
+        if (btnAddSales) btnAddSales.style.display = 'inline-block';
+        renderSalesProcList();
+      }
+    };
+
+    // 跨裝置熱同步功能
+    window.syncMaintenanceData = async function() {
+      const btn = document.getElementById('btn-sync-maintenance');
+      if (btn) {
+        btn.textContent = '🔄 同步中...';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+      }
+      try {
+        await fetchProductsFromCloud();
+        await fetchFixedMessagesFromCloud();
+        await fetchSalesProcessesFromCloud();
+        await fetchIssuesFromCloud();
+        await fetchGroupsFromCloud();
+        
+        // 重新整理當前選中的分頁畫面
+        const reviewTab = document.getElementById('prod-tab-review');
+        const fixedTab = document.getElementById('prod-tab-fixed');
+        const salesTab = document.getElementById('prod-tab-sales');
+        
+        if (reviewTab && reviewTab.classList.contains('active')) {
+          renderProductsReviewList();
+        } else if (fixedTab && fixedTab.classList.contains('active')) {
+          renderFixedMessagesList();
+        } else if (salesTab && salesTab.classList.contains('active')) {
+          renderSalesProcList();
+        }
+        
+        showToast('雲端資料同步完成！', 'success');
+      } catch (e) {
+        console.error("手動同步維護中心資料失敗：", e);
+        showToast('雲端同步失敗，請檢查網路連線！', 'error');
+      } finally {
+        if (btn) {
+          btn.textContent = '🔄 雲端同步';
+          btn.style.opacity = '1';
+          btn.disabled = false;
+        }
+      }
+    };
+
+    // 背景熱同步：每 3 分鐘自動在背景同步一次維護中心數據
+    setInterval(async () => {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        await fetchProductsFromCloud();
+        await fetchFixedMessagesFromCloud();
+        await fetchSalesProcessesFromCloud();
+        await fetchIssuesFromCloud();
+        await fetchGroupsFromCloud();
+        
+        // 如果目前維護中心 Modal 是打開的，在背景偷偷重繪
+        const modal = document.getElementById('products-review-modal');
+        if (modal && modal.classList.contains('active')) {
+          const reviewTab = document.getElementById('prod-tab-review');
+          const fixedTab = document.getElementById('prod-tab-fixed');
+          const salesTab = document.getElementById('prod-tab-sales');
+          
+          if (reviewTab && reviewTab.classList.contains('active')) {
+            renderProductsReviewList();
+          } else if (fixedTab && fixedTab.classList.contains('active')) {
+            renderFixedMessagesList();
+          } else if (salesTab && salesTab.classList.contains('active')) {
+            renderSalesProcList();
+          }
+        }
+      } catch (e) {
+        console.error("背景自動熱同步失敗：", e);
+      }
+    }, 180000); // 180000 毫秒 = 3 分鐘
+
+    let salesProcesses = [];
+    let currentSalesProcId = null;
+
+    window.loadSalesProcesses = function() {
+      try {
+        const stored = localStorage.getItem('crm_sales_processes');
+        salesProcesses = stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        console.error("載入銷售流程定義失敗：", e);
+        salesProcesses = [];
+      }
+    };
+
+    window.saveSalesProcesses = function() {
+      localStorage.setItem('crm_sales_processes', JSON.stringify(salesProcesses));
+      saveSalesProcessesToCloud();
+    };
+
+    window.saveSalesProcessesToCloud = async function() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveSalesProcesses', salesProcesses: salesProcesses })
+        });
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          debugLog('☁️ 銷售流程定義已同步至雲端：' + salesProcesses.length + ' 筆');
+        } else {
+          console.error("同步銷售流程定義至雲端失敗：", resObj.message);
+        }
+      } catch (e) {
+        console.error("同步銷售流程定義至雲端出錯：", e);
+      }
+    };
+
+    window.fetchSalesProcessesFromCloud = async function() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=sales_processes');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          salesProcesses = resObj.sales_processes || [];
+          localStorage.setItem('crm_sales_processes', JSON.stringify(salesProcesses));
+        }
+      } catch(e) {
+        console.error("載入銷售流程定義失敗：", e);
+      }
+    };
+
+    window.saveIssuesToCloud = async function() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const issues = getCustomIssues();
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveIssues', issues: issues })
+        });
+        debugLog('☁️ 常規議題已同步至雲端：' + issues.length + ' 筆');
+      } catch(e) {
+        console.error("同步常規議題失敗：", e);
+      }
+    };
+
+    window.fetchIssuesFromCloud = async function() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=issues');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          const issues = resObj.issues || [];
+          if (issues.length === 0) {
+            const localIssues = JSON.parse(localStorage.getItem('crm_issues') || 'null');
+            if (localIssues && localIssues.length > 0) {
+              // 本地有自訂資料，推上雲端做初始化
+              saveIssuesToCloud();
+            } else {
+              localStorage.setItem('crm_issues', JSON.stringify([]));
+            }
+          } else {
+            localStorage.setItem('crm_issues', JSON.stringify(issues));
+          }
+          if (typeof renderIssueList === 'function') renderIssueList();
+          if (typeof rebuildGroupSelect === 'function') rebuildGroupSelect();
+        }
+      } catch(e) {
+        console.error("載入常規議題失敗：", e);
+      }
+    };
+
+    window.saveGroupsToCloud = async function() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const groups = getCustomGroups();
+        await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveGroups', groups: groups })
+        });
+        debugLog('☁️ 自訂分群已同步至雲端：' + groups.length + ' 筆');
+      } catch(e) {
+        console.error("同步自訂分群失敗：", e);
+      }
+    };
+
+    window.fetchGroupsFromCloud = async function() {
+      if (!crmSettings || crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const response = await fetch(crmSettings.apiUrl + '?type=groups');
+        const resObj = await response.json();
+        if (resObj.status === 'success') {
+          const groups = resObj.groups || [];
+          if (groups.length === 0) {
+            const localGroups = JSON.parse(localStorage.getItem('crm_groups') || 'null');
+            if (localGroups && localGroups.length > 0) {
+              // 本地有自訂資料，推上雲端做初始化
+              saveGroupsToCloud();
+            } else {
+              localStorage.setItem('crm_groups', JSON.stringify([]));
+            }
+          } else {
+            localStorage.setItem('crm_groups', JSON.stringify(groups));
+          }
+          if (typeof renderGroupList === 'function') renderGroupList();
+          if (typeof rebuildGroupSelect === 'function') rebuildGroupSelect();
+        }
+      } catch(e) {
+        console.error("載入自訂分群失敗：", e);
+      }
+    };
+
+    window.renderSalesProcList = function() {
+      const container = document.getElementById('sales-proc-list-container');
+      if (!container) return;
+      loadSalesProcesses();
+
+      if (salesProcesses.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:40px 10px; font-size:0.75rem;">🎉 目前無任何流程定義，請點選上方新增！</div>`;
+        document.getElementById('sales-proc-empty').style.display = 'flex';
+        document.getElementById('sales-proc-detail').style.display = 'none';
+        document.getElementById('sales-proc-editor').style.display = 'none';
+        return;
+      }
+
+      container.innerHTML = '';
+      salesProcesses.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'fixed-msg-list-item';
+        div.setAttribute('data-id', item.id);
+        div.setAttribute('draggable', 'true');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '8px 10px';
+        div.style.borderRadius = '6px';
+        div.style.cursor = 'grab';
+        div.style.userSelect = 'none';
+        div.style.whiteSpace = 'nowrap';
+        div.style.overflow = 'hidden';
+        div.style.textOverflow = 'ellipsis';
+        div.style.color = '#fff';
+
+        div.innerHTML = `
+          <span style="font-weight: 700; color: #fff;">${escapeHtml(item.stage)} | ${escapeHtml(item.task)}</span>
+        `;
+
+        // 點擊事件
+        div.addEventListener('click', () => {
+          document.querySelectorAll('#sales-proc-list-container [data-id]').forEach(el => el.classList.remove('active'));
+          div.classList.add('active');
+          showSalesProcDetail(item);
+        });
+
+        // HTML5 拖曳事件處理 (Drag & Drop)
+        div.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', index);
+          div.style.opacity = '0.4';
+          div.style.cursor = 'grabbing';
+        });
+
+        div.addEventListener('dragend', () => {
+          div.style.opacity = '1';
+          div.style.cursor = 'grab';
+        });
+
+        div.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          div.style.borderTop = '2px solid var(--accent)';
+        });
+
+        div.addEventListener('dragleave', () => {
+          div.style.borderTop = 'none';
+        });
+
+        div.addEventListener('drop', (e) => {
+          e.preventDefault();
+          div.style.borderTop = 'none';
+          const dragIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          if (dragIdx !== index) {
+            const temp = salesProcesses[dragIdx];
+            salesProcesses.splice(dragIdx, 1);
+            salesProcesses.splice(index, 0, temp);
+            saveSalesProcesses();
+            renderSalesProcList();
+            
+            // 重新維持選取
+            setTimeout(() => {
+              const activeEl = document.querySelector(`#sales-proc-list-container [data-id="${temp.id}"]`);
+              if (activeEl) activeEl.click();
+            }, 50);
+          }
+        });
+
+        container.appendChild(div);
+      });
+
+      // 觸控裝置 Polyfill 的 Drag & Drop
+      if (typeof MobileDragDrop !== 'undefined' && typeof MobileDragDrop.polyfill === 'function') {
+        MobileDragDrop.polyfill();
+      }
+    };
+
+    window.showSalesProcDetail = function(item) {
+      currentSalesProcId = item.id;
+      document.getElementById('sales-proc-empty').style.display = 'none';
+      document.getElementById('sales-proc-editor').style.display = 'none';
+      document.getElementById('sales-proc-detail').style.display = 'flex';
+
+      document.getElementById('sales-proc-detail-title').textContent = `${item.stage} ＞ ${item.task}`;
+      document.getElementById('sales-proc-detail-stage').textContent = item.stage || '-';
+      document.getElementById('sales-proc-detail-intent').textContent = item.intent || '無用意描述';
+      document.getElementById('sales-proc-detail-document').textContent = item.document || '無對應文件';
+    };
+
+    window.openSalesProcEditor = function(id) {
+      document.getElementById('sales-proc-empty').style.display = 'none';
+      document.getElementById('sales-proc-detail').style.display = 'none';
+      document.getElementById('sales-proc-editor').style.display = 'flex';
+
+      const btnAdd = document.getElementById('btn-add-sales-proc');
+      const btnSave = document.getElementById('btn-save-sales-proc');
+      const btnCancel = document.getElementById('btn-cancel-sales-proc');
+      if (btnAdd) btnAdd.style.display = 'none';
+      if (btnSave) btnSave.style.display = 'inline-block';
+      if (btnCancel) btnCancel.style.display = 'inline-block';
+
+      if (id) {
+        currentSalesProcId = id;
+        const item = salesProcesses.find(x => x.id === id);
+        document.getElementById('sales-proc-edit-id').value = id;
+        document.getElementById('sales-proc-input-stage').value = item.stage || '';
+        document.getElementById('sales-proc-input-task').value = item.task || '';
+        document.getElementById('sales-proc-input-intent').value = item.intent || '';
+        document.getElementById('sales-proc-input-document').value = item.document || '';
+        document.getElementById('sales-proc-editor-title').textContent = '修改銷售流程定義';
+      } else {
+        currentSalesProcId = null;
+        document.getElementById('sales-proc-edit-id').value = '';
+        document.getElementById('sales-proc-input-stage').value = '';
+        document.getElementById('sales-proc-input-task').value = '';
+        document.getElementById('sales-proc-input-intent').value = '';
+        document.getElementById('sales-proc-input-document').value = '';
+        document.getElementById('sales-proc-editor-title').textContent = '新增銷售流程定義';
+      }
+    };
+
+    window.editSalesProcItem = function() {
+      if (currentSalesProcId) {
+        openSalesProcEditor(currentSalesProcId);
+      }
+    };
+
+    window.closeSalesProcEditor = function() {
+      document.getElementById('sales-proc-editor').style.display = 'none';
+      
+      const btnAdd = document.getElementById('btn-add-sales-proc');
+      const btnSave = document.getElementById('btn-save-sales-proc');
+      const btnCancel = document.getElementById('btn-cancel-sales-proc');
+      if (btnAdd) btnAdd.style.display = 'inline-block';
+      if (btnSave) btnSave.style.display = 'none';
+      if (btnCancel) btnCancel.style.display = 'none';
+
+      if (currentSalesProcId) {
+        const item = salesProcesses.find(x => x.id === currentSalesProcId);
+        if (item) showSalesProcDetail(item);
+        else document.getElementById('sales-proc-empty').style.display = 'flex';
+      } else {
+        document.getElementById('sales-proc-empty').style.display = 'flex';
+      }
+    };
+
+    window.saveSalesProcItem = function() {
+      const stage = document.getElementById('sales-proc-input-stage').value.trim();
+      const task = document.getElementById('sales-proc-input-task').value.trim();
+      const intent = document.getElementById('sales-proc-input-intent').value.trim();
+      const documentVal = document.getElementById('sales-proc-input-document').value.trim();
+      const editId = document.getElementById('sales-proc-edit-id').value;
+
+      if (!stage || !task) {
+        showToast('請填寫階段名稱與任務名稱！', 'error');
+        return;
+      }
+
+      loadSalesProcesses();
+      if (editId) {
+        const item = salesProcesses.find(x => x.id === editId);
+        if (item) {
+          item.stage = stage;
+          item.task = task;
+          item.intent = intent;
+          item.document = documentVal;
+        }
+      } else {
+        const newId = 'sales_' + Math.random().toString(36).substr(2, 9);
+        salesProcesses.push({
+          id: newId,
+          stage: stage,
+          task: task,
+          intent: intent,
+          document: documentVal
+        });
+        currentSalesProcId = newId;
+      }
+
+      saveSalesProcesses();
+      renderSalesProcList();
+      
+      // 關閉編輯器並重置按鈕狀態
+      closeSalesProcEditor();
+      
+      // 重新維持選取
+      setTimeout(() => {
+        const activeEl = document.querySelector(`#sales-proc-list-container [data-id="${currentSalesProcId}"]`);
+        if (activeEl) activeEl.click();
+      }, 50);
+      
+      showToast('銷售流程定義已儲存');
+    };
+
+    window.deleteSalesProcItem = function() {
+      if (!currentSalesProcId) return;
+      if (!confirm('確定要刪除此銷售流程定義嗎？')) return;
+      loadSalesProcesses();
+      salesProcesses = salesProcesses.filter(x => x.id !== currentSalesProcId);
+      currentSalesProcId = null;
+      saveSalesProcesses();
+      renderSalesProcList();
+      showToast('銷售流程定義已刪除');
+    };
+
+    let currentFixedMsgId = null;
+
+    window.renderFixedMessagesList = function() {
+      const container = document.getElementById('fixed-msgs-list-container');
+      if (!container) return;
+      loadFixedMessages();
+      
+      if (fixedMessages.length === 0) {
+        container.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding:40px 10px; font-size:0.75rem;">🎉 目前無任何固定訊息，請點選上方新增！</div>`;
+        document.getElementById('fixed-msg-detail-empty').style.display = 'flex';
+        document.getElementById('fixed-msg-detail-content').style.display = 'none';
+        document.getElementById('fixed-msg-editor').style.display = 'none';
+        return;
+      }
+      
+      container.innerHTML = '';
+      fixedMessages.forEach((m, index) => {
+        const isActive = currentFixedMsgId === m.id;
+        const div = document.createElement('div');
+        div.className = `fixed-msg-list-item ${isActive ? 'active' : ''}`;
+        div.setAttribute('data-id', m.id);
+        div.setAttribute('data-index', index);
+        div.setAttribute('draggable', 'true');
+        div.textContent = m.title || '無標題';
+        
+        // 點擊事件
+        div.addEventListener('click', () => selectFixedMsgItem(m.id));
+        
+        // 拖曳排序事件
+        div.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', index);
+          div.style.opacity = '0.4';
+          div.classList.add('dragging');
+        });
+        
+        div.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          div.style.borderTop = '2px solid var(--accent)';
+        });
+        
+        div.addEventListener('dragleave', () => {
+          div.style.borderTop = '';
+        });
+        
+        div.addEventListener('dragend', () => {
+          div.style.opacity = '';
+          div.style.borderTop = '';
+          div.classList.remove('dragging');
+        });
+        
+        div.addEventListener('drop', (e) => {
+          e.preventDefault();
+          div.style.borderTop = '';
+          const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          const toIndex = index;
+          if (fromIndex !== toIndex && !isNaN(fromIndex)) {
+            const movedItem = fixedMessages.splice(fromIndex, 1)[0];
+            fixedMessages.splice(toIndex, 0, movedItem);
+            saveFixedMessages();
+            renderFixedMessagesList();
+          }
+        });
+        
+        container.appendChild(div);
+      });
+      
+      // 預設點選顯示第一個 (如果不曾選擇，或原本選擇的被刪除了)
+      if (!currentFixedMsgId || !fixedMessages.some(x => x.id === currentFixedMsgId)) {
+        if (fixedMessages.length > 0) {
+          selectFixedMsgItem(fixedMessages[0].id);
+        }
+      } else {
+        selectFixedMsgItem(currentFixedMsgId);
+      }
+    };
+
+    window.selectFixedMsgItem = function(id) {
+      currentFixedMsgId = id;
+      
+      // 更新側邊欄 active 狀態
+      document.querySelectorAll('#fixed-msgs-list-container .fixed-msg-list-item').forEach(el => {
+        if (el.dataset.id === id) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      });
+      
+      const m = fixedMessages.find(x => x.id === id);
+      if (!m) return;
+      
+      document.getElementById('fixed-msg-detail-empty').style.display = 'none';
+      document.getElementById('fixed-msg-editor').style.display = 'none';
+      
+      const detailBox = document.getElementById('fixed-msg-detail-content');
+      detailBox.style.display = 'flex';
+      
+      document.getElementById('fixed-msg-detail-title').textContent = m.title;
+      document.getElementById('fixed-msg-detail-text').textContent = m.content;
+      
+      // 更新編輯/刪除按鈕事件
+      document.getElementById('btn-edit-fixed-msg').onclick = () => openFixedMsgEditor(m.id);
+      document.getElementById('btn-delete-fixed-msg').onclick = (e) => deleteFixedMsgItem(m.id, e);
+    };
+
+    window.copyCurrentFixedMsgText = function() {
+      const text = document.getElementById('fixed-msg-detail-text').textContent;
+      if (!text) return;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const m = fixedMessages.find(x => x.id === currentFixedMsgId);
+        showToast('複製成功：' + (m ? m.title : ''));
+      }).catch(err => {
+        showToast('複製失敗：' + err);
+      });
+    };
+    
+    window.openFixedMsgEditor = function(id) {
+      document.getElementById('fixed-msg-detail-empty').style.display = 'none';
+      document.getElementById('fixed-msg-detail-content').style.display = 'none';
+      
+      const editor = document.getElementById('fixed-msg-editor');
+      const titleInput = document.getElementById('fixed-msg-input-title');
+      const contentInput = document.getElementById('fixed-msg-input-content');
+      const idInput = document.getElementById('fixed-msg-edit-id');
+      const editorTitle = document.getElementById('fixed-msg-editor-title');
+      
+      editor.style.display = 'flex';
+      if (id) {
+        const m = fixedMessages.find(x => x.id === id);
+        if (m) {
+          idInput.value = m.id;
+          titleInput.value = m.title;
+          contentInput.value = m.content;
+          editorTitle.textContent = '✏️ 編輯固定訊息';
+        }
+      } else {
+        idInput.value = '';
+        titleInput.value = '';
+        contentInput.value = '';
+        editorTitle.textContent = '＋ 新增固定訊息項目';
+      }
+      titleInput.focus();
+    };
+    
+    window.closeFixedMsgEditor = function() {
+      document.getElementById('fixed-msg-editor').style.display = 'none';
+      if (currentFixedMsgId && fixedMessages.some(x => x.id === currentFixedMsgId)) {
+        selectFixedMsgItem(currentFixedMsgId);
+      } else if (fixedMessages.length > 0) {
+        selectFixedMsgItem(fixedMessages[0].id);
+      } else {
+        document.getElementById('fixed-msg-detail-empty').style.display = 'flex';
+      }
+    };
+    
+    window.saveFixedMsgItem = function() {
+      const id = document.getElementById('fixed-msg-edit-id').value;
+      const title = (document.getElementById('fixed-msg-input-title').value || '').trim();
+      const content = (document.getElementById('fixed-msg-input-content').value || '').trim();
+      
+      if (!title || !content) {
+        showToast('請填寫完整名稱與內容！');
+        return;
+      }
+      
+      if (id) {
+        const m = fixedMessages.find(x => x.id === id);
+        if (m) {
+          m.title = title;
+          m.content = content;
+        }
+      } else {
+        const newId = 'fixed_' + Date.now();
+        fixedMessages.push({
+          id: newId,
+          title: title,
+          content: content
+        });
+        currentFixedMsgId = newId; // 新增後預設選取它
+      }
+      saveFixedMessages();
+      document.getElementById('fixed-msg-editor').style.display = 'none';
+      renderFixedMessagesList();
+      showToast('固定訊息已儲存');
+    };
+    
+    window.deleteFixedMsgItem = function(id, event) {
+      if (event) event.stopPropagation();
+      if (!confirm('確定要刪除此固定訊息嗎？')) return;
+      fixedMessages = fixedMessages.filter(x => x.id !== id);
+      if (currentFixedMsgId === id) {
+        currentFixedMsgId = null;
+      }
+      saveFixedMessages();
+      renderFixedMessagesList();
+      showToast('固定訊息已刪除');
+    };
+
+    // === 產品知識複習 Modal ===
+    let productsReviewModalCallback = null;
+    window.toggleProductsReviewModal = function(show, callback) {
+      const modal = document.getElementById('products-review-modal');
+      if (!modal) return;
+      if (show) {
+        productsReviewModalCallback = callback || null;
+        modal.classList.add('active');
+        switchProductReviewTab('review'); // 每次打開預設回到產品複習頁籤
+        
+        // 預設點選顯示第一個
+        setTimeout(() => {
+          const firstItem = document.querySelector('#products-review-list-container [data-id]');
+          if (firstItem) {
+            firstItem.click();
+          } else {
+            document.getElementById('product-detail-empty').style.display = 'flex';
+            document.getElementById('product-detail-content').style.display = 'none';
+            document.getElementById('product-editor-box').style.display = 'none';
+          }
+        }, 50);
+      } else {
+        modal.classList.remove('active');
+        if (productsReviewModalCallback) {
+          const cb = productsReviewModalCallback;
+          productsReviewModalCallback = null;
+          cb();
+        }
+      }
+    };
+
+    window.renderProductsReviewList = function() {
+      const container = document.getElementById('products-review-list-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      loadProducts();
+      
+      if (products.length === 0) {
+        container.innerHTML = `
+          <div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:20px 0;">
+            目前無產品項目，請點擊「＋新增產品」建立。
+          </div>
+        `;
+        document.getElementById('product-detail-empty').style.display = 'flex';
+        document.getElementById('product-detail-content').style.display = 'none';
+        document.getElementById('product-editor-box').style.display = 'none';
+        return;
+      }
+
+      if (productViewMode === 'card') {
+        // 卡牌形式渲染：極簡單行展示，方便背誦，字體大小一致 (0.8rem)
+        products.forEach(p => {
+          const div = document.createElement('div');
+          div.className = 'activity-item';
+          div.setAttribute('data-id', p.id);
+          div.style.cursor = 'pointer';
+          div.style.padding = '10px 12px';
+
+          const isAct = p.status === 'active';
+
+          // 收集投保參數 (移除所有 icon，讓畫面簡潔有力)
+          const paramParts = [];
+          if (p.gender) paramParts.push(`${p.gender}`);
+          if (p.age) paramParts.push(`${p.age}`);
+          if (p.period) paramParts.push(`${p.period}`);
+          if (p.sumAssured) paramParts.push(`${p.sumAssured}`);
+          if (p.premium) paramParts.push(`${p.premium}`);
+          const paramsStr = paramParts.length > 0 ? ` | ${paramParts.join(' | ')}` : '';
+
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;">
+              <div style="font-weight: 600; color: #fff; font-size: 0.8rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <span style="font-weight: 700; color: #fff; margin-right:6px;">${escapeHtml(p.name)}</span>
+                <span style="color:#fff; font-size:0.76rem; opacity:0.95;">${escapeHtml(paramsStr)}</span>
+              </div>
+              <div style="display: flex; gap: 10px; flex-shrink: 0;" onclick="event.stopPropagation();">
+                <span onclick="openProductEditor('${p.id}')" style="cursor: pointer; font-size: 0.8rem;" title="編輯">✏️</span>
+                <span onclick="deleteProductItem('${p.id}')" style="cursor: pointer; font-size: 0.8rem;" title="刪除">🗑️</span>
+              </div>
+            </div>
+          `;
+          
+          div.addEventListener('click', () => {
+            document.querySelectorAll('#products-review-list-container [data-id]').forEach(item => item.classList.remove('active'));
+            div.classList.add('active');
+            showProductDetail(p);
+          });
+          container.appendChild(div);
+        });
+      } else {
+        // 表格形式渲染：寬版獨立欄位展示（無備註欄位，極致清爽），一目瞭然，字體大小一致 (0.8rem)
+        const wrapper = document.createElement('div');
+        wrapper.style.width = '100%';
+        
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.fontSize = '0.8rem';
+        table.style.tableLayout = 'fixed';
+        table.innerHTML = `
+          <thead>
+            <tr style="border-bottom:1px solid var(--border-color); text-align:left; background:rgba(0,0,0,0.2);">
+              <th style="padding:8px 6px; width:55px;">別</th>
+              <th style="padding:8px 6px; width:100px;">產品名稱</th>
+              <th style="padding:8px 6px; width:45px; text-align:center;">性別</th>
+              <th style="padding:8px 6px; width:55px; text-align:center;">年齡</th>
+              <th style="padding:8px 6px; width:55px; text-align:center;">年期</th>
+              <th style="padding:8px 6px; width:55px; text-align:center;">保額</th>
+              <th style="padding:8px 6px; width:65px; text-align:center;">保費</th>
+              <th style="padding:8px 6px; text-align:center; width:50px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        `;
+        
+        const tbody = table.querySelector('tbody');
+        products.forEach(p => {
+          const tr = document.createElement('tr');
+          tr.className = 'product-table-row';
+          tr.setAttribute('data-id', p.id);
+          tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+          tr.style.cursor = 'pointer';
+
+          const isAct = p.status === 'active';
+
+          tr.innerHTML = `
+            <td style="padding:8px 6px; font-weight:700; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.category)}
+            </td>
+            <td style="padding:8px 6px; color:#fff; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(p.name)}">
+              ${escapeHtml(p.name)}
+            </td>
+            <td style="padding:8px 6px; text-align:center; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.gender || '皆可')}
+            </td>
+            <td style="padding:8px 6px; text-align:center; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.age || '-')}
+            </td>
+            <td style="padding:8px 6px; text-align:center; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.period || '-')}
+            </td>
+            <td style="padding:8px 6px; text-align:center; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.sumAssured || '-')}
+            </td>
+            <td style="padding:8px 6px; text-align:center; color:var(--accent); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+              ${escapeHtml(p.premium || '-')}
+            </td>
+            <td style="padding:8px 6px; text-align:center;" onclick="event.stopPropagation();">
+              <span onclick="openProductEditor('${p.id}')" style="cursor: pointer; margin-right: 12px;" title="編輯">✏️</span>
+              <span onclick="deleteProductItem('${p.id}')" style="cursor: pointer;" title="刪除">🗑️</span>
+            </td>
+          `;
+          
+          tr.addEventListener('click', () => {
+            document.querySelectorAll('#products-review-list-container [data-id]').forEach(item => item.classList.remove('active'));
+            tr.classList.add('active');
+            showProductDetail(p);
+          });
+          tbody.appendChild(tr);
+        });
+        
+        wrapper.appendChild(table);
+        container.appendChild(wrapper);
+      }
+    };
 
     // --- 頁面切換 ---
     function toggleTodoPage() {
@@ -5614,6 +7398,7 @@
         const c = window.cases.find(x => x.id === t.caseId);
         caseName = c ? c.clientName : '';
       }
+      const displayTitle = caseName ? `${t.title} <span style="color: var(--accent); font-weight: bold; margin-left: 6px;">(${caseName})</span>` : t.title;
 
       // 次標籤顯示
       let subTagLabel = '';
@@ -5657,7 +7442,7 @@
       return `<div class="todo-card${doneClass}" id="todo-card-${t.id}" ondblclick="openTodoTimerModal('${t.id}')" style="cursor:pointer; display:flex; align-items:center; justify-content:flex-start; text-align:left;" title="雙擊開啟計時面板與歷史紀錄">
         <div class="todo-check" ondblclick="event.stopPropagation(); toggleTodoDone('${t.id}')" title="雙擊切換完成狀態">${checkIcon}</div>
         <div class="todo-info" style="display:flex; align-items:center; justify-content:flex-start; text-align:left; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden;">
-          <div class="todo-title" style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; margin:0; flex-shrink:0; text-align:left;">${t.title}</div>
+          <div class="todo-title" style="font-weight:bold; font-size:0.85rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; margin:0; flex-shrink:0; text-align:left;">${displayTitle}</div>
           ${priorityHtml ? `<div style="flex-shrink:0; display:flex; justify-content:flex-start; align-items:center;">${priorityHtml}</div>` : ''}
           <div class="todo-meta" style="margin:0; display:flex; align-items:center; justify-content:flex-start; gap:6px; flex-wrap:nowrap; white-space:nowrap; flex-shrink:0;">${caseTag}${stageLabel}${subTagHtml}${timeSpentHtml}${dueHtml}</div>
           ${t.note ? `<span style="font-size:0.72rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; margin-left:4px; flex-shrink:1; text-align:left;" title="${t.note}">(${t.note})</span>` : ''}
@@ -5731,16 +7516,19 @@
         cells.forEach(c => c.dataset.active = 'false');
         cell.classList.add('active');
         cell.dataset.active = 'true';
-        inputUrgent.value = urgent ? 'true' : 'false';
-        inputImportant.value = important ? 'true' : 'false';
+        inputUrgent.value = String(urgent);
+        inputImportant.value = String(important);
       }
     }
 
     function getPriorityMeta(urgent, important) {
-      if (urgent === true && important === true) return { q: 1, label: '🔴 緊急重要', color: '#ef4444', class: 'q1', title: '緊急且重要' };
-      if (urgent === true && important === false) return { q: 2, label: '🟠 緊急', color: '#f97316', class: 'q2', title: '緊急但重要性低' };
-      if (urgent === false && important === true) return { q: 3, label: '🟡 重要', color: '#eab308', class: 'q3', title: '重要但不緊急' };
-      if (urgent === false && important === false) return { q: 4, label: '⚪ 一般', color: '#9ca3af', class: 'q4', title: '不緊急且不重要' };
+      const u = String(urgent);
+      const i = String(important);
+      if (u === 'immediate' || i === 'immediate') return { q: 0, label: '🔥 立即處理', color: '#ffffff', class: 'q0', title: '最優先立即處理' };
+      if ((u === 'true' || urgent === true) && (i === 'true' || important === true)) return { q: 1, label: '🔴 緊急重要', color: '#ef4444', class: 'q1', title: '緊急且重要' };
+      if ((u === 'true' || urgent === true) && (i === 'false' || important === false)) return { q: 2, label: '🟠 緊急', color: '#f97316', class: 'q2', title: '緊急但重要性低' };
+      if ((u === 'false' || urgent === false) && (i === 'true' || important === true)) return { q: 3, label: '🟡 重要', color: '#eab308', class: 'q3', title: '重要但不緊急' };
+      if ((u === 'false' || urgent === false) && (i === 'false' || important === false)) return { q: 4, label: '⚪ 一般', color: '#9ca3af', class: 'q4', title: '不緊急且不重要' };
       return null; // 未分類
     }
 
@@ -5799,14 +7587,20 @@
         
         // 設定優先度 active 狀態
         if (t.urgent !== undefined && t.important !== undefined) {
-          const uVal = t.urgent === true || t.urgent === 'true';
-          const iVal = t.important === true || t.important === 'true';
-          document.getElementById('todo-input-urgent').value = uVal ? 'true' : 'false';
-          document.getElementById('todo-input-important').value = iVal ? 'true' : 'false';
+          const uStr = String(t.urgent);
+          const iStr = String(t.important);
+          document.getElementById('todo-input-urgent').value = t.urgent;
+          document.getElementById('todo-input-important').value = t.important;
+          
           let qIdx = 4;
-          if (uVal && iVal) qIdx = 1;
-          else if (uVal && !iVal) qIdx = 2;
-          else if (!uVal && iVal) qIdx = 3;
+          if (uStr === 'immediate' || iStr === 'immediate') qIdx = 0;
+          else {
+            const uVal = t.urgent === true || t.urgent === 'true';
+            const iVal = t.important === true || t.important === 'true';
+            if (uVal && iVal) qIdx = 1;
+            else if (uVal && !iVal) qIdx = 2;
+            else if (!uVal && iVal) qIdx = 3;
+          }
           
           const cell = document.querySelector(`.priority-cell[data-q="${qIdx}"]`);
           if (cell) {
@@ -5869,8 +7663,14 @@
       
       const urgentVal = document.getElementById('todo-input-urgent').value;
       const importantVal = document.getElementById('todo-input-important').value;
-      const urgent = urgentVal === '' ? undefined : urgentVal === 'true';
-      const important = importantVal === '' ? undefined : importantVal === 'true';
+      let urgent, important;
+      if (urgentVal === 'immediate' || importantVal === 'immediate') {
+        urgent = 'immediate';
+        important = 'immediate';
+      } else {
+        urgent = urgentVal === '' ? undefined : urgentVal === 'true';
+        important = importantVal === '' ? undefined : importantVal === 'true';
+      }
 
       if (editId) {
         const t = todos.find(x => x.id === editId);
@@ -6464,9 +8264,7 @@
           dueLabel = `<span style="color:var(--text-secondary); font-size:0.65rem; margin-left:auto;">(未設時間)</span>`;
         }
 
-        const uVal = t.urgent === true || t.urgent === 'true';
-        const iVal = t.important === true || t.important === 'true';
-        const pMeta = getPriorityMeta(uVal, iVal);
+        const pMeta = getPriorityMeta(t.urgent, t.important);
         const pBadge = pMeta ? `<span class="priority-badge ${pMeta.class}" style="font-size:0.6rem; padding:1px 4px; border-radius:3px;">${pMeta.label}</span>` : '';
 
         // 累計時間小標籤
@@ -6478,7 +8276,7 @@
         return `<div ondblclick="openTodoTimerModal('${t.id}')" style="display:flex; align-items:center; justify-content:flex-start; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); padding:8px 10px; border-radius:8px; margin-bottom:8px; gap:10px; cursor:pointer;" title="雙擊開啟計時面板與歷史紀錄">
           <div class="todo-check" ondblclick="event.stopPropagation(); toggleTodoDoneInNotify('${t.id}')" title="雙擊切換完成狀態" style="margin-right:2px; flex-shrink:0;"></div>
           <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; flex-wrap:nowrap; flex:1; min-width:0; overflow:hidden; text-align:left;">
-            <div style="font-weight:bold; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; margin:0; flex-shrink:0;">${t.title}</div>
+            <div style="font-weight:bold; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; margin:0; flex-shrink:0;">${caseName ? `${t.title} <span style="color: var(--accent); font-weight: bold; margin-left: 6px;">(${caseName})</span>` : t.title}</div>
             ${pBadge ? `<div style="flex-shrink:0; display:flex;">${pBadge}</div>` : ''}
             ${timeSpentHtml ? `<div style="flex-shrink:0; display:flex;">${timeSpentHtml}</div>` : ''}
             ${(caseName || stageText || subTagText) ? `<span style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; flex-shrink:1;">[${caseName}${stageText}${subTagText}]</span>` : ''}
@@ -6490,11 +8288,12 @@
       };
 
       // Tab A: 優先度分組 (相容字串與布林過濾)
-      const q1 = allPending.filter(t => (t.urgent === true || t.urgent === 'true') && (t.important === true || t.important === 'true'));
-      const q2 = allPending.filter(t => (t.urgent === true || t.urgent === 'true') && (t.important === false || t.important === 'false'));
-      const q3 = allPending.filter(t => (t.urgent === false || t.urgent === 'false') && (t.important === true || t.important === 'true'));
-      const q4 = allPending.filter(t => (t.urgent === false || t.urgent === 'false') && (t.important === false || t.important === 'false'));
-      const unclassified = allPending.filter(t => t.urgent === undefined || t.urgent === '' || t.important === undefined || t.important === '');
+      const q0 = allPending.filter(t => String(t.urgent) === 'immediate' || String(t.important) === 'immediate');
+      const q1 = allPending.filter(t => (String(t.urgent) !== 'immediate' && String(t.important) !== 'immediate') && (t.urgent === true || t.urgent === 'true') && (t.important === true || t.important === 'true'));
+      const q2 = allPending.filter(t => (String(t.urgent) !== 'immediate' && String(t.important) !== 'immediate') && (t.urgent === true || t.urgent === 'true') && (t.important === false || t.important === 'false'));
+      const q3 = allPending.filter(t => (String(t.urgent) !== 'immediate' && String(t.important) !== 'immediate') && (t.urgent === false || t.urgent === 'false') && (t.important === true || t.important === 'true'));
+      const q4 = allPending.filter(t => (String(t.urgent) !== 'immediate' && String(t.important) !== 'immediate') && (t.urgent === false || t.urgent === 'false') && (t.important === false || t.important === 'false'));
+      const unclassified = allPending.filter(t => String(t.urgent) !== 'immediate' && String(t.important) !== 'immediate' && (t.urgent === undefined || t.urgent === '' || t.important === undefined || t.important === ''));
 
       let pGroupsHtml = '';
       const appendGroup = (title, items, borderStyle, headerBg) => {
@@ -6509,6 +8308,7 @@
         `;
       };
 
+      appendGroup('🔥 立即處理', q0, '#ff3b30', '#ff3b30');
       appendGroup('🔴 緊急且重要 (Q1)', q1, 'rgba(239,68,68,0.2)', 'rgba(239,68,68,0.18)');
       appendGroup('🟠 緊急但重要性低 (Q2)', q2, 'rgba(249,115,22,0.2)', 'rgba(249,115,22,0.18)');
       appendGroup('🟡 重要但不緊急 (Q3)', q3, 'rgba(234,179,8,0.2)', 'rgba(234,179,8,0.18)');
@@ -6566,9 +8366,65 @@
     // --- Toast 提醒 ---
 
 
+    // 優先在 Capture 階段攔截 Option+Esc 與 Option+H 穿透所有輸入框焦點限制
+    window.addEventListener('keydown', function(e) {
+      // 🔒 Option + H (Alt + H) 全域切換個資去識別化顯示
+      if (e.altKey && (e.key === 'h' || e.key === 'H' || e.code === 'KeyH')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof toggleAnonymization === 'function') {
+          toggleAnonymization();
+        }
+        return;
+      }
+
+      if (e.altKey && (e.key === 'Escape' || e.code === 'Escape')) {
+        const modalsToClose = [
+          { id: 'timer-confirm-modal', closeFn: () => closeTimerConfirmModal() },
+          { id: 'edit-log-modal', closeFn: () => closeEditLogModal() },
+          { id: 'todo-timer-modal', closeFn: () => closeTodoTimerModal() },
+          { id: 'image-lightbox-modal', closeFn: () => closeImageLightbox() },
+          { id: 'todo-notify-modal', closeFn: () => toggleTodoNotifyModal(false) },
+          { id: 'add-todo-modal', closeFn: () => closeTodoModal() },
+          { id: 'add-canvassing-modal', closeFn: () => closeCanvassingModal() },
+          { id: 'reminder-modal', closeFn: () => toggleReminderModal(false) },
+          { id: 'add-case-modal', closeFn: () => toggleAddCaseModal(false) },
+          { id: 'activities-modal', closeFn: () => toggleActivitiesModal(false) },
+          { id: 'products-review-modal', closeFn: () => toggleProductsReviewModal(false) },
+          { id: 'visit-drawer-overlay', closeFn: () => toggleVisitDrawer(false) }
+        ];
+
+        for (const m of modalsToClose) {
+          const el = document.getElementById(m.id);
+          if (el && el.classList.contains('active')) {
+            e.preventDefault();
+            e.stopPropagation();
+            m.closeFn();
+            debugLog(`Option+Esc capture-close: ${m.id}`);
+            return;
+          }
+        }
+      }
+    }, { capture: true });
+
     // --- ESC 關閉所有 Modal (ADHD 防呆優化版) ---
     document.addEventListener('keydown', function(e) {
+      // Ctrl+F 或 Cmd+F (Mac) 啟動網頁內搜尋
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        const searchInput = document.getElementById('global-search-input');
+        if (searchInput) {
+          e.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
+
       if (e.key === 'Escape') {
+        const target = e.target;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+          return;
+        }
         const visitDrawerOverlay = document.getElementById('visit-drawer-overlay');
         if (visitDrawerOverlay && visitDrawerOverlay.classList.contains('active')) {
           toggleVisitDrawer(false);
@@ -6607,6 +8463,21 @@
         const todoNotifyModal = document.getElementById('todo-notify-modal');
         if (todoNotifyModal && todoNotifyModal.classList.contains('active')) {
           toggleTodoNotifyModal(false);
+          return;
+        }
+        const lightbox = document.getElementById('image-lightbox-modal');
+        if (lightbox && lightbox.classList.contains('active')) {
+          closeImageLightbox();
+          return;
+        }
+        const productsReviewModal = document.getElementById('products-review-modal');
+        if (productsReviewModal && productsReviewModal.classList.contains('active')) {
+          toggleProductsReviewModal(false);
+          return;
+        }
+        const activitiesModal = document.getElementById('activities-modal');
+        if (activitiesModal && activitiesModal.classList.contains('active')) {
+          toggleActivitiesModal(false);
           return;
         }
       }
@@ -6768,13 +8639,12 @@
       // 掃描未封存案件中，今天有約訪的案件 (超強聯集判定，徹底解決跨階段排程漏算問題)
       const activeCases = cases.filter(c => !c.archived);
       const todayCases = activeCases.filter(c => {
-        const saDate = (c.saDetails && c.saDetails.agreeDate) || '';
         const oaDate = (c.oaDetails && c.oaDetails.meetDate) || '';
         const pcDate = (c.pcDetails && c.pcDetails.meetDate) || '';
         const cDate = (c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '';
         const sDate = (c.sDetails && c.sDetails.meetDate) || '';
         
-        const allDates = [saDate, oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
+        const allDates = [oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
         return allDates.includes(todayStr);
       });
 
@@ -6823,13 +8693,12 @@
 
       const activeCases = cases.filter(c => !c.archived);
       const todayCases = activeCases.filter(c => {
-        const saDate = (c.saDetails && c.saDetails.agreeDate) || '';
         const oaDate = (c.oaDetails && c.oaDetails.meetDate) || '';
         const pcDate = (c.pcDetails && c.pcDetails.meetDate) || '';
         const cDate = (c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '';
         const sDate = (c.sDetails && c.sDetails.meetDate) || '';
         
-        const allDates = [saDate, oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
+        const allDates = [oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
         return allDates.includes(todayStr);
       });
 
@@ -6844,8 +8713,7 @@
 
       todayCases.forEach(c => {
         // 依據今天日期比對，找出實際排定於今日之到訪階段，避免大階段未移轉時顯示錯誤
-        let phase = c.currentPhase || 'SA';
-        const saDate = ((c.saDetails && c.saDetails.agreeDate) || '').replace(/\//g, '-').trim();
+        let phase = 'OA';
         const oaDate = ((c.oaDetails && c.oaDetails.meetDate) || '').replace(/\//g, '-').trim();
         const pcDate = ((c.pcDetails && c.pcDetails.meetDate) || '').replace(/\//g, '-').trim();
         const cDate = ((c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '').replace(/\//g, '-').trim();
@@ -6855,9 +8723,8 @@
         else if (pcDate === todayStr) phase = 'PC';
         else if (cDate === todayStr) phase = 'C';
         else if (sDate === todayStr) phase = 'S';
-        else if (saDate === todayStr) phase = 'SA';
 
-        const phaseLabels = { SA: '約訪/SA', OA: '初訪/OA', PC: '建議書/PC', C: '送件/C', S: '售服/S' };
+        const phaseLabels = { SA: '約訪', OA: '初訪/OA', PC: '建議書/PC', C: '送件/C', S: '售服/S' };
         const phaseColor = getPhaseColor(phase);
 
         // 預設的出門備忘 (Checklist)
@@ -6891,7 +8758,7 @@
         html += `
           <div class="visit-case-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-weight:700; font-size:1rem; color:#fff;">${c.clientName}</span>
+              <span style="font-weight:700; font-size:1rem; color:#fff;">${window.getClientDisplayName(c.clientName)}</span>
               <span class="status-badge" style="background:${phaseColor}20; color:${phaseColor}; border:1px solid ${phaseColor}40; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:700;">
                 ${phaseLabels[phase] || phase}
               </span>
@@ -7330,7 +9197,7 @@
 
       // 渲染為 HTML，格式為 [姓名]｜[議題名稱]
       listContainer.innerHTML = sortedCases.map(c => {
-        const displayName = `${c.clientName || '未命名'}｜${c.issueName || '無議題'}`;
+        const displayName = `${window.getClientDisplayName(c.clientName || '未命名')}｜${c.issueName || '無議題'}`;
         return `<div class="sidebar-item" onclick="scrollToCaseRow('${c.id}')" title="${displayName}">${displayName}</div>`;
       }).join('');
     }
@@ -7441,6 +9308,18 @@
         switchTodoNotifyTab('priority');
         toggleTodoNotifyModal(true, resolve);
       });
+
+      debugLog("🧠 ADHD 啟動流：步驟 5 - 近期活動通知");
+      await new Promise(resolve => {
+        loadActivities();
+        toggleActivitiesModal(true, resolve);
+      });
+
+      debugLog("🧠 ADHD 啟動流：步驟 6 - 保險產品專業知識複習");
+      await new Promise(resolve => {
+        loadProducts();
+        toggleProductsReviewModal(true, resolve);
+      });
       
       debugLog("🧠 ADHD 啟動流全部完成！");
     }
@@ -7451,12 +9330,17 @@
     
     let activeC360CustomerId = null;
 
-    window.cycleViewMode = function() {
+     window.cycleViewMode = function() {
       const modes = ['case', 'todo', 'customer', 'recruit'];
       let nextIdx = (modes.indexOf(currentViewMode) + 1) % modes.length;
       switchViewMode(modes[nextIdx]);
       
-      const modeNames = { 'case': '📊 案件管理', 'todo': '📋 待辦事項', 'customer': '👥 客戶畫布', 'recruit': '👥 增員輔導' };
+      const modeNames = { 
+        'case': '📊 案件管理', 
+        'todo': '📋 待辦事項', 
+        'customer': '👥 客戶畫布', 
+        'recruit': '👥 增員輔導'
+      };
       showToast(`已切換至：${modeNames[modes[nextIdx]]}`, 'success');
     };
 
@@ -7469,6 +9353,7 @@
       const todoPage = document.getElementById('todo-page');
       const customerPage = document.getElementById('customer-page');
       const recruitPage = document.getElementById('recruit-page');
+      const canvassingPage = document.getElementById('canvassing-page');
       
       if (weeklyCalendar) weeklyCalendar.style.display = mode === 'case' ? '' : 'none';
       if (canvasContainer) canvasContainer.style.display = mode === 'case' ? '' : 'none';
@@ -7499,9 +9384,34 @@
         if (mode === 'recruit') {
           recruitPage.style.display = 'block';
           loadRecruits();
+          if (typeof loadRecruitPrepTexts === 'function') {
+            loadRecruitPrepTexts();
+          }
           renderRecruitPage();
+          if (typeof switchRecruitLeftTab === 'function') {
+            switchRecruitLeftTab('prepare1');
+          }
         } else {
           recruitPage.style.display = 'none';
+        }
+      }
+
+      if (canvassingPage) {
+        if (mode === 'canvassing') {
+          canvassingPage.style.display = 'block';
+          loadCanvassing();
+          renderCanvassingPage();
+          initCanvassingMap();
+          updateMapMarkers();
+          // 如果有店家地標，地圖自動移動到第一個有定位的店家
+          if (canvassing.length > 0) {
+            const first = canvassing.find(c => c.latitude && c.longitude);
+            if (first && canvassingMap) {
+              canvassingMap.setView([first.latitude, first.longitude], 14);
+            }
+          }
+        } else {
+          canvassingPage.style.display = 'none';
         }
       }
     };
@@ -8134,14 +10044,307 @@
       localStorage.setItem('crm_recruits', JSON.stringify(recruits));
     };
 
-    // 渲染增員清單頁面
+    // 切換左側大方塊準備工作標籤
+    window.switchRecruitLeftTab = function(tabId) {
+      document.querySelectorAll('.btn-prepare-work').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.recruit-detail-view').forEach(view => view.style.display = 'none');
+      
+      const activeBtn = document.getElementById(`btn-recruit-prep-${tabId === 'prepare1' ? 'prep1' : (tabId === 'prepare2' ? 'prep2' : 'prep3')}`);
+      if (activeBtn) activeBtn.classList.add('active');
+      
+      // 更新樣式，只讓 active 按鈕有主題色，其他按鈕維持灰色
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById(`btn-recruit-prep${i}`);
+        if (btn) {
+          if (btn.classList.contains('active')) {
+            btn.style.background = 'rgba(56,189,248,0.08)';
+            btn.style.borderColor = 'rgba(56,189,248,0.3)';
+            btn.style.color = '#38bdf8';
+          } else {
+            btn.style.background = 'rgba(255,255,255,0.02)';
+            btn.style.borderColor = 'rgba(255,255,255,0.05)';
+            btn.style.color = '#fff';
+          }
+        }
+      }
+      
+      const content = document.getElementById(`recruit-prep-content-${tabId}`);
+      if (content) content.style.display = 'flex';
+      
+      // 清除名單選取
+      document.querySelectorAll('#recruit-list-container [data-id]').forEach(item => item.classList.remove('active'));
+      activeRecruitId = null;
+    };
+
+    // 儲存準備工作內容
+    window.saveRecruitPrepText = function(tabId) {
+      const text = document.getElementById(`recruit-prep-text-${tabId}`).value;
+      localStorage.setItem(`crm_recruit_prep_${tabId}`, text);
+      showToast('準備工作內容儲存成功！', 'success');
+    };
+
+    // 載入準備工作內容
+    window.loadRecruitPrepTexts = function() {
+      for (let i = 1; i <= 3; i++) {
+        const key = `prepare${i}`;
+        const stored = localStorage.getItem(`crm_recruit_prep_${key}`);
+        const el = document.getElementById(`recruit-prep-text-${key}`);
+        if (el) {
+          el.value = stored || '';
+        }
+      }
+    };
+
+    // 切換右側詳情頁籤
+    window.switchRecruitRightTab = function(subTabId) {
+      const btnPath = document.getElementById('tab-recruit-path');
+      const btnRecords = document.getElementById('tab-recruit-records');
+      const contentPath = document.getElementById('recruit-tab-content-path');
+      const contentRecords = document.getElementById('recruit-tab-content-records');
+      
+      if (subTabId === 'path') {
+        btnPath.classList.add('active');
+        btnPath.style.color = '#fff';
+        btnPath.style.borderBottomColor = 'var(--accent)';
+        
+        btnRecords.classList.remove('active');
+        btnRecords.style.color = 'var(--text-secondary)';
+        btnRecords.style.borderBottomColor = 'transparent';
+        
+        contentPath.style.display = 'flex';
+        contentRecords.style.display = 'none';
+      } else {
+        btnRecords.classList.add('active');
+        btnRecords.style.color = '#fff';
+        btnRecords.style.borderBottomColor = 'var(--accent)';
+        
+        btnPath.classList.remove('active');
+        btnPath.style.color = 'var(--text-secondary)';
+        btnPath.style.borderBottomColor = 'transparent';
+        
+        contentRecords.style.display = 'flex';
+        contentPath.style.display = 'none';
+      }
+    };
+
+    // 選擇增員對象
+    window.selectRecruitItem = function(recruitId) {
+      activeRecruitId = recruitId;
+      
+      // 清除大方塊 active class
+      document.querySelectorAll('.btn-prepare-work').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = 'rgba(255,255,255,0.02)';
+        btn.style.borderColor = 'rgba(255,255,255,0.05)';
+        btn.style.color = '#fff';
+      });
+      
+      // 隱藏所有準備工作內容區
+      document.querySelectorAll('.recruit-detail-view').forEach(view => view.style.display = 'none');
+      
+      // 顯示增員對象詳細資料
+      const personContent = document.getElementById('recruit-person-content');
+      if (personContent) personContent.style.display = 'flex';
+      
+      // 為名單項目加上 active 標示
+      document.querySelectorAll('#recruit-list-container [data-id]').forEach(item => {
+        if (item.getAttribute('data-id') === recruitId) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+      
+      // 填寫基本資料
+      const r = recruits.find(item => item.id === recruitId);
+      if (!r) return;
+      
+      document.getElementById('recruit-main-name').value = r.name || '';
+      document.getElementById('recruit-main-phone').value = r.phone || '';
+      document.getElementById('recruit-main-job').value = r.currentJob || '';
+      document.getElementById('recruit-main-stage').value = r.stage || 'contacting';
+      
+      // 渲染面談進度紀錄
+      renderRecruitMainLogs(r);
+      // 渲染輔導陪伴紀錄
+      renderCoachingListUI(r);
+      
+      // 預設切換到「增員路徑」頁籤
+      switchRecruitRightTab('path');
+    };
+
+    // 修改增員對象基本資料
+    window.updateRecruitMainField = function(field, value) {
+      if (!activeRecruitId) return;
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+      
+      if (field === 'name' && !value.trim()) {
+        showToast('姓名不得為空！', 'error');
+        document.getElementById('recruit-main-name').value = r.name;
+        return;
+      }
+      
+      if (field === 'name') r.name = value.trim();
+      else if (field === 'phone') r.phone = value.trim();
+      else if (field === 'currentJob') r.currentJob = value.trim();
+      else if (field === 'stage') r.stage = value;
+      
+      saveRecruits();
+      renderRecruitPage();
+      
+      // 點擊清單項目保持狀態
+      setTimeout(() => {
+        const item = document.querySelector(`#recruit-list-container [data-id="${activeRecruitId}"]`);
+        if (item) item.classList.add('active');
+      }, 50);
+      showToast('資料已成功更新。', 'success');
+    };
+
+    // 刪除增員對象
+    window.deleteRecruitFromMain = function() {
+      if (!activeRecruitId) return;
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+      
+      showConfirmModal({
+        title: '確認刪除增員對象',
+        body: `確定要刪除增員對象 <b>${r.name}</b> 嗎？這將會一併清除所有的面談與輔導紀錄。`,
+        confirmText: '🗑️ 確定刪除',
+        onConfirm: () => {
+          recruits = recruits.filter(item => item.id !== activeRecruitId);
+          saveRecruits();
+          activeRecruitId = null;
+          renderRecruitPage();
+          switchRecruitLeftTab('prepare1');
+          showToast('已刪除該增員對象。', 'success');
+        }
+      });
+    };
+
+    // 渲染面談進度紀錄清單 (主面板)
+    window.renderRecruitMainLogs = function(r) {
+      const container = document.getElementById('recruit-main-logs-container');
+      if (!container) return;
+      container.innerHTML = '';
+      const logs = r.interviewLogs || [];
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:20px;">（尚無面談紀錄）</div>';
+        return;
+      }
+
+      // 日期由新到舊排序
+      const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach((log) => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '4px';
+        item.style.background = 'rgba(255,255,255,0.02)';
+        item.style.border = '1px solid rgba(255,255,255,0.06)';
+        item.style.padding = '8px 10px';
+        item.style.borderRadius = '8px';
+        
+        // 取得在原始陣列中的索引
+        const origIndex = logs.indexOf(log);
+        
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; color:var(--text-secondary);">
+            <span>📅 ${log.date}</span>
+            <span style="cursor:pointer; color:#ef4444;" onclick="deleteRecruitLogFromMain('interview', ${origIndex})">🗑️</span>
+          </div>
+          <div style="font-size:0.78rem; color:#fff; word-break:break-all; white-space:pre-wrap; margin-top:2px;">${log.content}</div>
+        `;
+        container.appendChild(item);
+      });
+    };
+
+    // 渲染輔導紀錄清單 (主面板)
+    window.renderCoachingListUI = function(r) {
+      const container = document.getElementById('coaching-logs-container');
+      if (!container) return;
+      container.innerHTML = '';
+      const logs = r.coachingLogs || [];
+
+      if (logs.length === 0) {
+        container.innerHTML = '<div style="font-size:0.75rem; color:var(--text-secondary); opacity:0.6; text-align:center; padding:30px;">（暫無輔導陪伴紀錄，點擊右上方新增）</div>';
+        return;
+      }
+
+      // 日期由新到舊排序
+      const sorted = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+      sorted.forEach((log) => {
+        const item = document.createElement('div');
+        item.className = 'c360-list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.style.gap = '4px';
+        item.style.background = 'rgba(255,255,255,0.02)';
+        item.style.border = '1px solid rgba(255,255,255,0.06)';
+        item.style.padding = '8px 10px';
+        item.style.borderRadius = '8px';
+        
+        // 取得在原始陣列中的索引
+        const origIndex = logs.indexOf(log);
+
+        item.innerHTML = `
+          <div style="display:flex; justify-content:space-between; width:100%; font-size:0.7rem; color:var(--text-secondary);">
+            <span style="font-weight:700; color:var(--accent);">🎯 主題: ${escapeHtml(log.topic)}</span>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <span>📅 ${log.date}</span>
+              <span style="cursor:pointer; color:#ef4444;" onclick="deleteRecruitLogFromMain('coaching', ${origIndex})">🗑️</span>
+            </div>
+          </div>
+          <div style="font-size:0.78rem; color:#fff; word-break:break-all; white-space:pre-wrap; margin-top:2px;">${log.content}</div>
+        `;
+        container.appendChild(item);
+      });
+    };
+
+    // 刪除面談或輔導紀錄
+    window.deleteRecruitLogFromMain = function(type, index) {
+      if (!activeRecruitId) return;
+      loadRecruits();
+      const r = recruits.find(item => item.id === activeRecruitId);
+      if (!r) return;
+
+      showConfirmModal({
+        title: '確認刪除紀錄',
+        body: '確定要永久刪除這筆對話紀錄嗎？',
+        confirmText: '🗑️ 確定刪除',
+        onConfirm: () => {
+          if (type === 'coaching') {
+            r.coachingLogs.splice(index, 1);
+          } else {
+            r.interviewLogs.splice(index, 1);
+          }
+          saveRecruits();
+          
+          // 重新選取以刷新 UI
+          selectRecruitItem(activeRecruitId);
+          showToast('紀錄已成功刪除。', 'success');
+        }
+      });
+    };
+
+    window.openAddRecruitMainLog = function() {
+      openAddRecruitLog('interview');
+    };
+
+    window.openAddCoachingLog = function() {
+      openAddRecruitLog('coaching');
+    };
+
+    // 渲染增員清單頁面 (左側清單)
     window.renderRecruitPage = function() {
-      const grid = document.getElementById('recruit-grid');
-      if (!grid) return;
-      grid.innerHTML = '';
+      const container = document.getElementById('recruit-list-container');
+      if (!container) return;
+      container.innerHTML = '';
 
       if (recruits.length === 0) {
-        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-secondary); opacity:0.6;">（尚無增員資料，點擊右上角新增）</div>';
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary); opacity:0.6; font-size:0.75rem;">（尚無增員資料）</div>';
         return;
       }
 
@@ -8153,46 +10356,32 @@
         'contacting': '接觸中',
         'interviewing': '面談中',
         'examining': '考核中',
-        'joined': '已登錄下屬'
+        'joined': '已登錄'
       };
 
       sorted.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'customer-card';
-        card.style.position = 'relative';
-        card.style.display = 'flex';
-        card.style.flexDirection = 'column';
-        card.style.justifyContent = 'space-between';
+        const div = document.createElement('div');
+        div.className = 'fixed-msg-list-item';
+        div.setAttribute('data-id', r.id);
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+        div.style.padding = '8px 10px';
+        div.style.borderRadius = '6px';
+        div.style.cursor = 'pointer';
+        div.style.background = 'rgba(255,255,255,0.02)';
+        div.style.border = '1px solid rgba(255,255,255,0.04)';
+        div.style.transition = 'all 0.2s ease';
+        div.style.color = '#fff';
         
-        // 取得最近一筆面談或輔導的備忘簡短摘要
-        let lastLogText = '暫無紀錄';
-        if (r.stage === 'joined') {
-          if (r.coachingLogs && r.coachingLogs.length > 0) {
-            const lastLog = r.coachingLogs[r.coachingLogs.length - 1];
-            lastLogText = `[輔導] ${lastLog.date}: ${lastLog.topic}`;
-          }
-        } else {
-          if (r.interviewLogs && r.interviewLogs.length > 0) {
-            const lastLog = r.interviewLogs[r.interviewLogs.length - 1];
-            lastLogText = `[面談] ${lastLog.date}: ${lastLog.content.slice(0, 15)}...`;
-          }
-        }
-
-        card.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div style="font-weight:800; font-size:1.05rem; color:#fff;">${r.name}</div>
-            <span class="recruit-stage-badge ${r.stage}">${stageLabels[r.stage] || '未知'}</span>
-          </div>
-          <div style="font-size:0.75rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
-            <div>📱 電話：${r.phone || '無'}</div>
-            <div>💼 現職：${r.currentJob || '無'}</div>
-            <div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.04); color:rgba(255,255,255,0.6); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${lastLogText}">
-              📝 ${lastLogText}
-            </div>
-          </div>
+        const stageLabel = stageLabels[r.stage] || r.stage;
+        
+        div.innerHTML = `
+          <span style="font-weight: 700; color: #fff; font-size: 0.78rem;">${escapeHtml(r.name)} <span style="font-size:0.68rem; opacity:0.6; font-weight: normal; margin-left: 4px; color:#fff;">[${stageLabel}]</span></span>
         `;
-        card.onclick = () => openRecruitDrawer(r.id);
-        grid.appendChild(card);
+        
+        div.onclick = () => selectRecruitItem(r.id);
+        container.appendChild(div);
       });
     };
 
@@ -8470,7 +10659,18 @@
 
       saveRecruits();
       closeAddRecruitLogModal();
-      renderRecruitLogsUI(r);
+      if (typeof renderRecruitLogsUI === 'function') {
+        renderRecruitLogsUI(r);
+      }
+      renderRecruitMainLogs(r);
+      renderCoachingListUI(r);
+      renderRecruitPage();
+      
+      // 點擊清單項目保持選取狀態
+      setTimeout(() => {
+        const item = document.querySelector(`#recruit-list-container [data-id="${activeRecruitId}"]`);
+        if (item) item.classList.add('active');
+      }, 50);
       showToast('紀錄儲存成功！', 'success');
     };
 
@@ -8498,3 +10698,481 @@
         }
       });
     };
+
+    // ==========================================================================
+    // 📍 店家陌生開發管理核心模組 (Business Canvassing Core Module)
+    // ==========================================================================
+
+    let canvassingMap = null;
+    let canvassingMarkers = [];
+
+    // 快取解析後的地址經緯度
+    const geocodeCacheKey = 'canvassing_geocode_cache';
+    let geocodeCache = {};
+    try {
+      const cached = localStorage.getItem(geocodeCacheKey);
+      geocodeCache = cached ? JSON.parse(cached) : {};
+    } catch(e) {
+      geocodeCache = {};
+    }
+
+    // 免費地址解析 (Nominatim Geocoding)
+    async function geocodeAddress(address) {
+      if (!address) return null;
+      const cleanAddr = address.trim();
+      if (geocodeCache[cleanAddr]) {
+        return geocodeCache[cleanAddr];
+      }
+
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(cleanAddr)}`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          const result = { lat, lon };
+          geocodeCache[cleanAddr] = result;
+          localStorage.setItem(geocodeCacheKey, JSON.stringify(geocodeCache));
+          return result;
+        }
+      } catch(e) {
+        debugLog("Geocoding failed: " + e);
+      }
+      return null;
+    }
+
+    // 兩點經緯度計算距離 (公尺) - Haversine 演算法
+    function getDistanceInMeters(lat1, lon1, lat2, lon2) {
+      if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // 地址防重複即時偵測
+    window.checkDuplicateAddress = async function(address) {
+      const alertDiv = document.getElementById('canvassing-duplicate-alert');
+      if (!alertDiv) return;
+
+      if (!address || address.trim().length < 4) {
+        alertDiv.style.display = 'none';
+        return;
+      }
+
+      const cleanAddr = address.trim();
+      const editId = document.getElementById('canvassing-edit-id').value;
+
+      // 1. 完全相同地址比對
+      const matchExact = canvassing.find(c => c.address === cleanAddr && c.id !== editId);
+      if (matchExact) {
+        alertDiv.textContent = `⚠️ 重複警告：此地址與店家「${matchExact.storeName}」完全相同！`;
+        alertDiv.style.display = 'block';
+        return;
+      }
+
+      // 2. 50 公尺內鄰近店家比對
+      const coord = await geocodeAddress(cleanAddr);
+      if (coord) {
+        const nearStore = canvassing.find(c => {
+          if (c.id === editId) return false;
+          const dist = getDistanceInMeters(coord.lat, coord.lon, c.latitude, c.longitude);
+          return dist <= 50;
+        });
+
+        if (nearStore) {
+          alertDiv.textContent = `⚠️ 距離過近：此地址距離「${nearStore.storeName}」僅約 50 公尺內，請評估是否重複踩線！`;
+          alertDiv.style.display = 'block';
+          return;
+        }
+      }
+      alertDiv.style.display = 'none';
+    };
+
+    // 本機資料存取
+    function loadCanvassing() {
+      try {
+        const raw = localStorage.getItem('crm_canvassing');
+        canvassing = raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        canvassing = [];
+      }
+    }
+
+    function saveLocalCanvassing() {
+      localStorage.setItem('crm_canvassing', JSON.stringify(canvassing));
+      // 非同步同步到雲端
+      pushCanvassingToCloud();
+    }
+
+    // 雲端拉取
+    async function pullCanvassingFromCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const res = await fetch(`${crmSettings.apiUrl}?type=canvassing`);
+        const resJson = await res.json();
+        if (resJson.status === 'success') {
+          canvassing = resJson.canvassing || [];
+          localStorage.setItem('crm_canvassing', JSON.stringify(canvassing));
+          if (currentViewMode === 'canvassing') {
+            renderCanvassingPage();
+          }
+        }
+      } catch(e) {
+        debugLog("Pull canvassing failed: " + e);
+      }
+    }
+
+    // 雲端推送
+    async function pushCanvassingToCloud() {
+      if (crmSettings.isOffline || !crmSettings.apiUrl) return;
+      try {
+        const res = await fetch(crmSettings.apiUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'saveCanvassing',
+            canvassing: canvassing
+          })
+        });
+        const resJson = await res.json();
+        if (resJson.status === 'success') {
+          showToast("店家陌生開發資料已同步至雲端 ☁️", "success");
+        } else {
+          showToast("同步失敗：" + (resJson.message || "未知原因"), "error");
+        }
+      } catch(e) {
+        showToast("同步失敗，請檢查網路連線", "error");
+        debugLog("Push canvassing failed: " + e);
+      }
+    }
+
+    // 初始化 Leaflet 地圖 (解決 hidden container 載入問題)
+    function initCanvassingMap() {
+      const mapContainer = document.getElementById('canvassing-map');
+      if (!mapContainer) return;
+
+      if (canvassingMap) {
+        setTimeout(() => {
+          canvassingMap.invalidateSize();
+        }, 100);
+        return;
+      }
+
+      // 預設以台北市政府為中心點
+      canvassingMap = L.map('canvassing-map', {
+        zoomControl: true,
+        maxZoom: 18,
+        minZoom: 9
+      }).setView([25.038, 121.564], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(canvassingMap);
+
+      setTimeout(() => {
+        canvassingMap.invalidateSize();
+      }, 200);
+    }
+
+    // 獲取進度對應的 CSS 類
+    function getCanvassingStatusClass(status) {
+      if (!status) return 'status-grey';
+      if (status.includes('未拜訪')) return 'status-grey';
+      if (status.includes('初次接觸')) return 'status-blue';
+      if (status.includes('議題探討')) return 'status-yellow';
+      if (status.includes('方案評估')) return 'status-orange';
+      if (status.includes('合作簽約')) return 'status-green';
+      if (status.includes('暫拒')) return 'status-red';
+      if (status.includes('永久拒絕')) return 'status-purple';
+      return 'status-grey';
+    }
+
+    // 獲取地圖大頭針配色
+    function getCanvassingPinColorClass(status) {
+      if (!status) return 'pin-grey';
+      if (status.includes('未拜訪')) return 'pin-grey';
+      if (status.includes('初次接觸')) return 'pin-blue';
+      if (status.includes('議題探討')) return 'pin-yellow';
+      if (status.includes('方案評估')) return 'pin-orange';
+      if (status.includes('合作簽約')) return 'pin-green';
+      if (status.includes('暫拒')) return 'pin-red';
+      if (status.includes('永久拒絕')) return 'pin-purple';
+      return 'pin-grey';
+    }
+
+    // 更新地圖標記 (Markers)
+    function updateMapMarkers() {
+      if (!canvassingMap) return;
+
+      // 清理舊的 markers
+      canvassingMarkers.forEach(m => canvassingMap.removeLayer(m));
+      canvassingMarkers = [];
+
+      canvassing.forEach(item => {
+        if (!item.latitude || !item.longitude) return;
+
+        const pinColorClass = getCanvassingPinColorClass(item.status);
+        const icon = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div class="custom-map-pin ${pinColorClass}">${item.visitCount || 0}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+
+        const popupContent = `
+          <div style="font-size:0.8rem; text-align:left; color:#fff; min-width:180px; line-height:1.4;">
+            <div style="font-weight:700; font-size:0.85rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; color:#fff;">${escapeHtml(item.storeName)}</div>
+            <div style="margin-bottom:2px;">📌 <b>地址:</b> ${escapeHtml(item.address)}</div>
+            <div style="margin-bottom:2px;">🚦 <b>狀態:</b> ${escapeHtml(item.status)}</div>
+            <div style="margin-bottom:2px;">🚗 <b>拜訪:</b> ${item.visitCount || 0} 次</div>
+            ${item.contactName ? `<div style="margin-bottom:2px;">👤 <b>聯絡人:</b> ${escapeHtml(item.contactName)}</div>` : ''}
+            ${item.reminderDate ? `<div style="margin-bottom:2px; color:var(--accent);">⏰ <b>下次跟進:</b> ${item.reminderDate}</div>` : ''}
+            <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+              <button class="btn btn-sm" onclick="openEditCanvassingModal('${item.id}')" style="font-size:0.7rem; padding:2px 8px; cursor:pointer;">📝 編輯</button>
+              <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}" target="_blank" class="btn btn-sm" style="background:#4285f4; color:#fff; text-decoration:none; margin-left:6px; display:inline-flex; align-items:center; height:20px; font-size:0.7rem; line-height:1; border-radius:4px; padding:2px 8px; font-weight:700;">🚗 導航</a>
+            </div>
+          </div>
+        `;
+
+        const marker = L.marker([item.latitude, item.longitude], { icon })
+          .bindPopup(popupContent)
+          .addTo(canvassingMap);
+
+        canvassingMarkers.push(marker);
+      });
+    }
+
+    // 點擊清單項目移動地圖視野並高亮
+    window.focusStoreOnMap = function(id) {
+      document.querySelectorAll('.canvassing-store-item').forEach(el => el.classList.remove('active'));
+      const itemEl = document.getElementById(`canvassing-item-${id}`);
+      if (itemEl) itemEl.classList.add('active');
+
+      const store = canvassing.find(c => c.id === id);
+      if (store && store.latitude && store.longitude && canvassingMap) {
+        canvassingMap.setView([store.latitude, store.longitude], 16);
+        const idx = canvassing.findIndex(c => c.id === id);
+        const marker = canvassingMarkers[idx];
+        if (marker) {
+          setTimeout(() => {
+            marker.openPopup();
+          }, 100);
+        }
+      }
+    };
+
+    // 渲染清單
+    window.renderCanvassingList = function(list = canvassing) {
+      const container = document.getElementById('canvassing-list-container');
+      if (!container) return;
+
+      if (list.length === 0) {
+        container.innerHTML = '<div style="font-size:0.8rem; color:var(--text-secondary); text-align:center; padding:20px; opacity:0.6;">（無店家資料）</div>';
+        return;
+      }
+
+      const sortedList = [...list].sort((a, b) => (b.lastUpdated || '').localeCompare(a.lastUpdated || ''));
+
+      container.innerHTML = sortedList.map(item => {
+        const statusClass = getCanvassingStatusClass(item.status);
+        const issuesHtml = item.issues ? item.issues.split(',').map(iss => `<span style="background:rgba(99,102,241,0.06); padding:2px 5px; border-radius:4px; font-size:0.68rem; border:1px solid rgba(99,102,241,0.15); color:var(--accent);">${iss}</span>`).join(' ') : '<span style="opacity:0.4; font-size:0.68rem;">尚未商談議題</span>';
+        
+        return `
+          <div class="canvassing-store-item" id="canvassing-item-${item.id}" onclick="focusStoreOnMap('${item.id}')">
+            <div class="canvassing-store-title">
+              <span>${escapeHtml(item.storeName)}</span>
+              <span class="canvassing-badge ${statusClass}">${escapeHtml(item.status || '⚪ 未拜訪')}</span>
+            </div>
+            <div class="canvassing-store-address">📍 ${escapeHtml(item.address)}</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;">
+              ${issuesHtml}
+            </div>
+            <div class="canvassing-store-info-row">
+              <span>👤 聯絡人: ${escapeHtml(item.contactName || '無')}</span>
+              <span>🚗 拜訪次數: ${item.visitCount || 0}</span>
+            </div>
+            ${item.reminderDate ? `<div style="font-size:0.68rem; color:var(--accent); font-weight:700; margin-top:2px;">⏰ 跟進日期: ${item.reminderDate}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    };
+
+    // 搜尋與篩選邏輯
+    window.filterCanvassingList = function() {
+      const q = (document.getElementById('canvassing-search-input').value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('canvassing-filter-status').value;
+
+      const filtered = canvassing.filter(item => {
+        const matchQ = !q || (item.storeName || '').toLowerCase().includes(q) || (item.address || '').toLowerCase().includes(q);
+        const matchStatus = !statusFilter || item.status === statusFilter;
+        return matchQ && matchStatus;
+      });
+
+      renderCanvassingList(filtered);
+    };
+
+    // 渲染整個頁面
+    window.renderCanvassingPage = function() {
+      renderCanvassingList();
+      filterCanvassingList();
+    };
+
+    // Modal 控制項
+    window.openAddCanvassingModal = function() {
+      const modal = document.getElementById('add-canvassing-modal');
+      if (!modal) return;
+
+      document.getElementById('canvassing-modal-title').textContent = '新增店家開發記錄';
+      document.getElementById('canvassing-edit-id').value = '';
+      document.getElementById('canvassing-input-storeName').value = '';
+      document.getElementById('canvassing-input-address').value = '';
+      document.getElementById('canvassing-input-contactName').value = '';
+      document.getElementById('canvassing-input-phone').value = '';
+      document.getElementById('canvassing-input-status').value = '⚪ 未拜訪';
+      document.getElementById('canvassing-input-visitCount').value = '0';
+      document.getElementById('canvassing-input-reminderDate').value = '';
+      document.getElementById('canvassing-input-notes').value = '';
+      document.getElementById('canvassing-duplicate-alert').style.display = 'none';
+      document.getElementById('btn-delete-canvassing').style.display = 'none';
+
+      // 清除議題 checkboxes
+      document.querySelectorAll('input[name="canvassing-issues"]').forEach(cb => cb.checked = false);
+
+      modal.classList.add('active');
+    };
+
+    window.openEditCanvassingModal = function(id) {
+      const modal = document.getElementById('add-canvassing-modal');
+      if (!modal) return;
+
+      const item = canvassing.find(c => c.id === id);
+      if (!item) return;
+
+      document.getElementById('canvassing-modal-title').textContent = '編輯店家開發記錄';
+      document.getElementById('canvassing-edit-id').value = item.id;
+      document.getElementById('canvassing-input-storeName').value = item.storeName || '';
+      document.getElementById('canvassing-input-address').value = item.address || '';
+      document.getElementById('canvassing-input-contactName').value = item.contactName || '';
+      document.getElementById('canvassing-input-phone').value = item.phone || '';
+      document.getElementById('canvassing-input-status').value = item.status || '⚪ 未拜訪';
+      document.getElementById('canvassing-input-visitCount').value = item.visitCount || 0;
+      document.getElementById('canvassing-input-reminderDate').value = item.reminderDate || '';
+      document.getElementById('canvassing-input-notes').value = item.notes || '';
+      document.getElementById('canvassing-input-latitude').value = item.latitude || '';
+      document.getElementById('canvassing-input-longitude').value = item.longitude || '';
+      document.getElementById('canvassing-duplicate-alert').style.display = 'none';
+      document.getElementById('btn-delete-canvassing').style.display = 'block';
+
+      // 選取商談議題
+      const issues = item.issues ? item.issues.split(',') : [];
+      document.querySelectorAll('input[name="canvassing-issues"]').forEach(cb => {
+        cb.checked = issues.includes(cb.value);
+      });
+
+      modal.classList.add('active');
+    };
+
+    window.closeCanvassingModal = function() {
+      const modal = document.getElementById('add-canvassing-modal');
+      if (modal) modal.classList.remove('active');
+    };
+
+    // 儲存店家
+    window.saveCanvassingStore = async function() {
+      const storeName = (document.getElementById('canvassing-input-storeName').value || '').trim();
+      const address = (document.getElementById('canvassing-input-address').value || '').trim();
+
+      if (!storeName) {
+        showToast("請輸入店家名稱 *", "error");
+        document.getElementById('canvassing-input-storeName').focus();
+        return;
+      }
+      if (!address) {
+        showToast("請輸入店家地址 *", "error");
+        document.getElementById('canvassing-input-address').focus();
+        return;
+      }
+
+      showToast("正在解析地址與保存資料...", "info");
+
+      // 地址經緯度解析
+      const coord = await geocodeAddress(address);
+      const lat = coord ? coord.lat : null;
+      const lon = coord ? coord.lon : null;
+
+      const editId = document.getElementById('canvassing-edit-id').value;
+      const contactName = (document.getElementById('canvassing-input-contactName').value || '').trim();
+      const phone = (document.getElementById('canvassing-input-phone').value || '').trim();
+      const status = document.getElementById('canvassing-input-status').value;
+      const visitCount = parseInt(document.getElementById('canvassing-input-visitCount').value) || 0;
+      const reminderDate = document.getElementById('canvassing-input-reminderDate').value;
+      const notes = (document.getElementById('canvassing-input-notes').value || '').trim();
+
+      // 商談議題勾選
+      const checkedIssues = [];
+      document.querySelectorAll('input[name="canvassing-issues"]:checked').forEach(cb => {
+        checkedIssues.push(cb.value);
+      });
+      const issues = checkedIssues.join(',');
+
+      const now = new Date();
+      const lastUpdated = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+      if (editId) {
+        // 編輯
+        const idx = canvassing.findIndex(c => c.id === editId);
+        if (idx !== -1) {
+          canvassing[idx] = {
+            id: editId, storeName, address, contactName, phone, status, issues, visitCount, notes, reminderDate,
+            latitude: lat || canvassing[idx].latitude, longitude: lon || canvassing[idx].longitude, lastUpdated
+          };
+        }
+      } else {
+        // 新增
+        const newStore = {
+          id: 'canv_' + Date.now(),
+          storeName, address, contactName, phone, status, issues, visitCount, notes, reminderDate,
+          latitude: lat, longitude: lon, lastUpdated
+        };
+        canvassing.push(newStore);
+      }
+
+      saveLocalCanvassing();
+      closeCanvassingModal();
+      renderCanvassingPage();
+      updateMapMarkers();
+      
+      if (!coord) {
+        showToast("店家資料已儲存（但無法解析經緯度，未在地圖上標記）", "warning");
+      } else {
+        showToast("店家開發記錄已儲存！", "success");
+      }
+    };
+
+    // 刪除店家
+    window.deleteCanvassingStore = function() {
+      const editId = document.getElementById('canvassing-edit-id').value;
+      if (!editId) return;
+
+      showConfirm({
+        icon: '🗑️',
+        title: '確認刪除店家記錄',
+        body: '確定要永久刪除此陌生開發店家記錄嗎？此操作無法還原。',
+        okText: '確認刪除',
+        okStyle: 'background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444;',
+        onOk: () => {
+          canvassing = canvassing.filter(c => c.id !== editId);
+          saveLocalCanvassing();
+          closeCanvassingModal();
+          renderCanvassingPage();
+          updateMapMarkers();
+          showToast("店家開發記錄已刪除", "success");
+        }
+      });
+    };
+
