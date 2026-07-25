@@ -672,7 +672,12 @@
             discussDate: row["Ｓ"] || '',
             discussNotes: row["Ｓ週年服務備忘"] || '',
             visitTasks: row["Ｓ現場任務"] ? parseJsonSafe(row["Ｓ現場任務"]) : []
-          }
+          },
+          calendarEvents: (() => {
+            try {
+              return row["Google日曆連結"] ? parseJsonSafe(row["Google日曆連結"]) : {};
+            } catch (e) { return {}; }
+          })()
         };
       });
       sortCasesBySavedOrder(mapped);
@@ -764,6 +769,7 @@
         "ＰＣ現場任務": JSON.stringify(pc.visitTasks || []),
         "Ｃ現場任務": JSON.stringify(cc.visitTasks || []),
         "Ｓ現場任務": JSON.stringify(s.visitTasks || []),
+        "Google日曆連結": JSON.stringify(c.calendarEvents || {}),
         "最後更新時間": c.lastUpdated || ''
       };
     }
@@ -807,6 +813,7 @@
           const result = await response.json();
           if (result.status === 'success') {
             successCount++;
+            handleSyncSuccessResponse(result, item);
           } else {
             throw new Error(result.message || '雲端同步錯誤');
           }
@@ -859,6 +866,7 @@
         
         if (result.status === 'success') {
           updateConnectionStatus('connected');
+          handleSyncSuccessResponse(result, queueItem);
           if (syncQueue.length > 0) {
             setTimeout(processSyncQueue, 500);
           }
@@ -872,6 +880,105 @@
         syncQueue.push(queueItem);
         saveSyncQueue();
         showToast("雲端同步失敗，已儲存至本機暫存", "error");
+      }
+    }
+
+    function handleSyncSuccessResponse(result, queueItem) {
+      if (!result.updatedData) return;
+      
+      const caseId = result.updatedData["客戶ID"] || (queueItem.data ? queueItem.data["客戶ID"] : null);
+      if (!caseId) return;
+      
+      const c = cases.find(item => item.id === caseId || (item.clientName === queueItem.customerName && queueItem.action !== 'delete'));
+      if (!c) return;
+      
+      let localChanged = false;
+      
+      if (result.calendarLinks) {
+        c.calendarEvents = result.calendarLinks;
+        localChanged = true;
+      }
+      
+      if (result.calendarNotifications && result.calendarNotifications.length > 0) {
+        result.calendarNotifications.forEach(notif => {
+          const type = notif.type;
+          const newDate = notif.newDate;
+          const newTimeSlot = notif.newTimeSlot;
+          const isDeleted = notif.deleted;
+          
+          let targetDetailObj = null;
+          let dateField = 'meetDate';
+          let slotField = 'meetTimeSlot';
+          let stateField = 'meetState';
+          
+          if (type === 'OA') {
+            targetDetailObj = c.oaDetails;
+          } else if (type === 'OA_DISCUSS') {
+            targetDetailObj = c.oaDetails;
+            dateField = 'discussDate';
+            slotField = '';
+            stateField = 'discussState';
+          } else if (type === 'PC') {
+            targetDetailObj = c.pcDetails;
+          } else if (type === 'PC_DISCUSS') {
+            targetDetailObj = c.pcDetails;
+            dateField = 'discussDate';
+            slotField = '';
+            stateField = 'discussState';
+          } else if (type === 'C') {
+            targetDetailObj = c.cDetails;
+          } else if (type === 'S') {
+            targetDetailObj = c.sDetails;
+          }
+          
+          if (targetDetailObj) {
+            if (isDeleted) {
+              targetDetailObj[dateField] = '';
+              if (slotField) targetDetailObj[slotField] = '';
+              
+              if (type === 'OA') targetDetailObj.meetState = '未面談';
+              else if (type === 'PC') targetDetailObj.meetState = '未遞送';
+              else targetDetailObj[stateField] = 'dim';
+              
+              showToast(`📅 偵測到日曆行程被秘書取消，系統已同步清除 ${c.clientName} - ${notif.phaseName} 的日期`, 'info');
+              localChanged = true;
+            } else {
+              if (targetDetailObj[dateField] !== newDate || (slotField && targetDetailObj[slotField] !== newTimeSlot)) {
+                targetDetailObj[dateField] = newDate;
+                if (slotField) targetDetailObj[slotField] = newTimeSlot;
+                
+                if (type === 'OA' && targetDetailObj.meetState === '未面談') {
+                  targetDetailObj.meetState = 'pending';
+                } else if (type === 'PC' && targetDetailObj.meetState === '未遞送') {
+                  targetDetailObj.meetState = 'confirmed';
+                } else if (targetDetailObj[stateField] === 'dim') {
+                  targetDetailObj[stateField] = 'ongoing';
+                }
+                
+                let slotChinese = '';
+                if (newTimeSlot) {
+                  const slotMap = {
+                    before_lunch: '午餐前',
+                    lunch: '午餐',
+                    afternoon_1: '下午一',
+                    afternoon_2: '下午二',
+                    dinner: '晚餐',
+                    after_dinner: '晚餐後'
+                  };
+                  slotChinese = ' (' + (slotMap[newTimeSlot] || newTimeSlot) + ')';
+                }
+                
+                showToast(`📅 偵測到秘書已在日曆變更 ${c.clientName} - ${notif.phaseName} 時間，系統已自動同步為 ${newDate}${slotChinese}`, 'success');
+                localChanged = true;
+              }
+            }
+          }
+        });
+      }
+      
+      if (localChanged) {
+        saveCasesToStorage();
+        renderCases();
       }
     }
 

@@ -33,7 +33,7 @@ function getOrCreateSheet() {
     "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
     "Ｓ", "Ｓ保單送達狀態", "Ｓ保單送達備忘", "Ｓ契撤追蹤狀態", "Ｓ週年服務狀態", 
     "Ｓ週年服務備忘", "當前階段", "開拓管道", "客戶來源", "介紹人", "緣故標籤", "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段",
-    "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "訪談類型", "最後更新時間"
+    "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "訪談類型", "Google日曆連結", "最後更新時間"
   ];
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
@@ -69,7 +69,7 @@ function getOrCreateSheet() {
       "Ｃ文件準備狀態", "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
       "ＯＡ訪前規劃日期", "ＯＡ訪前演練日期", "ＯＡ訪後討論日期", "ＯＡ訪前演練備忘",
       "ＰＣ規劃建議日期", "ＰＣ講解演練日期", "ＰＣ已傳建議日期", "ＰＣ規劃建議備忘", "ＰＣ講解演練備忘",
-      "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務"
+      "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "Google日曆連結"
     ];
 
     columnsToCheck.forEach(colName => {
@@ -752,10 +752,28 @@ function doPost(e) {
     
     if (action === 'delete') {
       if (targetRowIndex !== -1) {
+        // 同步刪除所有關聯的未來日曆行程
+        try {
+          const linksVal = values[targetRowIndex - 1][headers.indexOf("Google日曆連結")] || "";
+          if (linksVal) {
+            const links = JSON.parse(linksVal);
+            const cal = getOrCreateCrmCalendar();
+            Object.keys(links).forEach(type => {
+              const eventId = links[type];
+              if (eventId) {
+                try {
+                  const ev = cal.getEventById(eventId);
+                  if (ev) ev.deleteEvent();
+                } catch(e) {}
+              }
+            });
+          }
+        } catch(e) {}
+
         sheet.deleteRow(targetRowIndex);
         // 資料變更，清除快取
         clearCachedData();
-        return jsonResponse({ status: 'success', message: '已成功刪除案件' });
+        return jsonResponse({ status: 'success', message: '已成功刪除案件，並清理相關日曆行程' });
       } else {
         return jsonResponse({ status: 'error', message: '在試算表中找不到客戶姓名「' + searchName + '」的資料列' });
       }
@@ -764,13 +782,108 @@ function doPost(e) {
     if (action === 'create' || action === 'add' || action === 'update') {
       if (!data) throw new Error("無資料內容無法寫入");
       
+      // --- Google 日曆同步對接 ---
+      let calendarLinks = {};
+      try {
+        calendarLinks = data["Google日曆連結"] ? JSON.parse(data["Google日曆連結"]) : {};
+      } catch(e) { calendarLinks = {}; }
+
+      const caseId = data["客戶ID"] || ("case_" + Math.random().toString(36).substr(2, 9));
+      const clientName = data["客戶姓名"] || "";
+      const issueName = data["邀約議題"] || "";
+
+      // 定義要同步的行程類型與其對應的欄位
+      const syncSpecs = [
+        { type: "OA", dateKey: "ＯＡ", slotKey: "ＯＡ時段", stateKey: "ＯＡ已面談", notesKey: "ＯＡ訪前規劃備忘", rescheduleKey: "ＯＡ改期歷史" },
+        { type: "OA_DISCUSS", dateKey: "ＯＡ訪後討論日期", slotKey: "", stateKey: "ＯＡ訪後討論狀態", notesKey: "ＯＡ訪後討論備忘", rescheduleKey: "" },
+        { type: "PC", dateKey: "ＰＣ", slotKey: "ＰＣ時段", stateKey: "ＰＣ已遞送", notesKey: "ＰＣ規劃建議備忘", rescheduleKey: "ＰＣ改期歷史" },
+        { type: "PC_DISCUSS", dateKey: "ＰＣ講解演練日期", slotKey: "", stateKey: "ＰＣ訪後討論狀態", notesKey: "ＰＣ訪後討論備忘", rescheduleKey: "" },
+        { type: "C", dateKey: "Ｃ", slotKey: "Ｃ時段", stateKey: "Ｃ簽約狀態", notesKey: "Ｃ文件準備備忘", rescheduleKey: "Ｃ改期歷史" },
+        { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ保單送達狀態", notesKey: "Ｓ保單送達備忘", rescheduleKey: "" }
+      ];
+
+      let calendarNotifications = []; // 用於記錄哪些日期被日曆反向更新了
+
+      syncSpecs.forEach(spec => {
+        const dateVal = data[spec.dateKey] || "";
+        const slotVal = spec.slotKey ? (data[spec.slotKey] || "") : "";
+        
+        let stateVal = 'dim';
+        if (spec.type === 'OA') {
+          stateVal = (data["ＯＡ已面談"] === '已面談' || data["ＯＡ已面談"] === '喬時間中') ? 'ongoing' : 'dim';
+          if (data["ＯＡ已面談"] === '已面談') stateVal = 'active';
+        } else if (spec.type === 'PC') {
+          stateVal = data["ＰＣ已遞送"] === '已遞送' ? 'active' : 'ongoing';
+          if (!dateVal) stateVal = 'dim';
+        } else {
+          stateVal = data[spec.stateKey] || 'dim';
+        }
+
+        const notesVal = data[spec.notesKey] || "";
+        const rescheduleVal = spec.rescheduleKey ? (data[spec.rescheduleKey] || "") : "";
+        const oldEventId = calendarLinks[spec.type] || "";
+
+        // 執行同步
+        const syncResult = syncCaseToCalendar(
+          caseId,
+          clientName,
+          issueName,
+          spec.type,
+          dateVal,
+          slotVal,
+          stateVal,
+          notesVal,
+          rescheduleVal,
+          oldEventId
+        );
+
+        if (syncResult) {
+          if (syncResult.eventId) {
+            calendarLinks[spec.type] = syncResult.eventId;
+          } else {
+            delete calendarLinks[spec.type];
+          }
+
+          // 如果被日曆反向更改了日期或時段，同步回寫入 data 中
+          if (syncResult.updatedByCalendar) {
+            data[spec.dateKey] = syncResult.date;
+            if (spec.slotKey) {
+              data[spec.slotKey] = syncResult.timeSlot;
+            }
+            
+            if (syncResult.deleted) {
+              if (spec.type === 'OA') data["ＯＡ已面談"] = "未面談";
+              else if (spec.type === 'PC') data["ＰＣ已遞送"] = "未遞送";
+              else data[spec.stateKey] = "dim";
+            } else {
+              if (spec.type === 'OA' && data["ＯＡ已面談"] === '未面談') {
+                data["ＯＡ已面談"] = "喬時間中";
+              } else if (spec.type === 'PC' && data["ＰＣ已遞送"] === '未遞送') {
+                data["ＰＣ已遞送"] = "已遞送";
+              } else if (data[spec.stateKey] === 'dim') {
+                data[spec.stateKey] = 'ongoing';
+              }
+            }
+
+            calendarNotifications.push({
+              type: spec.type,
+              phaseName: spec.type === 'OA' ? 'OA需求面談' : (spec.type === 'PC' ? 'PC講解建議' : (spec.type === 'C' ? 'C約定簽約' : (spec.type === 'S' ? 'S送達服務' : (spec.type === 'OA_DISCUSS' ? 'OA訪後討論' : 'PC講解演練')))),
+              newDate: syncResult.date,
+              newTimeSlot: syncResult.timeSlot,
+              deleted: !!syncResult.deleted
+            });
+          }
+        }
+      });
+
+      data["Google日曆連結"] = JSON.stringify(calendarLinks);
+
       // 根據 headers 的順序，拼湊出寫入資料列的 rowData
       const rowData = headers.map(header => {
         return data[header] !== undefined ? data[header] : '';
       });
       
       if (action === 'create' || action === 'add') {
-        // 如果案件已存在，則轉為更新
         if (targetRowIndex !== -1) {
           sheet.getRange(targetRowIndex, 1, 1, headers.length).setValues([rowData]);
         } else {
@@ -780,19 +893,222 @@ function doPost(e) {
         if (targetRowIndex !== -1) {
           sheet.getRange(targetRowIndex, 1, 1, headers.length).setValues([rowData]);
         } else {
-          // 若找不到該客戶姓名，但動作是更新，則自動防呆建立新列
           sheet.appendRow(rowData);
         }
       }
       
       // 資料變更，清除快取
       clearCachedData();
-      return jsonResponse({ status: 'success', message: '資料寫入/更新成功' });
+      return jsonResponse({ 
+        status: 'success', 
+        message: '資料寫入/更新成功',
+        calendarNotifications: calendarNotifications,
+        calendarLinks: calendarLinks,
+        updatedData: data
+      });
     }
     
     throw new Error("無效的 action 指令");
   } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
+  }
+}
+
+// ==========================================
+// === Google 日曆雙向同步核心輔助函數 ===
+// ==========================================
+
+function getOrCreateCrmCalendar() {
+  const calName = "客戶案件管理";
+  const calendars = CalendarApp.getCalendarsByName(calName);
+  if (calendars.length > 0) {
+    return calendars[0];
+  }
+  return CalendarApp.createCalendar(calName);
+}
+
+function getEventTimeRange(dateStr, timeSlot) {
+  const dateParts = dateStr.split('-');
+  const year = parseInt(dateParts[0], 10);
+  const month = parseInt(dateParts[1], 10) - 1;
+  const day = parseInt(dateParts[2], 10);
+  
+  let startHour = 9;
+  let endHour = 17;
+  let isAllDay = true;
+  
+  if (timeSlot) {
+    isAllDay = false;
+    switch (timeSlot) {
+      case 'before_lunch':
+        startHour = 11; endHour = 12;
+        break;
+      case 'lunch':
+        startHour = 12; endHour = 14;
+        break;
+      case 'afternoon_1':
+        startHour = 14; endHour = 16;
+        break;
+      case 'afternoon_2':
+        startHour = 16; endHour = 18;
+        break;
+      case 'dinner':
+        startHour = 18; endHour = 20;
+        break;
+      case 'after_dinner':
+        startHour = 20; endHour = 22;
+        break;
+      default:
+        isAllDay = true;
+    }
+  }
+  
+  if (isAllDay) {
+    return { isAllDay: true, startDate: new Date(year, month, day) };
+  } else {
+    return {
+      isAllDay: false,
+      startTime: new Date(year, month, day, startHour, 0, 0),
+      endTime: new Date(year, month, day, endHour, 0, 0)
+    };
+  }
+}
+
+function mapTimeToSlot(startTime) {
+  if (!startTime) return '';
+  const hour = startTime.getHours();
+  if (hour >= 11 && hour < 12) return 'before_lunch';
+  if (hour >= 12 && hour < 14) return 'lunch';
+  if (hour >= 14 && hour < 16) return 'afternoon_1';
+  if (hour >= 16 && hour < 18) return 'afternoon_2';
+  if (hour >= 18 && hour < 20) return 'dinner';
+  if (hour >= 20 && hour < 22) return 'after_dinner';
+  return '';
+}
+
+function syncCaseToCalendar(caseId, clientName, issueName, phaseType, dateStr, timeSlot, state, notes, rescheduleHistory, eventId) {
+  const cal = getOrCreateCrmCalendar();
+  let event = null;
+  let wasDeletedOnCalendar = false;
+  
+  if (eventId) {
+    try {
+      event = cal.getEventById(eventId);
+      if (!event) {
+        wasDeletedOnCalendar = true;
+      }
+    } catch (e) {
+      wasDeletedOnCalendar = true;
+    }
+  }
+  
+  if (wasDeletedOnCalendar) {
+    return { eventId: "", date: "", timeSlot: "", updatedByCalendar: true, deleted: true };
+  }
+  
+  if (!event && dateStr) {
+    const startSearch = new Date();
+    startSearch.setDate(startSearch.getDate() - 365);
+    const endSearch = new Date();
+    endSearch.setDate(endSearch.getDate() + 730);
+    const searchString = "CRM_CASE_ID: " + caseId + " | TYPE: " + phaseType;
+    const foundEvents = cal.getEvents(startSearch, endSearch, { search: searchString });
+    if (foundEvents.length > 0) {
+      event = foundEvents[0];
+    }
+  }
+  
+  let phaseName = "";
+  switch(phaseType) {
+    case "OA": phaseName = "OA需求面談"; break;
+    case "PC": phaseName = "PC講解建議"; break;
+    case "C": phaseName = "C約定簽約"; break;
+    case "S": phaseName = "S送達服務"; break;
+    case "OA_DISCUSS": phaseName = "OA訪後討論"; break;
+    case "PC_DISCUSS": phaseName = "PC講解演練"; break;
+    default: phaseName = "會面討論";
+  }
+  
+  let title = clientName + "｜" + phaseName + "｜" + (issueName || "客戶服務");
+  if (state === 'active') {
+    title = "[✓已完成] " + title;
+  }
+  
+  let desc = "CRM_CASE_ID: " + caseId + " | TYPE: " + phaseType + "\n";
+  desc += "客戶姓名: " + clientName + "\n";
+  if (notes) desc += "備忘內容: " + notes + "\n";
+  
+  if (rescheduleHistory) {
+    try {
+      const history = typeof rescheduleHistory === 'string' ? JSON.parse(rescheduleHistory) : rescheduleHistory;
+      if (Array.isArray(history) && history.length > 0) {
+        desc += "\n--- 改期歷史紀錄 ---\n";
+        history.forEach(h => {
+          desc += "[" + (h.date || "") + "] 原時間: " + (h.originalDate || "無") + " -> 改期至: " + (h.newDate || "") + " (" + (h.reason || "無說明") + ")\n";
+        });
+      }
+    } catch(e) {}
+  }
+  
+  if (!dateStr || dateStr.trim() === "" || state === 'dim') {
+    if (event) {
+      event.deleteEvent();
+    }
+    return null;
+  }
+  
+  const timeRange = getEventTimeRange(dateStr, timeSlot);
+  
+  if (event) {
+    let calendarDateChanged = false;
+    let newSyncedDate = dateStr;
+    let newSyncedSlot = timeSlot;
+    
+    if (timeRange.isAllDay) {
+      const calDate = event.getAllDayStartDate();
+      const expectedDate = timeRange.startDate;
+      if (calDate && calDate.toDateString() !== expectedDate.toDateString()) {
+        calendarDateChanged = true;
+        const y = calDate.getFullYear();
+        const m = ("0" + (calDate.getMonth() + 1)).slice(-2);
+        const d = ("0" + calDate.getDate()).slice(-2);
+        newSyncedDate = y + "-" + m + "-" + d;
+        newSyncedSlot = "";
+      }
+    } else {
+      const calStart = event.getStartTime();
+      const expectedStart = timeRange.startTime;
+      if (calStart && calStart.getTime() !== expectedStart.getTime()) {
+        calendarDateChanged = true;
+        const y = calStart.getFullYear();
+        const m = ("0" + (calStart.getMonth() + 1)).slice(-2);
+        const d = ("0" + calStart.getDate()).slice(-2);
+        newSyncedDate = y + "-" + m + "-" + d;
+        newSyncedSlot = mapTimeToSlot(calStart);
+      }
+    }
+    
+    if (calendarDateChanged) {
+      event.setTitle(title);
+      event.setDescription(desc);
+      return { eventId: event.getId(), date: newSyncedDate, timeSlot: newSyncedSlot, updatedByCalendar: true };
+    }
+    
+    event.setTitle(title);
+    event.setDescription(desc);
+    if (timeRange.isAllDay) {
+      event.setAllDayDate(timeRange.startDate);
+    } else {
+      event.setTime(timeRange.startTime, timeRange.endTime);
+    }
+    return { eventId: event.getId(), updatedByCalendar: false };
+  } else {
+    if (timeRange.isAllDay) {
+      event = cal.createAllDayEvent(title, timeRange.startDate, { description: desc });
+    } else {
+      event = cal.createEvent(title, timeRange.startTime, timeRange.endTime, { description: desc });
+    }
+    return { eventId: event.getId(), updatedByCalendar: false };
   }
 }
 
