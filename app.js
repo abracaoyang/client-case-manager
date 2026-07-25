@@ -1316,6 +1316,7 @@
         
         populateBirthdayDropdowns('quick-birthday');
         populateBirthdayDropdowns('customer-birthday');
+        populateBirthdayDropdowns('c360-birthday-input');
         debugLog("生日年月日下拉選單初始化完畢");
         
         loadTodos();
@@ -9926,8 +9927,21 @@
       if (!grid) return;
       grid.innerHTML = '';
       
+      const searchVal = (document.getElementById('customer-search-input')?.value || '').trim().toLowerCase();
+      
       if (customers.length === 0) {
         grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-secondary); opacity:0.6;">（尚無客戶資料，點擊右上角新增）</div>';
+        return;
+      }
+      
+      const filtered = customers.filter(c => {
+        if (!searchVal) return true;
+        return (c.name || '').toLowerCase().includes(searchVal) || 
+               (c.phone || '').toLowerCase().includes(searchVal);
+      });
+      
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:var(--text-secondary); opacity:0.6;">（無符合搜尋條件的客戶）</div>';
         return;
       }
       
@@ -10037,7 +10051,20 @@
       // 填充基本資料
       document.getElementById('c360-client-name').textContent = cust.name;
       document.getElementById('c360-client-phone').textContent = cust.phone || '無電話欄位';
-      document.getElementById('c360-client-birthday').textContent = cust.birthday ? '🎂 ' + cust.birthday : '';
+      
+      // 初始化與設定生日顯示
+      const bdayStr = cust.birthday || '';
+      const textSpan = document.getElementById('c360-client-birthday-text');
+      if (textSpan) {
+        textSpan.textContent = bdayStr ? '🎂 ' + bdayStr : '🎂 設定生日';
+      }
+      setBirthdayToDropdowns('c360-birthday-input', bdayStr);
+      
+      // 確保初始狀態為顯示模式
+      const displayWrapper = document.getElementById('c360-birthday-display-wrapper');
+      const editWrapper = document.getElementById('c360-birthday-edit-wrapper');
+      if (displayWrapper) displayWrapper.style.display = 'flex';
+      if (editWrapper) editWrapper.style.display = 'none';
       
       // 綁定編輯按鈕
       document.getElementById('c360-edit-btn').onclick = () => {
@@ -10061,6 +10088,47 @@
       document.getElementById('customer-360-overlay').classList.remove('active');
       document.getElementById('customer-360-drawer').classList.remove('active');
       activeC360CustomerId = null;
+    };
+
+    window.startC360BirthdayEdit = function() {
+      const displayWrapper = document.getElementById('c360-birthday-display-wrapper');
+      const editWrapper = document.getElementById('c360-birthday-edit-wrapper');
+      if (displayWrapper) displayWrapper.style.display = 'none';
+      if (editWrapper) editWrapper.style.display = 'flex';
+    };
+
+    window.cancelC360BirthdayInline = function(event) {
+      if (event) event.stopPropagation();
+      const displayWrapper = document.getElementById('c360-birthday-display-wrapper');
+      const editWrapper = document.getElementById('c360-birthday-edit-wrapper');
+      if (displayWrapper) displayWrapper.style.display = 'flex';
+      if (editWrapper) editWrapper.style.display = 'none';
+    };
+
+    window.saveC360BirthdayInline = function(event) {
+      if (event) event.stopPropagation();
+      if (!activeC360CustomerId) return;
+      
+      const newBday = getBirthdayFromDropdowns('c360-birthday-input');
+      const cust = customers.find(c => c.id === activeC360CustomerId);
+      
+      if (cust) {
+        cust.birthday = newBday;
+        cust.lastUpdated = new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+        saveCustomers();
+        showToast(`已成功更新 ${cust.name} 的生日日期 🎂`, 'success');
+        
+        const textSpan = document.getElementById('c360-client-birthday-text');
+        if (textSpan) {
+          textSpan.textContent = newBday ? '🎂 ' + newBday : '🎂 設定生日';
+        }
+        if (window.renderCustomerPage) renderCustomerPage();
+      }
+      
+      const displayWrapper = document.getElementById('c360-birthday-display-wrapper');
+      const editWrapper = document.getElementById('c360-birthday-edit-wrapper');
+      if (displayWrapper) displayWrapper.style.display = 'flex';
+      if (editWrapper) editWrapper.style.display = 'none';
     };
 
     // --- 左欄：家人家庭關係與基本保障框架 ---

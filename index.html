@@ -116,8 +116,9 @@
   <!-- ===== 客戶畫布管理頁面 ===== -->
   <div id="customer-page" style="display: none;">
     <div id="customer-page-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
-      <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 16px; flex: 1;">
         <h2 style="margin: 0;">👥 客戶 360° 顧問畫布</h2>
+        <input type="text" id="customer-search-input" oninput="renderCustomerPage()" placeholder="🔍 搜尋客戶姓名或電話..." style="max-width: 300px; width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; box-sizing: border-box; outline: none;">
       </div>
       <button class="btn btn-primary" onclick="openAddCustomerModal()" style="padding: 5px 14px; font-size: 0.82rem;">＋ 新增客戶</button>
     </div>
@@ -1254,7 +1255,29 @@
         <span style="font-size: 1.3rem;">👤</span>
         <h2 id="c360-client-name" style="margin: 0; font-weight: 800;">客戶姓名</h2>
         <span id="c360-client-phone" style="font-size: 0.85rem; color: var(--text-secondary); margin-left: 8px;"></span>
-        <span id="c360-client-birthday" style="font-size: 0.85rem; color: #f43f5e; margin-left: 8px;"></span>
+        <div id="c360-birthday-container" style="display: flex; align-items: center; margin-left: 8px; font-size: 0.85rem;">
+          <!-- 顯示模式 -->
+          <div id="c360-birthday-display-wrapper" style="cursor: pointer; color: #f43f5e; display: flex; align-items: center; gap: 4px;" onclick="startC360BirthdayEdit()" title="點擊編輯生日">
+            <span id="c360-client-birthday-text">🎂 設定生日</span>
+            <span style="font-size: 0.7rem; opacity: 0.6; margin-left: 2px;">✏️</span>
+          </div>
+          <!-- 編輯模式 (預設隱藏) -->
+          <div id="c360-birthday-edit-wrapper" style="display: none; align-items: center; gap: 4px; background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+            <input type="number" id="c360-birthday-input-year" placeholder="西元" style="width: 55px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 0.75rem;" min="1900" max="2100">
+            <span style="color: var(--text-secondary); font-size: 0.75rem;">年</span>
+            <select id="c360-birthday-input-month" style="width: 50px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 2px; border-radius: 4px; font-size: 0.75rem; box-sizing: border-box;">
+              <!-- JS 動態生成 -->
+            </select>
+            <span style="color: var(--text-secondary); font-size: 0.75rem;">月</span>
+            <select id="c360-birthday-input-day" style="width: 50px; background: var(--bg-input); border: 1px solid var(--border-color); color: #fff; padding: 2px; border-radius: 4px; font-size: 0.75rem; box-sizing: border-box;">
+              <!-- JS 動態生成 -->
+            </select>
+            <span style="color: var(--text-secondary); font-size: 0.75rem;">日</span>
+            
+            <button onclick="saveC360BirthdayInline(event)" style="background: #10b981; border: none; color: #000; font-weight: 700; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; margin-left: 4px;">✓</button>
+            <button onclick="cancelC360BirthdayInline(event)" style="background: rgba(255,255,255,0.1); border: none; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">✕</button>
+          </div>
+        </div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
         <button class="btn" id="c360-edit-btn" style="padding: 4px 10px; font-size: 0.85rem;">✏ 編輯資料</button>
