@@ -1030,13 +1030,13 @@ function syncCaseToCalendar(caseId, clientName, issueName, phaseType, dateStr, t
   
   let phaseName = "";
   switch(phaseType) {
-    case "OA": phaseName = "OA需求面談"; break;
-    case "PC": phaseName = "PC講解建議"; break;
-    case "C": phaseName = "C約定簽約"; break;
-    case "S": phaseName = "S送達服務"; break;
-    case "OA_DISCUSS": phaseName = "OA訪後討論"; break;
-    case "PC_DISCUSS": phaseName = "PC講解演練"; break;
-    default: phaseName = "會面討論";
+    case "OA": phaseName = "OA"; break;
+    case "PC": phaseName = "PC"; break;
+    case "C": phaseName = "C"; break;
+    case "S": phaseName = "S"; break;
+    case "OA_DISCUSS": phaseName = "OA Discuss"; break;
+    case "PC_DISCUSS": phaseName = "PC Discuss"; break;
+    default: phaseName = "Meeting";
   }
   
   let title = clientName + "｜" + phaseName + "｜" + (issueName || "客戶服務");
