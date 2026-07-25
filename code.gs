@@ -987,6 +987,16 @@ function mapTimeToSlot(startTime) {
 }
 
 function syncCaseToCalendar(caseId, clientName, issueName, phaseType, dateStr, timeSlot, state, notes, rescheduleHistory, eventId) {
+  // 防呆：如果 dateStr 是 Date 物件（試算表讀出的日期格式），轉為 YYYY-MM-DD 字串
+  if (dateStr instanceof Date) {
+    const y = dateStr.getFullYear();
+    const m = ("0" + (dateStr.getMonth() + 1)).slice(-2);
+    const d = ("0" + dateStr.getDate()).slice(-2);
+    dateStr = y + "-" + m + "-" + d;
+  } else if (dateStr && typeof dateStr !== 'string') {
+    dateStr = dateStr.toString();
+  }
+
   const cal = getOrCreateCrmCalendar();
   let event = null;
   let wasDeletedOnCalendar = false;
