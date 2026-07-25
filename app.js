@@ -663,6 +663,7 @@
           sDetails: {
             meetDate: row["Ｓ"] || '',
             meetTimeSlot: row["Ｓ時段"] || '',
+            meetState: row["Ｓ約定狀態"] || '',
             planState: row["Ｓ保單送達狀態"] || 'dim',
             planDate: row["Ｓ"] || '',
             planNotes: row["Ｓ保單送達備忘"] || '',
@@ -765,6 +766,7 @@
         "議題發想備忘": c.issueNote || '',
         "Ｃ時段": (c.cDetails ? c.cDetails.meetTimeSlot : '') || '',
         "Ｓ時段": (c.sDetails ? c.sDetails.meetTimeSlot : '') || '',
+        "Ｓ約定狀態": (c.sDetails ? c.sDetails.meetState : '') || '',
         "ＯＡ現場任務": JSON.stringify(oa.visitTasks || []),
         "ＰＣ現場任務": JSON.stringify(pc.visitTasks || []),
         "Ｃ現場任務": JSON.stringify(cc.visitTasks || []),
@@ -2559,7 +2561,7 @@
         c.oaDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.oaDetails || {});
         c.pcDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", discussNotes: "", rescheduleHistory: [] }, c.pcDetails || {});
         c.cDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", signState: "dim", signDate: "", remedyState: "dim", remedyDate: "", submitState: "dim", submitDate: "", submitProcessed: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "", rescheduleHistory: [] }, c.cDetails || {});
-        c.sDetails = Object.assign({ meetDate: "", meetState: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "" }, c.sDetails || {});
+        c.sDetails = Object.assign({ meetDate: "", meetState: "", meetTimeSlot: "", planState: "dim", planDate: "", practiceState: "dim", practiceDate: "", discussState: "dim", discussDate: "", planNotes: "", discussNotes: "" }, c.sDetails || {});
 
         // 建立卡片列
         const row = document.createElement('div');
@@ -2760,7 +2762,6 @@
                 <div class="node-date" style="width: 44px; text-align: right; font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; white-space: nowrap; flex-shrink: 0;">${sDateText}</div>
                 <div class="node-dot">S</div>
                 <div class="sub-tag-group" onclick="event.stopPropagation()">
-                  <span class="sub-tag-btn ${c.sDetails.planState === 'active' ? 'active s-plan' : (c.sDetails.planState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPlanDirect('${c.id}', event)">${c.sDetails.planState === 'active' ? fmtSubLabel('保單送達', c.sDetails.planDate) : (c.sDetails.planState === 'ongoing' ? fmtSubLabel('保單送達', c.sDetails.planDate) : '保單送達')}</span>
                   <span class="sub-tag-btn ${c.sDetails.practiceState === 'active' ? 'active s-practice' : (c.sDetails.practiceState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPracticeDirect('${c.id}', event)">${c.sDetails.practiceState === 'active' ? fmtSubLabel('契撤追蹤', c.sDetails.practiceDate) : (c.sDetails.practiceState === 'ongoing' ? fmtSubLabel('契撤追蹤', c.sDetails.practiceDate) : '契撤追蹤')}</span>
                   <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : (c.sDetails.discussState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSDiscussDirect('${c.id}', event)">${c.sDetails.discussState === 'active' ? fmtSubLabel('年度提醒', c.sDetails.discussDate) : (c.sDetails.discussState === 'ongoing' ? fmtSubLabel('年度提醒', c.sDetails.discussDate) : '年度提醒')}</span>
                 </div>
@@ -2859,7 +2860,7 @@
       if (section === 'client' || section === 'SA') {
         drawerWidth = 900;
       } else if (section === 'S') {
-        drawerWidth = 820;
+        drawerWidth = 700; // 縮小 S 抽屜寬度以精準對齊，防止太靠左偏斜
       } else if (section === 'OA' || section === 'PC') {
         drawerWidth = 1050; // 進一步加大寬度，提供三個超寬面板與大文字框
       } else if (section === 'C') {
@@ -2880,13 +2881,17 @@
         const lightCenter = elementLeft + elementWidth / 2;
         let computedLeft = lightCenter - (finalWidth / 2);
         
-        // 避免超出右邊界
-        if (computedLeft + finalWidth > rowWidth - 20) {
-          computedLeft = rowWidth - 20 - finalWidth;
+        // 考慮到 .drawer-row 有 padding-left (1.5rem = 24px)，扣除 24px 以使容器中心線對齊箭頭
+        computedLeft = computedLeft - 24;
+        
+        // 避免超出右邊界 (考慮左右 padding 各 24px，可用空間為 rowWidth - 48)
+        const maxLeft = rowWidth - 48 - finalWidth;
+        if (computedLeft > maxLeft) {
+          computedLeft = maxLeft;
         }
         
         // 避免超出左邊界
-        if (computedLeft < 10) computedLeft = 10;
+        if (computedLeft < 0) computedLeft = 0;
 
         drawerContent.style.marginLeft = `${computedLeft}px`;
         drawerContent.style.width = `${finalWidth}px`;
@@ -4466,15 +4471,35 @@
 
       container.innerHTML = `
         <div class="drawer-grid-horizontal">
-          <div style="flex: 1.2; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 12px; display:flex; flex-direction:column; justify-content:space-between; min-width: 0;">
-            <div>
-              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 售後服務設定</div>
-              <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04); width:100%; box-sizing:border-box;">
-                <input type="text" readonly value="${s.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 's')" placeholder="選擇服務日期" style="width:100%; text-align:center; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer; background:transparent; border:none; color:#fff;">
+          <div style="flex: 1.5; border-right: 1px solid rgba(255,255,255,0.06); padding-right: 12px; display:flex; flex-direction:column; gap:6px; min-width: 0; justify-content:space-between; height:100%;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">📅 保單送達日期</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
+                <input type="text" readonly value="${s.meetDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'meetDate', 's')" placeholder="選擇送達日期" style="width:100%; text-align:center; padding:2px 4px; font-size:0.75rem; height:22px; cursor:pointer; background:transparent; border:none; color:#fff;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-size:0.7rem; color:var(--text-secondary);">送達約定狀態</span>
+                <div style="display:flex; gap:4px;">
+                  <button class="status-badge-btn ${s.meetState === 'pending' ? 'active' : ''}" onclick="updateSField('${c.id}', 'meetState', 'pending')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">喬時間中</button>
+                  <button class="status-badge-btn ${s.meetState === 'confirmed' ? 'active' : ''}" onclick="updateSField('${c.id}', 'meetState', 'confirmed')" style="flex:1; justify-content:center; padding: 3px 0; font-size:0.68rem; border-radius:4px;">已送達約定</button>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <span style="font-size:0.7rem; color:var(--text-secondary);">送達時間時段</span>
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:3px;">
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'before_lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'before_lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐前</button>
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'lunch' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'lunch')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">午餐</button>
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'afternoon_1' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'afternoon_1')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午一</button>
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'afternoon_2' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'afternoon_2')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">下午二</button>
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐</button>
+                  <button type="button" class="status-badge-btn ${s.meetTimeSlot === 'after_dinner' ? 'active' : ''}" onclick="updateTimeSlot('${c.id}', 's', 'after_dinner')" style="justify-content:center; padding: 2px 0; font-size:0.66rem; border-radius:4px;">晚餐後</button>
+                </div>
               </div>
             </div>
-            <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent); margin-top: 12px;">👥 客戶 360 畫布</button>
-            <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000; margin-top: 6px;">✓ 完成</button>
+            <div style="display:flex; flex-direction:column; gap:4px; margin-top: 8px;">
+              <button type="button" class="btn" onclick="openC360FromCaseRow('${c.clientName}', '${c.id}')" style="width: 100%; justify-content: center; height: 24px; font-size: 0.68rem; font-weight: 700; border-color: var(--accent); color: var(--accent);">👥 客戶 360 畫布</button>
+              <button onclick="closeCaseDrawer('${c.id}')" class="btn btn-primary" style="width:100%; justify-content:center; height:24px; font-size:0.68rem; font-weight:700; background:var(--color-c); color:#000;">✓ 完成</button>
+            </div>
           </div>
 
           ${renderVisitTasksSection(c, 'S')}

@@ -32,7 +32,7 @@ function getOrCreateSheet() {
     "Ｃ", "Ｃ已成交", "Ｃ文件準備狀態", 
     "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
     "Ｓ", "Ｓ保單送達狀態", "Ｓ保單送達備忘", "Ｓ契撤追蹤狀態", "Ｓ週年服務狀態", 
-    "Ｓ週年服務備忘", "當前階段", "開拓管道", "客戶來源", "介紹人", "緣故標籤", "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段",
+    "Ｓ週年服務備忘", "當前階段", "開拓管道", "客戶來源", "介紹人", "緣故標籤", "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段", "Ｓ約定狀態",
     "ＯＡ現場任務", "ＰＣ現場任務", "Ｃ現場任務", "Ｓ現場任務", "訪談類型", "Google日曆連結", "最後更新時間"
   ];
   if (!sheet) {
@@ -65,7 +65,7 @@ function getOrCreateSheet() {
     let nextCol = lastCol + 1;
     const columnsToCheck = [
       "客戶ID",
-      "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段",
+      "ＳＡ備忘", "是否封存", "聯絡資訊", "備註", "議題發想備忘", "Ｃ時段", "Ｓ時段", "Ｓ約定狀態",
       "Ｃ文件準備狀態", "Ｃ文件準備備忘", "Ｃ文件準備日期", "Ｃ簽約狀態", "Ｃ簽約日期", "Ｃ補件狀態", "Ｃ補件日期", "Ｃ送件狀態", "Ｃ送件日期", "Ｃ送件已處理", "Ｃ要保簽署狀態", "Ｃ要保簽署日期", "Ｃ保費首扣狀態", "Ｃ保費首扣日期", "Ｃ保費首扣備忘", "Ｃ改期歷史",
       "ＯＡ訪前規劃日期", "ＯＡ訪前演練日期", "ＯＡ訪後討論日期", "ＯＡ訪前演練備忘",
       "ＰＣ規劃建議日期", "ＰＣ講解演練日期", "ＰＣ已傳建議日期", "ＰＣ規劃建議備忘", "ＰＣ講解演練備忘",
@@ -799,7 +799,7 @@ function doPost(e) {
         { type: "PC", dateKey: "ＰＣ", slotKey: "ＰＣ時段", stateKey: "ＰＣ已遞送", notesKey: "ＰＣ規劃建議備忘", rescheduleKey: "ＰＣ改期歷史" },
         { type: "PC_DISCUSS", dateKey: "ＰＣ講解演練日期", slotKey: "", stateKey: "ＰＣ訪後討論狀態", notesKey: "ＰＣ訪後討論備忘", rescheduleKey: "" },
         { type: "C", dateKey: "Ｃ", slotKey: "Ｃ時段", stateKey: "Ｃ簽約狀態", notesKey: "Ｃ文件準備備忘", rescheduleKey: "Ｃ改期歷史" },
-        { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ保單送達狀態", notesKey: "Ｓ保單送達備忘", rescheduleKey: "" }
+        { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ約定狀態", notesKey: "", rescheduleKey: "" }
       ];
 
       let calendarNotifications = []; // 用於記錄哪些日期被日曆反向更新了
@@ -1208,7 +1208,7 @@ function batchSyncAllExistingCasesToCalendar() {
     { type: "PC", dateKey: "ＰＣ", slotKey: "ＰＣ時段", stateKey: "ＰＣ已遞送", notesKey: "ＰＣ規劃建議備忘", rescheduleKey: "ＰＣ改期歷史" },
     { type: "PC_DISCUSS", dateKey: "ＰＣ講解演練日期", slotKey: "", stateKey: "ＰＣ訪後討論狀態", notesKey: "ＰＣ訪後討論備忘", rescheduleKey: "" },
     { type: "C", dateKey: "Ｃ", slotKey: "Ｃ時段", stateKey: "Ｃ簽約狀態", notesKey: "Ｃ文件準備備忘", rescheduleKey: "Ｃ改期歷史" },
-    { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ保單送達狀態", notesKey: "Ｓ保單送達備忘", rescheduleKey: "" }
+    { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ約定狀態", notesKey: "", rescheduleKey: "" }
   ];
   
   let syncCount = 0;
