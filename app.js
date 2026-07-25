@@ -1314,6 +1314,10 @@
         rebuildIssueSelects();
         debugLog("議題選單初始化完畢");
         
+        populateBirthdayDropdowns('quick-birthday');
+        populateBirthdayDropdowns('customer-birthday');
+        debugLog("生日年月日下拉選單初始化完畢");
+        
         loadTodos();
         debugLog("待辦事項本機快取載入完畢");
 
@@ -1353,6 +1357,7 @@
         'todo-notify-modal':() => toggleTodoNotifyModal(false),
         'activities-modal': () => toggleActivitiesModal(false),
         'products-review-modal': () => toggleProductsReviewModal(false),
+        'quick-birthday-modal': () => toggleQuickBirthdayModal(false),
         'add-customer-modal':() => closeAddCustomerModal(),
         'add-family-modal': () => closeAddFamilyModal(),
         'add-note-modal':   () => closeAddNoteModal(),
@@ -1633,30 +1638,56 @@
         }
       });
 
-      debugLog("連線模式判定中... 離線模式: " + crmSettings.isOffline + ", API網址: " + crmSettings.apiUrl);
-      if (!crmSettings.isOffline && crmSettings.apiUrl) {
-        debugLog("啟動雲端同步載入 (fetchCases)...");
-        await fetchCustomersFromCloud();
-        await fetchProductsFromCloud();
-        await fetchFixedMessagesFromCloud();
-        await fetchSalesProcessesFromCloud();
-        await fetchIssuesFromCloud();
-        await fetchGroupsFromCloud();
-        await fetchCases();
-      } else {
-        debugLog("啟動本機快取載入...");
-        loadCustomers();
-        loadProducts();
-        loadFixedMessages();
-        loadSalesProcesses();
-        loadCasesFromStorage();
-        debugLog("本機快取載入完畢，準備渲染 (renderCases)...");
-        renderCases();
-        renderSidebarList(); // 同步渲染側欄案件清單
-        debugLog("本機案件渲染完畢");
-      }
+      // 1. 先快速加載本機快取數據，確保介面與開工步驟秒開
+      debugLog("快速加載本機快取...");
+      loadCustomers();
+      loadProducts();
+      loadFixedMessages();
+      loadSalesProcesses();
+      loadCasesFromStorage();
+      renderCases();
+      renderSidebarList(); // 同步渲染側欄案件清單
+      debugLog("本機案件渲染完畢");
+
+      // 2. 秒開：立即啟動開工七步驟與提醒看板
       startADHDStartupFlow();
       checkTodayVisits();
+      checkMobileView();
+      window.addEventListener('resize', checkMobileView);
+
+      // 3. 默默在背景進行雲端熱同步（並行下載，最大化提升效率）
+      if (!crmSettings.isOffline && crmSettings.apiUrl) {
+        debugLog("🔄 背景啟動雲端數據熱同步...");
+        (async () => {
+          try {
+            // 同時拉取基礎輔助資料 (Promise.all)
+            await Promise.all([
+              fetchCustomersFromCloud(),
+              fetchProductsFromCloud(),
+              fetchFixedMessagesFromCloud(),
+              fetchSalesProcessesFromCloud(),
+              fetchIssuesFromCloud(),
+              fetchGroupsFromCloud()
+            ]);
+            
+            // 隨後拉取案件資料 (fetchCases 內部自帶 loading 判斷與連線指示狀態更新)
+            await fetchCases();
+            
+            debugLog("☁️ 背景數據熱同步完成！");
+            
+            // 重新刷新畫布與提醒看板
+            renderCases();
+            renderSidebarList();
+            checkTodayVisits();
+            if (window.innerWidth <= 768) {
+              renderMobileMinimalView();
+            }
+          } catch(e) {
+            console.error("背景雲端熱同步失敗：", e);
+          }
+        })();
+      }
+      
       // 啟動時從雲端同步待辦事項（非同步，不影響主流程）
       fetchTodosFromCloud();
       } catch (e) {
@@ -2170,6 +2201,62 @@
       return window.maskName(clean);
     };
 
+    window.populateBirthdayDropdowns = function(prefix) {
+      const monthSel = document.getElementById(`${prefix}-month`);
+      const daySel = document.getElementById(`${prefix}-day`);
+      if (monthSel) {
+        let mHtml = '<option value="">--</option>';
+        for (let i = 1; i <= 12; i++) {
+          const val = String(i).padStart(2, '0');
+          mHtml += `<option value="${val}">${i}</option>`;
+        }
+        monthSel.innerHTML = mHtml;
+      }
+      if (daySel) {
+        let dHtml = '<option value="">--</option>';
+        for (let i = 1; i <= 31; i++) {
+          const val = String(i).padStart(2, '0');
+          dHtml += `<option value="${val}">${i}</option>`;
+        }
+        daySel.innerHTML = dHtml;
+      }
+    };
+
+    window.getBirthdayFromDropdowns = function(prefix) {
+      const year = (document.getElementById(`${prefix}-year`).value || '').trim();
+      const month = document.getElementById(`${prefix}-month`).value;
+      const day = document.getElementById(`${prefix}-day`).value;
+      if (!month || !day) return '';
+      return year ? `${year}-${month}-${day}` : `${month}-${day}`;
+    };
+
+    window.setBirthdayToDropdowns = function(prefix, bdayStr) {
+      const yearEl = document.getElementById(`${prefix}-year`);
+      const monthEl = document.getElementById(`${prefix}-month`);
+      const dayEl = document.getElementById(`${prefix}-day`);
+      if (!yearEl || !monthEl || !dayEl) return;
+      if (!bdayStr) {
+        yearEl.value = '';
+        monthEl.value = '';
+        dayEl.value = '';
+        return;
+      }
+      const parts = bdayStr.split('-');
+      if (parts.length === 3) {
+        yearEl.value = parts[0];
+        monthEl.value = parts[1];
+        dayEl.value = parts[2];
+      } else if (parts.length === 2) {
+        yearEl.value = '';
+        monthEl.value = parts[0];
+        dayEl.value = parts[1];
+      } else {
+        yearEl.value = '';
+        monthEl.value = '';
+        dayEl.value = '';
+      }
+    };
+
     // 切換去識別化狀態 (Option + H 觸發)
     window.toggleAnonymization = function(forceState) {
       if (typeof forceState === 'boolean') {
@@ -2567,7 +2654,7 @@
                 <div class="sub-tag-group" onclick="event.stopPropagation()">
                   <span class="sub-tag-btn ${c.sDetails.planState === 'active' ? 'active s-plan' : (c.sDetails.planState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPlanDirect('${c.id}', event)">${c.sDetails.planState === 'active' ? fmtSubLabel('保單送達', c.sDetails.planDate) : (c.sDetails.planState === 'ongoing' ? fmtSubLabel('保單送達', c.sDetails.planDate) : '保單送達')}</span>
                   <span class="sub-tag-btn ${c.sDetails.practiceState === 'active' ? 'active s-practice' : (c.sDetails.practiceState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSPracticeDirect('${c.id}', event)">${c.sDetails.practiceState === 'active' ? fmtSubLabel('契撤追蹤', c.sDetails.practiceDate) : (c.sDetails.practiceState === 'ongoing' ? fmtSubLabel('契撤追蹤', c.sDetails.practiceDate) : '契撤追蹤')}</span>
-                  <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : (c.sDetails.discussState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSDiscussDirect('${c.id}', event)">${c.sDetails.discussState === 'active' ? fmtSubLabel('週年服務', c.sDetails.discussDate) : (c.sDetails.discussState === 'ongoing' ? fmtSubLabel('週年服務', c.sDetails.discussDate) : '週年服務')}</span>
+                  <span class="sub-tag-btn ${c.sDetails.discussState === 'active' ? 'active s-discuss' : (c.sDetails.discussState === 'ongoing' ? 'ongoing-s' : '')}" onclick="toggleSDiscussDirect('${c.id}', event)">${c.sDetails.discussState === 'active' ? fmtSubLabel('年度提醒', c.sDetails.discussDate) : (c.sDetails.discussState === 'ongoing' ? fmtSubLabel('年度提醒', c.sDetails.discussDate) : '年度提醒')}</span>
                 </div>
               </div>
             </div>
@@ -4319,7 +4406,7 @@
                   <div>
                     <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,${isDiscussDone ? '0.18' : (isDiscussOngoing ? '0.3' : '0.04')}); border-radius:6px; padding:6px; display:flex; flex-direction:column; gap:4px;">
                       <div style="display:flex; align-items:center; justify-content:space-between;">
-                        <span style="font-size:0.72rem; color:#34d399; font-weight:700;">週年服務</span>
+                        <span style="font-size:0.72rem; color:#34d399; font-weight:700;">年度提醒</span>
                         <button class="status-badge-btn ${isDiscussDone ? 'active agree' : (isDiscussOngoing ? 'ongoing-s' : '')}" 
                                 onclick="handleCBtnClick('${c.id}', 'discussState', 's')" 
                                 ondblclick="handleCBtnDblClick('${c.id}', 'discussState', 's')"
@@ -4327,8 +4414,8 @@
                           ${isDiscussDone ? `✓ (${formatShortDate(s.discussDate)})` : (isDiscussOngoing ? `進行中` : '標記進行中')}
                         </button>
                       </div>
-                      <input type="text" readonly id="date-input-${c.id}-discussState" value="${s.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 's')" placeholder="定期維繫日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
-                      <textarea style="height:110px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:4px;" placeholder="週年聯絡記錄..." onchange="updateSField('${c.id}', 'discussNotes', this.value)">${s.discussNotes || ''}</textarea>
+                      <input type="text" readonly id="date-input-${c.id}-discussState" value="${s.discussDate || ''}" onclick="showCustomDatePicker(this, '${c.id}', 'discussDate', 's')" placeholder="下一次提醒日期" style="width:100%; padding:2px 4px; font-size:0.72rem; height:20px; cursor:pointer; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px;">
+                      <textarea style="height:110px; resize:none; font-size:0.72rem; background:var(--bg-input); border:1px solid var(--border-color); color:#fff; border-radius:4px; padding:4px;" placeholder="提醒內容..." onchange="updateSField('${c.id}', 'discussNotes', this.value)">${s.discussNotes || ''}</textarea>
                     </div>
                   </div>
                 </div>
@@ -4800,6 +4887,7 @@
           if (c.cDetails) {
             debugLog("🔍 客戶: " + c.clientName + " | 送件日: '" + c.cDetails.submitDate + "' | 已處理狀態: '" + c.cDetails.submitProcessed + "'");
           }
+          // 1. 常規送件提醒
           if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
             const sDate = c.cDetails.submitDate.replace(/\//g, '-');
             if (sDate < todayStr) {
@@ -4808,6 +4896,30 @@
               today.push(c);
             } else if (sDate > todayStr && sDate <= limitDateStr) {
               future.push(c);
+            }
+          }
+          // 2. S階段 年度提醒 (依據設定時間，提早一週顯示)
+          if (c.sDetails && c.sDetails.discussDate && c.sDetails.discussState === 'ongoing') {
+            const rDate = c.sDetails.discussDate.replace(/\//g, '-');
+            const rTime = new Date(rDate).getTime();
+            const todayTime = new Date(todayStr).getTime();
+            const diffDays = Math.ceil((rTime - todayTime) / (1000 * 60 * 60 * 24));
+            
+            const virtualItem = {
+              ...c,
+              isAnnualReminder: true,
+              reminderDate: rDate,
+              reminderNotes: c.sDetails.discussNotes || ''
+            };
+            
+            if (diffDays >= 0 && diffDays <= 7) {
+              if (diffDays === 0) {
+                today.push(virtualItem);
+              } else {
+                future.push(virtualItem);
+              }
+            } else if (diffDays < 0) {
+              expired.push(virtualItem);
             }
           }
         });
@@ -4837,8 +4949,39 @@
       if (futureCount) futureCount.innerText = future.length;
 
       const renderItemHtml = (c, isActionable, colorVar, btnText) => {
+        const isAnnual = c.isAnnualReminder;
         const typeText = c.type === 'life' ? '壽' : '產';
         const typeClass = c.type === 'life' ? 'life' : 'property';
+        const nameText = window.getClientDisplayName(c.clientName);
+        
+        if (isAnnual) {
+          return `<div class="reminder-row" style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.01); border:1px solid rgba(255, 255, 255, 0.05); padding:8px 10px; border-radius:6px; margin-bottom:8px; gap:8px; transition: all 0.4s ease; transform-origin: left center;">
+              <div style="display:flex; flex-direction:column; gap:4px; min-width: 0; flex: 1;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="type-badge ${typeClass}">${typeText}</span>
+                  <span style="font-weight:700; font-size:0.8rem; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nameText}</span>
+                  <span style="font-size:0.65rem; color:#10b981; background:rgba(16,185,129,0.15); padding:1px 4px; border-radius:3px;">🔔 年度提醒</span>
+                </div>
+                <div style="font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.reminderNotes || '無提醒內容'}">
+                  內容：${c.reminderNotes || '無提醒內容'}
+                </div>
+                <div style="font-size:0.65rem; color:${colorVar}; font-family:monospace; white-space:nowrap;">
+                  提醒日期：${c.reminderDate}
+                </div>
+              </div>
+              ${isActionable ? `
+                <button class="status-badge-btn active agree" 
+                        ondblclick="markAnnualReminderProcessed('${c.id}', this)" 
+                        title="雙擊此按鈕完成提醒" 
+                        style="height:22px; font-size:0.65rem; padding:0 6px; border-radius:3px; flex-shrink:0; background:${colorVar}; border-color:${colorVar}; color:#000; font-weight:700; cursor:pointer; user-select:none; transition: all 0.2s;">
+                  ${btnText}
+                </button>
+              ` : `
+                <span style="font-size: 0.65rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 3px; flex-shrink:0;">預告</span>
+              `}
+            </div>`;
+        }
+
         const issueText = c.issueName || '無議題';
         
         // 過濾短日期格式為 MM-DD 格式，徹底防範年份折行
@@ -4912,6 +5055,62 @@
           futureList.innerHTML = sortedFuture.map(c => renderItemHtml(c, false, '#22c55e', '')).join('');
         }
       }
+
+      // 🎂 渲染生日提醒
+      const birthdaySection = document.getElementById('reminder-birthday-section');
+      const birthdayList = document.getElementById('reminder-birthday-list');
+      if (birthdaySection && birthdayList) {
+        const upcomingBirthdays = checkBirthdayReminders();
+        if (upcomingBirthdays.length > 0) {
+          birthdaySection.style.display = 'flex';
+          birthdayList.innerHTML = upcomingBirthdays.map(b => {
+            const daysText = b.daysLeft === 0 ? '🔥 今天生日！' : `⏳ 剩 ${b.daysLeft} 天 (${b.dateStr})`;
+            const itemBg = b.daysLeft === 0 ? 'rgba(244, 63, 94, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+            const borderCol = b.daysLeft === 0 ? '#f43f5e' : 'rgba(255, 255, 255, 0.1)';
+            return `
+              <div style="background:${itemBg}; border:1px solid ${borderCol}; border-radius:6px; padding:4px 10px; color:#fff; display:flex; align-items:center; gap:6px;">
+                <span>🎂 <strong>${window.getClientDisplayName(b.name)}</strong></span>
+                <span style="font-size:0.7rem; color:${b.daysLeft === 0 ? '#fff' : 'var(--text-secondary)'}; font-weight:${b.daysLeft === 0 ? '700' : 'bold'};">${daysText}</span>
+              </div>
+            `;
+          }).join('');
+        } else {
+          birthdaySection.style.display = 'none';
+        }
+      }
+    }
+
+    function checkBirthdayReminders() {
+      // 取得台灣時間今日
+      const now = new Date();
+      const twOffset = 8 * 60 * 60 * 1000;
+      const twNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + twOffset);
+      
+      const birthdays = [];
+      if (customers && customers.length > 0) {
+        customers.forEach(c => {
+          if (!c.birthday) return;
+          const parts = c.birthday.split('-');
+          if (parts.length < 2) return;
+          const bMonth = parseInt(parts[parts.length - 2], 10);
+          const bDay = parseInt(parts[parts.length - 1], 10);
+          
+          // 檢查今天起算未來 7 天
+          for (let i = 0; i < 7; i++) {
+            const checkDate = new Date(twNow.getTime() + i * 24 * 60 * 60 * 1000);
+            if (checkDate.getMonth() + 1 === bMonth && checkDate.getDate() === bDay) {
+              birthdays.push({
+                name: c.name,
+                dateStr: `${bMonth}/${bDay}`,
+                daysLeft: i
+              });
+              break;
+            }
+          }
+        });
+      }
+      birthdays.sort((a, b) => a.daysLeft - b.daysLeft);
+      return birthdays;
     }
 
     function markReminderProcessed(caseId, btnEl) {
@@ -4971,6 +5170,73 @@
         }
       }, 400);
     }
+    function markAnnualReminderProcessed(caseId, btnEl) {
+      const rowEl = btnEl ? btnEl.closest('.reminder-row') : null;
+      if (rowEl) {
+        rowEl.style.transform = 'translateX(30px)';
+        rowEl.style.opacity = '0';
+      }
+
+      setTimeout(() => {
+        updateCase(caseId, c => {
+          if (!c.sDetails) c.sDetails = {};
+          c.sDetails.discussState = 'active'; // 標記為完成 (active)
+        });
+
+        // 重新執行 checkAndShowDailyReminders 的核心計算部分，但不重啟 Modal
+        const d = new Date();
+        const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+        const twDate = new Date(utc + (3600000 * 8));
+        const todayStr = twDate.getFullYear() + "-" + String(twDate.getMonth() + 1).padStart(2, '0') + "-" + String(twDate.getDate()).padStart(2, '0');
+        
+        const limitDays = crmSettings.reminderDaysLimit || 14;
+        const limitDate = new Date(twDate.getTime() + (limitDays * 24 * 60 * 60 * 1000));
+        const limitDateStr = limitDate.getFullYear() + "-" + String(limitDate.getMonth() + 1).padStart(2, '0') + "-" + String(limitDate.getDate()).padStart(2, '0');
+
+        const expired = [];
+        const today = [];
+        const future = [];
+
+        cases.forEach(c => {
+          if (c.cDetails && c.cDetails.submitDate && c.cDetails.submitProcessed !== 'processed') {
+            const sDate = c.cDetails.submitDate.replace(/\//g, '-');
+            if (sDate < todayStr) expired.push(c);
+            else if (sDate === todayStr) today.push(c);
+            else if (sDate > todayStr && sDate <= limitDateStr) future.push(c);
+          }
+          if (c.sDetails && c.sDetails.discussDate && c.sDetails.discussState === 'ongoing') {
+            const rDate = c.sDetails.discussDate.replace(/\//g, '-');
+            const rTime = new Date(rDate).getTime();
+            const todayTime = new Date(todayStr).getTime();
+            const diffDays = Math.ceil((rTime - todayTime) / (1000 * 60 * 60 * 24));
+            
+            const virtualItem = {
+              ...c,
+              isAnnualReminder: true,
+              reminderDate: rDate,
+              reminderNotes: c.sDetails.discussNotes || ''
+            };
+            
+            if (diffDays >= 0 && diffDays <= 7) {
+              if (diffDays === 0) today.push(virtualItem);
+              else future.push(virtualItem);
+            } else if (diffDays < 0) {
+              expired.push(virtualItem);
+            }
+          }
+        });
+
+        updateGlobalReminderIcon(expired.length, today.length, future.length, expired, today, future);
+        renderReminderBoard(expired, today, future);
+
+        if (expired.length === 0 && today.length === 0) {
+          setTimeout(() => {
+            toggleReminderModal(false);
+          }, 400);
+        }
+      }, 400);
+    }
+    window.markAnnualReminderProcessed = markAnnualReminderProcessed;
 
     
     let addCaseModalCallback = null;
@@ -7166,7 +7432,7 @@
         if (productsReviewModalCallback) {
           const cb = productsReviewModalCallback;
           productsReviewModalCallback = null;
-          cb();
+          setTimeout(cb, 150); // 延遲 150ms 執行，確保前一個 Modal 完全淡出後，再進入下一步驟，防範瀏覽器動畫衝突
         }
       }
     };
@@ -8391,6 +8657,7 @@
           { id: 'add-case-modal', closeFn: () => toggleAddCaseModal(false) },
           { id: 'activities-modal', closeFn: () => toggleActivitiesModal(false) },
           { id: 'products-review-modal', closeFn: () => toggleProductsReviewModal(false) },
+          { id: 'quick-birthday-modal', closeFn: () => toggleQuickBirthdayModal(false) },
           { id: 'visit-drawer-overlay', closeFn: () => toggleVisitDrawer(false) }
         ];
 
@@ -8480,6 +8747,11 @@
           toggleActivitiesModal(false);
           return;
         }
+        const quickBirthdayModal = document.getElementById('quick-birthday-modal');
+        if (quickBirthdayModal && quickBirthdayModal.classList.contains('active')) {
+          toggleQuickBirthdayModal(false);
+          return;
+        }
       }
     });
 
@@ -8537,7 +8809,7 @@
         
         { phase: 'S', value: 's_plan', label: '保單送達' },
         { phase: 'S', value: 's_practice', label: '契撤追蹤' },
-        { phase: 'S', value: 's_discuss', label: '週年服務' },
+        { phase: 'S', value: 's_discuss', label: '年度提醒' },
         { phase: 'S', value: 's_pending', label: '喬時間中' }
       ];
       
@@ -8805,6 +9077,128 @@
     }
     window.renderVisitDrawer = renderVisitDrawer;
 
+    function renderMobileMinimalView() {
+      const container = document.getElementById('mobile-today-visits-list');
+      if (!container) return;
+
+      const now = new Date();
+      const twOffset = 8 * 60 * 60 * 1000;
+      const twNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + twOffset);
+      const yyyy = twNow.getFullYear();
+      const mm = String(twNow.getMonth() + 1).padStart(2, '0');
+      const dd = String(twNow.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+
+      const activeCases = cases.filter(c => !c.archived);
+      const todayCases = activeCases.filter(c => {
+        const oaDate = (c.oaDetails && c.oaDetails.meetDate) || '';
+        const pcDate = (c.pcDetails && c.pcDetails.meetDate) || '';
+        const cDate = (c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '';
+        const sDate = (c.sDetails && c.sDetails.meetDate) || '';
+        
+        const allDates = [oaDate, pcDate, cDate, sDate].map(d => d.replace(/\//g, '-').trim());
+        return allDates.includes(todayStr);
+      });
+
+      if (todayCases.length === 0) {
+        container.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--text-secondary); font-size:0.85rem;">
+          🚗 今天沒有安排任何約訪！
+        </div>`;
+        return;
+      }
+
+      let html = '';
+      todayCases.forEach(c => {
+        let phase = 'OA';
+        const oaDate = ((c.oaDetails && c.oaDetails.meetDate) || '').replace(/\//g, '-').trim();
+        const pcDate = ((c.pcDetails && c.pcDetails.meetDate) || '').replace(/\//g, '-').trim();
+        const cDate = ((c.cDetails && (c.cDetails.meetDate || c.cDetails.practiceDate)) || '').replace(/\//g, '-').trim();
+        const sDate = ((c.sDetails && c.sDetails.meetDate) || '').replace(/\//g, '-').trim();
+        
+        if (oaDate === todayStr) phase = 'OA';
+        else if (pcDate === todayStr) phase = 'PC';
+        else if (cDate === todayStr) phase = 'C';
+        else if (sDate === todayStr) phase = 'S';
+
+        const phaseLabels = { SA: '約訪', OA: '初訪/OA', PC: '建議書/PC', C: '送件/C', S: '售服/S' };
+        const phaseColor = getPhaseColor(phase);
+
+        const detailsKey = `${phase.toLowerCase()}Details`;
+        const visitTasks = (c[detailsKey] && c[detailsKey].visitTasks) || [];
+
+        let visitTasksHtml = '';
+        if (visitTasks.length === 0) {
+          visitTasksHtml = `
+            <div style="font-size:0.72rem; color:var(--text-secondary); text-align:center; padding:10px 0; border: 1px dashed rgba(255,255,255,0.06); border-radius:6px; background:rgba(255,255,255,0.01); width:100%; box-sizing:border-box;">
+              📭 無特定現場任務
+            </div>
+          `;
+        } else {
+          visitTasksHtml = visitTasks.map(t => {
+            return `
+              <div class="visit-checklist-item ${t.done ? 'checked' : ''}" onclick="toggleVisitTask('${c.id}', '${phase}', '${t.id}')" style="width:100%; box-sizing:border-box;">
+                <span class="visit-checklist-checkbox">${t.done ? '✓' : ''}</span>
+                <span class="visit-checklist-text" style="${t.done ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">${t.text}</span>
+              </div>
+            `;
+          }).join('');
+        }
+
+        const caseTodos = todos.filter(t => !t.done && t.caseId === c.id && t.dueDate === todayStr);
+
+        html += `
+          <div class="visit-case-card" style="background:var(--bg-card); border:1px solid var(--border-color); padding:16px; border-radius:8px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:700; font-size:1rem; color:#fff;">${window.getClientDisplayName(c.clientName)}</span>
+              <span class="status-badge" style="background:${phaseColor}20; color:${phaseColor}; border:1px solid ${phaseColor}40; padding:2px 8px; border-radius:12px; font-size:0.7rem; font-weight:700;">
+                ${phaseLabels[phase] || phase}
+              </span>
+            </div>
+            
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:12px;">
+              📍 階段進度備忘：${c.summaryDescription || '無備忘描述'}
+            </div>
+            
+            <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--accent); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                🧳 現場執行任務防呆檢核
+              </div>
+              ${visitTasksHtml}
+            </div>
+
+            ${caseTodos.length > 0 ? `
+            <div style="border-top:1px solid rgba(255,255,255,0.05); padding-top:8px; margin-top:8px;">
+              <div style="font-size:0.75rem; font-weight:700; color:#f59e0b; margin-bottom:6px;">
+                🎯 本日關聯任務 (${caseTodos.length})
+              </div>
+              ${caseTodos.map(t => `
+                <div class="visit-checklist-item" onclick="quickCompleteTodo('${t.id}', event)">
+                  <span class="visit-checklist-checkbox"></span>
+                  <span class="visit-checklist-text" style="color:#fdba74;">${t.title}</span>
+                </div>
+              `).join('')}
+            </div>
+            ` : ''}
+
+            <div style="margin-top:12px; display:flex; gap:8px;">
+              <button class="btn" ondblclick="quickCompleteVisit('${c.id}', '${phase}')" title="雙擊以完成此到訪" style="flex:1; font-size:0.75rem; padding:4px 8px; border-color:#10b981; color:#10b981; background:rgba(16,185,129,0.05); cursor:pointer;">
+                🤝 雙擊完成到訪
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+    window.renderMobileMinimalView = renderMobileMinimalView;
+
+    window.checkMobileView = function() {
+      if (window.innerWidth <= 768) {
+        renderMobileMinimalView();
+      }
+    };
+
     // 點擊切換出門物品勾選狀態
     window.toggleVisitCheckItem = function(caseId, key) {
       // 取得台灣時間今日
@@ -8850,6 +9244,9 @@
         renderVisitDrawer();
         renderTodoPage();
         updateTodoBadges();
+        if (window.innerWidth <= 768) {
+          renderMobileMinimalView();
+        }
       }
     }
 
@@ -8905,6 +9302,9 @@
       renderTodoPage();
       updateTodoBadges();
       renderCases();
+      if (window.innerWidth <= 768) {
+        renderMobileMinimalView();
+      }
       
       // 若沒有今日到訪了，自動關閉
       const now = new Date();
@@ -8989,6 +9389,9 @@
       if (visitDrawer && visitDrawer.classList.contains('active')) {
         renderVisitDrawer();
       }
+      if (window.innerWidth <= 768) {
+        renderMobileMinimalView();
+      }
     };
 
     window.deleteVisitTask = function(caseId, phase, taskId) {
@@ -9004,6 +9407,9 @@
       const visitDrawer = document.getElementById('visit-drawer');
       if (visitDrawer && visitDrawer.classList.contains('active')) {
         renderVisitDrawer();
+      }
+      if (window.innerWidth <= 768) {
+        renderMobileMinimalView();
       }
     };
 
@@ -9320,9 +9726,99 @@
         loadProducts();
         toggleProductsReviewModal(true, resolve);
       });
+
+      debugLog("🧠 ADHD 啟動流：步驟 7 - 快速登錄生日");
+      await new Promise(resolve => {
+        // 載入 datalist 選項 (動態生成既有客戶名單以利快速搜尋/聯想)
+        const list = document.getElementById('quick-birthday-customers-list');
+        if (list) {
+          list.innerHTML = customers.map(c => `<option value="${c.name}"></option>`).join('');
+        }
+        
+        const nameInput = document.getElementById('quick-birthday-name-input');
+        if (nameInput) {
+          nameInput.value = '';
+          setTimeout(() => nameInput.focus(), 100);
+        }
+        
+        const bdayInput = document.getElementById('quick-birthday-year');
+        if (bdayInput) bdayInput.value = '';
+        setBirthdayToDropdowns('quick-birthday', '');
+        
+        toggleQuickBirthdayModal(true, resolve);
+      });
       
       debugLog("🧠 ADHD 啟動流全部完成！");
     }
+
+    window.toggleQuickBirthdayModal = function(show, callback) {
+      const modal = document.getElementById('quick-birthday-modal');
+      debugLog(`[DEBUG] toggleQuickBirthdayModal called - show: ${show}, modal exists: ${!!modal}`);
+      if (!modal) return;
+      if (show) {
+        window.quickBirthdayCallback = callback || null;
+        modal.classList.add('active');
+        debugLog(`[DEBUG] added active class, classList: ${modal.className}, style.display: ${modal.style.display}, clientHeight: ${modal.clientHeight}`);
+      } else {
+        modal.classList.remove('active');
+        if (window.quickBirthdayCallback) {
+          const cb = window.quickBirthdayCallback;
+          window.quickBirthdayCallback = null;
+          cb();
+        }
+      }
+    };
+
+    window.skipQuickBirthday = function() {
+      toggleQuickBirthdayModal(false);
+    };
+
+    window.saveQuickBirthday = function() {
+      const name = (document.getElementById('quick-birthday-name-input').value || '').trim();
+      const birthday = getBirthdayFromDropdowns('quick-birthday');
+      
+      if (!name) {
+        showToast("請輸入或搜尋選擇客戶姓名", "error");
+        document.getElementById('quick-birthday-name-input').focus();
+        return;
+      }
+      
+      if (!birthday) {
+        showToast("請選擇生日日期 🎂", "error");
+        return;
+      }
+      
+      // 搜尋是否為既有客戶
+      const cust = customers.find(c => c.name === name);
+      if (cust) {
+        // 既有客戶：更新生日
+        cust.birthday = birthday;
+        cust.lastUpdated = new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+        saveCustomers();
+        showToast(`已儲存既有客戶 ${cust.name} 的生日日期 🎂`, 'success');
+      } else {
+        // 新建立客戶並同步
+        const twTime = new Date(new Date().getTime() + 8 * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+        const newCust = {
+          id: 'cust_' + Math.random().toString(36).substr(2, 9),
+          name: name,
+          phone: '',
+          birthday: birthday,
+          family: '[]',
+          framework: '{}',
+          campaigns: '{}',
+          lastUpdated: twTime
+        };
+        customers.push(newCust);
+        saveCustomers();
+        showToast(`已建立新客戶「${name}」並登錄生日 🎂`, 'success');
+        
+        // 重新渲染客戶頁面以利新客戶顯示
+        if (window.renderCustomerPage) renderCustomerPage();
+      }
+      
+      toggleQuickBirthdayModal(false);
+    };
 
     // ==========================================================================
     // 👥 三態視角切換器 & 客戶 360° 畫布控制核心
@@ -9476,11 +9972,13 @@
         document.getElementById('customer-edit-id').value = cust.id;
         document.getElementById('customer-input-name').value = cust.name || '';
         document.getElementById('customer-input-phone').value = cust.phone || '';
+        setBirthdayToDropdowns('customer-birthday', cust.birthday || '');
       } else {
         title.textContent = '新增客戶資料';
         document.getElementById('customer-edit-id').value = '';
         document.getElementById('customer-input-name').value = '';
         document.getElementById('customer-input-phone').value = '';
+        setBirthdayToDropdowns('customer-birthday', '');
       }
       modal.classList.add('active');
     };
@@ -9493,6 +9991,7 @@
     window.saveCustomer = function() {
       const name = (document.getElementById('customer-input-name').value || '').trim();
       const phone = (document.getElementById('customer-input-phone').value || '').trim();
+      const birthday = getBirthdayFromDropdowns('customer-birthday');
       
       if (!name) {
         document.getElementById('customer-input-name').focus();
@@ -9507,6 +10006,7 @@
         if (cust) {
           cust.name = name;
           cust.phone = phone;
+          cust.birthday = birthday;
           cust.lastUpdated = twTime;
         }
       } else {
@@ -9514,6 +10014,7 @@
           id: 'cust_' + Math.random().toString(36).substr(2, 9),
           name: name,
           phone: phone,
+          birthday: birthday,
           family: '[]',
           framework: '{}',
           campaigns: '{}',
@@ -9536,6 +10037,7 @@
       // 填充基本資料
       document.getElementById('c360-client-name').textContent = cust.name;
       document.getElementById('c360-client-phone').textContent = cust.phone || '無電話欄位';
+      document.getElementById('c360-client-birthday').textContent = cust.birthday ? '🎂 ' + cust.birthday : '';
       
       // 綁定編輯按鈕
       document.getElementById('c360-edit-btn').onclick = () => {

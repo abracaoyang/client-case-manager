@@ -1311,13 +1311,33 @@ html {
     /* 📱 響應式 RWD 介面設計 - 手機版卡片排版 */
     @media (max-width: 768px) {
       body {
-        padding: 1rem;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow-x: hidden;
       }
       
-      header {
+      header,
+      #weekly-calendar-bar,
+      #canvas-container,
+      #todo-page,
+      #customer-page,
+      #recruit-page,
+      #canvassing-page,
+      #left-sidebar,
+      .sidebar,
+      #btn-sidebar-trigger {
+        display: none !important;
+      }
+
+      #mobile-minimal-view {
+        display: flex !important;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
+        height: 100dvh;
+        width: 100vw;
+        background: var(--bg-main, #0b0f19);
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
       
       /* 將表頭隱藏，因為手機版改用卡片排版 */

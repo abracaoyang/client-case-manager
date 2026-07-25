@@ -88,7 +88,7 @@ function getOrCreateSheet() {
 function getOrCreateCustomersSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CUSTOMERS_SHEET_NAME);
-  const headers = ["id", "name", "phone", "family", "framework", "campaigns", "lastUpdated"];
+  const headers = ["id", "name", "phone", "birthday", "family", "framework", "campaigns", "lastUpdated"];
   if (!sheet) {
     sheet = ss.insertSheet(CUSTOMERS_SHEET_NAME);
     sheet.appendRow(headers);
@@ -507,7 +507,7 @@ function doPost(e) {
     if (action === 'saveCustomers') {
       const customersSheet = getOrCreateCustomersSheet();
       const customersList = payload.customers || [];
-      const headers = ["id", "name", "phone", "family", "framework", "campaigns", "lastUpdated"];
+      const headers = ["id", "name", "phone", "birthday", "family", "framework", "campaigns", "lastUpdated"];
       
       const lastRow = customersSheet.getLastRow();
       if (lastRow > 1) {
