@@ -1174,3 +1174,105 @@ function clearCachedData() {
     // 忽略潛在的系統層清除異常
   }
 }
+
+// === 批次同步現有案件至 Google 日曆 ===
+function batchSyncAllExistingCasesToCalendar() {
+  const sheet = getOrCreateSheet();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+  const headers = values[0];
+  
+  const idCol = headers.indexOf("客戶ID");
+  const nameCol = headers.indexOf("客戶姓名");
+  const issueCol = headers.indexOf("邀約議題");
+  const calCol = headers.indexOf("Google日曆連結");
+  
+  if (idCol === -1 || nameCol === -1 || calCol === -1) {
+    Logger.log("試算表結構不完整，無法執行批次同步");
+    return;
+  }
+  
+  const syncSpecs = [
+    { type: "OA", dateKey: "ＯＡ", slotKey: "ＯＡ時段", stateKey: "ＯＡ已面談", notesKey: "ＯＡ訪前規劃備忘", rescheduleKey: "ＯＡ改期歷史" },
+    { type: "OA_DISCUSS", dateKey: "ＯＡ訪後討論日期", slotKey: "", stateKey: "ＯＡ訪後討論狀態", notesKey: "ＯＡ訪後討論備忘", rescheduleKey: "" },
+    { type: "PC", dateKey: "ＰＣ", slotKey: "ＰＣ時段", stateKey: "ＰＣ已遞送", notesKey: "ＰＣ規劃建議備忘", rescheduleKey: "ＰＣ改期歷史" },
+    { type: "PC_DISCUSS", dateKey: "ＰＣ講解演練日期", slotKey: "", stateKey: "ＰＣ訪後討論狀態", notesKey: "ＰＣ訪後討論備忘", rescheduleKey: "" },
+    { type: "C", dateKey: "Ｃ", slotKey: "Ｃ時段", stateKey: "Ｃ簽約狀態", notesKey: "Ｃ文件準備備忘", rescheduleKey: "Ｃ改期歷史" },
+    { type: "S", dateKey: "Ｓ", slotKey: "Ｓ時段", stateKey: "Ｓ保單送達狀態", notesKey: "Ｓ保單送達備忘", rescheduleKey: "" }
+  ];
+  
+  let syncCount = 0;
+  
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const clientName = row[nameCol];
+    if (!clientName) continue;
+    
+    const caseId = row[idCol] || ("case_" + Math.random().toString(36).substr(2, 9));
+    if (!row[idCol]) {
+      sheet.getRange(i + 1, idCol + 1).setValue(caseId);
+    }
+    
+    let calendarLinks = {};
+    const oldLinksVal = row[calCol] || "";
+    try {
+      if (oldLinksVal) calendarLinks = JSON.parse(oldLinksVal);
+    } catch(e) { calendarLinks = {}; }
+    
+    let rowChanged = false;
+    
+    syncSpecs.forEach(spec => {
+      const dateIdx = headers.indexOf(spec.dateKey);
+      const slotIdx = spec.slotKey ? headers.indexOf(spec.slotKey) : -1;
+      const stateIdx = headers.indexOf(spec.stateKey);
+      const notesIdx = headers.indexOf(spec.notesKey);
+      const rescheduleIdx = spec.rescheduleKey ? headers.indexOf(spec.rescheduleKey) : -1;
+      
+      const dateVal = row[dateIdx] || "";
+      if (dateVal) {
+        const slotVal = slotIdx !== -1 ? (row[slotIdx] || "") : "";
+        
+        let stateVal = 'dim';
+        if (spec.type === 'OA') {
+          const oaDoneVal = row[headers.indexOf("ＯＡ已面談")] || "";
+          stateVal = (oaDoneVal === '已面談' || oaDoneVal === '喬時間中') ? 'ongoing' : 'dim';
+          if (oaDoneVal === '已面談') stateVal = 'active';
+        } else if (spec.type === 'PC') {
+          const pcDoneVal = row[headers.indexOf("ＰＣ已遞送")] || "";
+          stateVal = pcDoneVal === '已遞送' ? 'active' : 'ongoing';
+        } else {
+          stateVal = row[stateIdx] || 'dim';
+        }
+        
+        const notesVal = notesIdx !== -1 ? (row[notesIdx] || "") : "";
+        const rescheduleVal = rescheduleIdx !== -1 ? (row[rescheduleIdx] || "") : "";
+        const oldEventId = calendarLinks[spec.type] || "";
+        
+        const syncResult = syncCaseToCalendar(
+          caseId,
+          clientName,
+          row[issueCol] || "",
+          spec.type,
+          dateVal,
+          slotVal,
+          stateVal,
+          notesVal,
+          rescheduleVal,
+          oldEventId
+        );
+        
+        if (syncResult && syncResult.eventId) {
+          calendarLinks[spec.type] = syncResult.eventId;
+          rowChanged = true;
+        }
+      }
+    });
+    
+    if (rowChanged) {
+      sheet.getRange(i + 1, calCol + 1).setValue(JSON.stringify(calendarLinks));
+      syncCount++;
+    }
+  }
+  
+  Logger.log("成功批次同步 " + syncCount + " 筆舊案件至 Google 日曆！");
+}
